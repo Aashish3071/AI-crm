@@ -1,0 +1,17 @@
+[project]
+name = "ai_crm"
+authors = [
+    { name = "Developer", email = "developer@example.com" }
+]
+description = "AI features for Frappe CRM"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "openai>=1.0.0",
+    "requests"
+]
+dynamic = ["version"]
+
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"

@@ -1,0 +1,9 @@
+include License
+include README.md
+recursive-include ai_crm *.py
+recursive-include ai_crm *.html
+recursive-include ai_crm *.js
+recursive-include ai_crm *.css
+recursive-include ai_crm *.png
+recursive-include ai_crm *.txt
+recursive-include ai_crm *.json
