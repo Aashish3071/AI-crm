@@ -2,14 +2,20 @@ import frappe
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
 def after_install():
-    # Inject AI fields into the CRM Lead doctype
+    """Inject AI fields into the CRM Lead doctype. Safe to re-run (idempotent)."""
     create_custom_fields({
         "CRM Lead": [
+            {
+                "fieldname": "biggest_challenge",
+                "label": "Biggest Challenge",
+                "fieldtype": "Small Text",
+                "insert_after": "industry",
+            },
             {
                 "fieldname": "ai_score",
                 "label": "AI Score",
                 "fieldtype": "Percent",
-                "insert_after": "status",
+                "insert_after": "biggest_challenge",
                 "read_only": 1
             },
             {
@@ -24,17 +30,19 @@ def after_install():
                 "label": "Suggested Followup Subject",
                 "fieldtype": "Data",
                 "insert_after": "ai_score_explanation",
-                "read_only": 1
+                "read_only": 1,
+                "hidden": 1
             },
             {
                 "fieldname": "suggested_followup_body",
                 "label": "Suggested Followup Body",
                 "fieldtype": "Long Text",
                 "insert_after": "suggested_followup_subject",
-                "read_only": 1
+                "read_only": 1,
+                "hidden": 1
             }
         ]
-    })
+    }, update=True)
     
     # Commit database changes
     frappe.db.commit()

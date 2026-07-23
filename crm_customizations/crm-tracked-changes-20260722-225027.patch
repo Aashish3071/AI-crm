@@ -1,0 +1,742 @@
+diff --git a/README.md b/README.md
+index 193b240..3c1e6e5 100644
+--- a/README.md
++++ b/README.md
+@@ -1,203 +1,61 @@
+-<div align="center" markdown="1">
++# Standalone AI-Driven CRM
+ 
+-<a href="https://frappe.io/products/crm">
+-    <img src=".github/logo.svg" height="80" alt="Frappe CRM Logo">
+-</a>
+-
+-<h1>Frappe CRM</h1>
+-
+-**Simplify Sales, Amplify Relationships**
++A white-labeled, premium CRM application optimized for modern sales workflows, complete with local AI insights and permissions-hardened search engines. 
+ 
+-[![GitHub release (latest by date)](https://img.shields.io/github/v/release/frappe/crm)](https://github.com/frappe/crm/releases)
++This repository has been configured to serve as a 100% standalone CRM product, fully isolated from default ERPNext sub-modules and standard admin desks.
+ 
+-<div>
+-    <picture>
+-        <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/FrappeCRMHeroImage.png">
+-        <img width="1402" alt="Frappe CRM Hero Image" src=".github/screenshots/FrappeCRMHeroImage.png">
+-    </picture>
+-</div>
++---
+ 
+-[Live Demo](https://frappecrm-demo.frappe.cloud/api/method/crm.api.live_demo.login) - [Website](https://frappe.io/crm) - [Documentation](https://docs.frappe.io/crm)
++## 🌟 Key Features
+ 
+-</div>
++* **🤖 Context-Aware AI Advisor**: A global sliding drawer powered by local LLM models (via OpenAI-compatible APIs). Understands historical timelines, tasks, notes, and comments to draft contextual emails or summarize deals.
++* **⚡ Lead Profile AI Insights**: Passive, real-time lead summaries and scoring cards rendered directly on the Lead profile page.
++* **🔒 Secure Permissions & Hierarchy**: All backend AI and search logic respects role-based permissions and Sales Hierarchy visibility scopes by querying database views through native permission checks (`frappe.get_list(ignore_permissions=False)`).
++* **🎨 Fully White-Labeled UI**:
++  * Root redirection bypasses standard Frappe Admin Desks and forces users directly into `/crm`.
++  * Hides "About" modals and standard "Desk" app switchers for non-administrator users.
++  * Overrides login and signup layouts to remove default footers, "Login with Frappe Cloud" links, and "Built on Frappe" credits.
++  * Stripped out "ERPNext Settings" and "Home Actions" customizers to keep settings clean and simple.
++* **⏰ Automated Stale Lead Checker**: Daily cron jobs automatically detect and alert owners about active inactive leads (excluding converted/lost leads).
+ 
+-## Frappe CRM
++---
+ 
+-Frappe CRM is a simple, affordable, open-source CRM tool designed for modern sales teams with unlimited users. Frappe CRM is crafted for providing a great user experience, packed with features for core CRM activities helping you build strong customer relationships while keeping things clean and organised.
++## 🚀 Getting Started
+ 
+-### Motivation
+-
+-The motivation behind building Frappe CRM stems from the need for a simple, customizable, and open-source solution tailored to modern business needs. Many existing CRMs are either too complex, overly generic, or locked behind steep pricing models that hinder accessibility and flexibility. Frappe CRM was designed to bridge this gap, offering a tool that empowers businesses to manage their customer relationships seamlessly while being easy to adapt to specific workflows. Built on the Frappe framework, it prioritizes usability, extensibility, and affordability, making it an ideal choice for growing teams and organizations looking for a CRM that aligns with their unique processes.
++### Prerequisites
++* Docker & Docker Compose
++* Node.js & Yarn (for asset compilation)
++* Python 3.10+
++* A local LLM engine (e.g. LM Studio, Ollama, or OpenAI API credentials)
+ 
+-### Key Features
++### Installation & Run
+ 
+--   **User-Friendly and Flexible:** A simple, intuitive interface that’s easy to navigate and highly customizable, enabling teams to adapt it to their specific processes effortlessly.
+--   **All-in-One Lead/Deal Page:** Consolidate all essential actions and details—like activities, comments, notes, tasks, and more—into a single page for a seamless workflow experience.
+--   **Kanban View:** Manage leads and deals visually with a drag-and-drop Kanban board, offering clarity and efficiency in tracking progress across stages.
+--   **Custom Views:** Design personalized views to organize and display leads and deals using custom filters, sorting, and columns, ensuring quick access to the most relevant information.
++1. **Clone and Install dependencies**:
++   ```bash
++   cd apps/crm/frontend
++   yarn install
++   ```
+ 
+-    <details>
+-    <summary>Screenshots</summary>
++2. **Compile Assets**:
++   ```bash
++   npx yarn vite build --minify false --sourcemap false
++   ```
+ 
+-    <div>
+-        <picture>
+-            <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/LeadList.png">
+-            <img width="1402" alt="Lead List" src=".github/screenshots/LeadList.png">
+-        </picture>
+-    </div>
+-    <div>
+-        <picture>
+-            <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/LeadPage.png">
+-            <img width="1402" alt="Lead Page" src=".github/screenshots/LeadPage.png">
+-        </picture>
+-    </div>
+-    <div>
+-        <picture>
+-            <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/EmailTemplate.png">
+-            <img width="1402" alt="Email Template" src=".github/screenshots/EmailTemplate.png">
+-        </picture>
+-    </div>
+-    <div>
+-        <picture>
+-            <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/CallUI.png">
+-            <img width="1402" alt="Call UI" src=".github/screenshots/CallUI.png">
+-        </picture>
+-    </div>
+-    <div>
+-        <picture>
+-            <source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/CallLog.png">
+-            <img width="1402" alt="Call Log" src=".github/screenshots/CallLog.png">
+-        </picture>
+-    </div>
++3. **Deploy to Bench**:
++   Copy compiled assets and restart your server:
++   ```bash
++   docker cp ../crm/public/ <container_id>:/workspace/development/frappe-bench/apps/crm/crm/public/
++   bench restart
++   ```
+ 
+-    </details>
++4. **Connect AI Services**:
++   Configure your OpenAI-compatible API endpoint inside your site's settings or environments to enable the AI Insights Card and global Advisor Drawer.
+ 
+-### Integrations
++---
+ 
+--   **Twilio:** Integrate Twilio to make and receive calls from the CRM. You can also record calls. It is a built-in integration.
+--   **Exotel:** Integrate Exotel to make and receive calls via agents mobile phone from the CRM. You can also record calls. It is a built-in integration.
+--   **WhatsApp:** Integrate WhatsApp to send and receive messages from the CRM. [Frappe WhatsApp](https://github.com/shridarpatil/frappe_whatsapp) is used for this integration.
+--   **ERPNext:** Integrate with [ERPNext](https://erpnext.com) to extend the CRM capabilities to include invoicing, accounting, and more.
++## 📂 Project Structure
+ 
+-### Under the Hood
+-
+-- [Frappe Framework](https://github.com/frappe/frappe): A full-stack web application framework.
+-- [Frappe UI](https://github.com/frappe/frappe-ui): A Vue-based UI library, to provide a modern user interface.
+-
+-### Compatibility
+-This app is compatible with the following versions of Frappe and ERPNext:
+-
+-| CRM branch            | Stability | Frappe branch        | ERPNext branch       |
+-| :-------------------- | :-------- | :------------------- | :------------------- |
+-| main - v1.x           | stable    | v15.x & v16.x        | v15.x & v16.x        |
+-| develop - future/v2.x | unstable  | develop - future/v17 | develop - future/v17 |
+-
+-## Getting Started (Production)
+-
+-### Managed Hosting
+-
+-Get started with your personal or business site with a few clicks on Frappe Cloud - our official hosting service.
+-<div>
+-	<a href="https://frappecloud.com/crm/signup" target="_blank">
+-		<picture>
+-			<source media="(prefers-color-scheme: dark)" srcset="https://frappe.io/files/try-on-fc-white.png">
+-			<img src="https://frappe.io/files/try-on-fc-black.png" alt="Try on Frappe Cloud" height="28" />
+-		</picture>
+-	</a>
+-</div>
+-
+-### Self Hosting
+-
+-Follow these steps to set up Frappe CRM in production:
+-
+-**Step 1**: Download the easy install script
+-
+-```bash
+-wget https://frappe.io/easy-install.py
+-```
+-
+-**Step 2**: Run the deployment command
+-
+-```bash
+-python3 ./easy-install.py deploy \
+-    --project=crm_prod_setup \
+-    --email=email.example.com \
+-    --image=ghcr.io/frappe/crm \
+-    --version=stable \
+-    --app=crm \
+-    --sitename subdomain.domain.tld
+-```
+-
+-Replace the following parameters with your values:
+-
+--   `email.example.com`: Your email address
+--   `subdomain.domain.tld`: Your domain name where CRM will be hosted
+-
+-The script will set up a production-ready instance of Frappe CRM with all the necessary configurations in about 5 minutes.
+-
+-## Getting Started (Development)
+-
+-### Local Setup
+-
+-1. [Setup Bench](https://docs.frappe.io/framework/user/en/installation).
+-1. In the frappe-bench directory, run `bench start` and keep it running.
+-1. Open a new terminal session and cd into `frappe-bench` directory and run following commands:
+-    ```sh
+-    $ bench get-app crm
+-    $ bench new-site sitename.localhost --install-app crm
+-    $ bench browse sitename.localhost --user Administrator
+-    ```
+-1. Access the crm page at `sitename.localhost:8000/crm` in your web browser.
+-
+-**For Frontend Development**
+-1. Open a new terminal session and cd into `frappe-bench/apps/crm`, and run the following commands:
+-    ```
+-    yarn install
+-    yarn dev
+-    ```
+-1. Now, you can access the site on vite dev server at `http://sitename.localhost:8080`
+-
+-**Note:** You'll find all the code related to Frappe CRM's frontend inside `frappe-bench/apps/crm/frontend`
+-
+-### Docker
+-
+-You need Docker, docker-compose and git setup on your machine. Refer [Docker documentation](https://docs.docker.com/). After that, follow below steps:
+-
+-**Step 1**: Setup folder and download the required files
+-
+-    mkdir frappe-crm
+-    cd frappe-crm
+-
+-    # Download the docker-compose file
+-    wget -O docker-compose.yml https://raw.githubusercontent.com/frappe/crm/develop/docker/docker-compose.yml
+-
+-    # Download the setup script
+-    wget -O init.sh https://raw.githubusercontent.com/frappe/crm/develop/docker/init.sh
+-
+-**Step 2**: Run the container and daemonize it
+-
+-    docker compose up -d
+-
+-**Step 3**: The site [http://crm.localhost:8000/crm](http://crm.localhost:8000/crm) should now be available. The default credentials are:
+-
+--   Username: Administrator
+--   Password: admin
+-
+-## Learn and connect
+-
+--   [Telegram Public Group](https://t.me/frappecrm)
+--   [Discuss Forum](https://discuss.frappe.io/c/frappe-crm)
+--   [Documentation](https://docs.frappe.io/crm)
+--   [YouTube](https://www.youtube.com/@frappetech)
+--   [X/Twitter](https://x.com/frappetech)
+-
+-<br>
+-<br>
+-<div align="center" style="padding-top: 0.75rem;">
+-	<a href="https://frappe.io" target="_blank">
+-		<picture>
+-			<source media="(prefers-color-scheme: dark)" srcset="https://frappe.io/files/Frappe-white.png">
+-			<img src="https://frappe.io/files/Frappe-black.png" alt="Frappe Technologies" height="28"/>
+-		</picture>
+-	</a>
+-</div>
++* `frontend/`: Vue 3 SPA frontend files (Vite-built).
++* `crm/`: Core Python controllers, models, and dashboard configurations.
++* `ai_crm/`: Custom integration module implementing AI API connections, prompt injection schemas, database retrievers, and cron schedules.
++* `ARCHITECTURE.md`: Technical description of security, database query permission scopes, and AI pipelines.
+diff --git a/frontend/auto-imports.d.ts b/frontend/auto-imports.d.ts
+index b0b0357..9d24007 100644
+--- a/frontend/auto-imports.d.ts
++++ b/frontend/auto-imports.d.ts
+@@ -5,4 +5,6 @@
+ // Generated by unplugin-auto-import
+ // biome-ignore lint: disable
+ export {}
+-declare global {}
++declare global {
++
++}
+diff --git a/frontend/src/components/Layouts/AppSidebar.vue b/frontend/src/components/Layouts/AppSidebar.vue
+index 6f4172a..27042de 100644
+--- a/frontend/src/components/Layouts/AppSidebar.vue
++++ b/frontend/src/components/Layouts/AppSidebar.vue
+@@ -101,21 +101,7 @@
+           <BrushCleaningIcon class="h-4 w-4" />
+         </template>
+       </SidebarLink>
+-      <SidebarLink
+-        v-if="isOnboardingStepsCompleted"
+-        :label="__('Help')"
+-        :isCollapsed="isSidebarCollapsed"
+-        @click="
+-          () => {
+-            showHelpModal = minimize ? true : !showHelpModal
+-            minimize = !showHelpModal
+-          }
+-        "
+-      >
+-        <template #icon>
+-          <HelpIcon class="h-4 w-4" />
+-        </template>
+-      </SidebarLink>
++
+       <SidebarLink
+         :label="isSidebarCollapsed ? __('Expand') : __('Collapse')"
+         :isCollapsed="isSidebarCollapsed"
+diff --git a/frontend/src/components/Layouts/DesktopLayout.vue b/frontend/src/components/Layouts/DesktopLayout.vue
+index 3c5f115..f212d55 100644
+--- a/frontend/src/components/Layouts/DesktopLayout.vue
++++ b/frontend/src/components/Layouts/DesktopLayout.vue
+@@ -1,5 +1,5 @@
+ <template>
+-  <div class="flex h-screen w-screen">
++  <div class="flex h-screen w-screen overflow-hidden">
+     <div class="h-full border-r bg-surface-gray-1">
+       <AppSidebar />
+     </div>
+@@ -7,11 +7,13 @@
+       <AppHeader />
+       <slot />
+     </div>
++    <AIAdvisorPanel />
+     <GlobalModals />
+   </div>
+ </template>
+ <script setup>
+ import AppSidebar from '@/components/Layouts/AppSidebar.vue'
+ import AppHeader from '@/components/Layouts/AppHeader.vue'
++import AIAdvisorPanel from '@/components/Layouts/AIAdvisorPanel.vue'
+ import GlobalModals from '@/components/Modals/GlobalModals.vue'
+ </script>
+diff --git a/frontend/src/components/Settings/Settings.vue b/frontend/src/components/Settings/Settings.vue
+index e6eea57..18f4d74 100644
+--- a/frontend/src/components/Settings/Settings.vue
++++ b/frontend/src/components/Settings/Settings.vue
+@@ -209,17 +209,7 @@ const tabs = computed(() => {
+       ],
+       condition: () => isManager(),
+     },
+-    {
+-      label: __('Customization'),
+-      items: [
+-        {
+-          label: __('Home Actions'),
+-          component: markRaw(HomeActions),
+-          icon: 'home',
+-        },
+-      ],
+-      condition: () => isManager(),
+-    },
++
+     {
+       label: __('Integrations', null, 'FCRM'),
+       items: [
+@@ -234,12 +224,7 @@ const tabs = computed(() => {
+           component: markRaw(WhatsAppSettings),
+           condition: () => isWhatsappInstalled.value && isManager(),
+         },
+-        {
+-          label: __('ERPNext'),
+-          icon: ERPNextIcon,
+-          component: markRaw(ERPNextSettings),
+-          condition: () => isManager(),
+-        },
++
+         {
+           label: __('Lead Syncing'),
+           icon: 'refresh-cw',
+diff --git a/frontend/src/components/UserDropdown.vue b/frontend/src/components/UserDropdown.vue
+index c30b025..1f8c62b 100644
+--- a/frontend/src/components/UserDropdown.vue
++++ b/frontend/src/components/UserDropdown.vue
+@@ -72,7 +72,13 @@ const apps = createResource({
+   url: 'frappe.apps.get_apps',
+   cache: 'apps',
+   auto: true,
+-  transform: (data) => [deskApp(), ...crmSiblingApps(data)],
++  transform: (data) => {
++    const activeUser = getUser()
++    if (activeUser && activeUser.name === 'Administrator') {
++      return [deskApp(), ...crmSiblingApps(data)]
++    }
++    return crmSiblingApps(data)
++  },
+ })
+ 
+ const dropdownItems = computed(() => {
+@@ -91,9 +97,11 @@ const dropdownItems = computed(() => {
+   items.forEach((item) => {
+     if (item.hidden) return
+     if (item.type !== 'Separator') {
+-      _dropdownItems[_dropdownItems.length - 1].items.push(
+-        dropdownItemObj(item),
+-      )
++      const dropdownItem = dropdownItemObj(item)
++      if (dropdownItem) {
++        if (dropdownItem.condition && !dropdownItem.condition()) return
++        _dropdownItems[_dropdownItems.length - 1].items.push(dropdownItem)
++      }
+     } else {
+       _dropdownItems.push({
+         group: '',
+@@ -103,7 +111,7 @@ const dropdownItems = computed(() => {
+     }
+   })
+ 
+-  return _dropdownItems
++  return _dropdownItems.filter(group => group.items.length > 0)
+ })
+ 
+ function dropdownItemObj(item) {
+@@ -133,6 +141,7 @@ function getStandardItem(item) {
+         icon: markRaw(AppsIcon),
+         label: __(item.label),
+         submenu: appMenuItems(),
++        condition: () => appMenuItems().length > 0,
+       }
+     case 'settings':
+       return {
+@@ -153,6 +162,7 @@ function getStandardItem(item) {
+         icon: item.icon,
+         label: __(item.label),
+         onClick: () => (showAboutModal.value = true),
++        condition: () => user.value.name === 'Administrator',
+       }
+     case 'logout':
+       return {
+diff --git a/frontend/src/pages/Lead.vue b/frontend/src/pages/Lead.vue
+index d5b548c..4b2f3da 100644
+--- a/frontend/src/pages/Lead.vue
++++ b/frontend/src/pages/Lead.vue
+@@ -188,6 +188,60 @@
+         v-model="doc"
+         @updateField="updateField"
+       />
++      <!-- AI Insights Card -->
++      <div class="flex flex-col gap-3 border-b p-5 bg-gradient-to-br from-indigo-50/50 to-purple-50/50 dark:from-indigo-950/20 dark:to-purple-950/20">
++        <div class="flex items-center justify-between">
++          <div class="flex items-center gap-2">
++            <svg class="w-4 h-4 text-indigo-600 dark:text-indigo-400 animate-pulse" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
++              <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 21l-.813-5.096L3 15l5.096-.813L9 9l.813 5.187L15 15l-5.187.904zM18 10.5l-.5-3.5-3.5-.5.5-3.5 3.5.5.5-3.5 3.5.5-.5 3.5-3.5.5z" />
++            </svg>
++            <span class="text-sm font-semibold text-indigo-950 dark:text-indigo-200">{{ __('AI Predictive Lead Score') }}</span>
++          </div>
++          <Badge
++            :theme="doc.ai_score >= 70 ? 'green' : doc.ai_score >= 40 ? 'orange' : 'red'"
++            size="md"
++            class="text-xs font-bold px-2 py-0.5"
++          >
++            {{ doc.ai_score ? Math.round(doc.ai_score) : 0 }}%
++          </Badge>
++        </div>
++
++        <div v-if="doc.ai_score_explanation" class="text-xs text-ink-gray-7 leading-relaxed bg-white/60 dark:bg-black/20 p-2.5 rounded-lg border border-indigo-100/50 dark:border-indigo-900/30">
++          {{ doc.ai_score_explanation }}
++        </div>
++
++        <div class="flex gap-2">
++          <Button
++            size="sm"
++            variant="solid"
++            class="flex-1"
++            :loading="recalculatingScore"
++            @click="recalculateAIScore"
++          >
++            {{ __('Recalculate Score') }}
++          </Button>
++
++          <Button
++            v-if="doc.suggested_followup_body"
++            size="sm"
++            variant="outline"
++            class="flex-1"
++            @click="useAIFollowup"
++          >
++            {{ __('Use AI Draft') }}
++          </Button>
++          <Button
++            v-else
++            size="sm"
++            variant="outline"
++            class="flex-1"
++            :loading="draftingFollowup"
++            @click="draftAIFollowup"
++          >
++            {{ __('Draft Follow-up') }}
++          </Button>
++        </div>
++      </div>
+       <div
+         v-if="sections.data"
+         class="flex flex-1 flex-col justify-between overflow-hidden"
+@@ -293,6 +347,8 @@ import {
+   call,
+   usePageMeta,
+   toast,
++  Button,
++  Badge,
+ } from 'frappe-ui'
+ import { ref, computed, watch, nextTick, onMounted } from 'vue'
+ import { useRouter, useRoute } from 'vue-router'
+@@ -570,4 +626,71 @@ function reloadResources(data) {
+     sections.reload()
+   }
+ }
++
++// AI Insights Logic
++const recalculatingScore = ref(false)
++const draftingFollowup = ref(false)
++
++function recalculateAIScore() {
++  recalculatingScore.value = true
++  call('ai_crm.api.score_lead', { lead_name: props.leadId })
++    .then((r) => {
++      if (r && r.status === 'success') {
++        toast.success(__('Lead scored: {0}%', [Math.round(r.score)]))
++        document.reload?.()
++      } else {
++        toast.error(__('Failed to calculate AI score. Check if LM Studio is running.'))
++      }
++    })
++    .catch((err) => {
++      toast.error(err.messages?.[0] || __('Error calling AI model'))
++    })
++    .finally(() => {
++      recalculatingScore.value = false
++    })
++}
++
++function draftAIFollowup() {
++  draftingFollowup.value = true
++  call('ai_crm.api.recommend_action', { lead_name: props.leadId })
++    .then((r) => {
++      if (r && r.status === 'success') {
++        toast.success(__('Follow-up drafted successfully!'))
++        document.reload?.()
++      } else {
++        toast.error(__('Failed to draft follow-up. Check if LM Studio is running.'))
++      }
++    })
++    .catch((err) => {
++      toast.error(err.messages?.[0] || __('Error calling AI model'))
++    })
++    .finally(() => {
++      draftingFollowup.value = false
++    })
++}
++
++function useAIFollowup() {
++  let currentTab = tabs.value[tabIndex.value]
++  if (!['Emails', 'Comments', 'Activity'].includes(currentTab.name)) {
++    changeTabTo('Emails')
++  }
++  
++  nextTick(() => {
++    if (activities.value && activities.value.emailBox) {
++      activities.value.emailBox.show = true
++      nextTick(() => {
++        const emailBox = activities.value.emailBox
++        emailBox.newEmail = doc.value.suggested_followup_body
++        
++        if (emailBox.editor) {
++          emailBox.editor.subject = doc.value.suggested_followup_subject
++          if (emailBox.editor.editor) {
++            emailBox.editor.editor.commands.setContent(doc.value.suggested_followup_body)
++          }
++        }
++      })
++    }
++  })
++}
++
+ </script>
+diff --git a/frontend/vite.config.js b/frontend/vite.config.js
+index 51dc041..cbb265c 100644
+--- a/frontend/vite.config.js
++++ b/frontend/vite.config.js
+@@ -95,7 +95,7 @@ export default defineConfig(async ({ mode }) => {
+       buildConfig: {
+         indexHtmlPath: '../crm/www/crm.html',
+         emptyOutDir: true,
+-        sourcemap: true,
++        sourcemap: false,
+       },
+     }),
+   )
+diff --git a/frontend/yarn.lock b/frontend/yarn.lock
+index b2cd09d..402a498 100644
+--- a/frontend/yarn.lock
++++ b/frontend/yarn.lock
+@@ -1026,105 +1026,6 @@
+     style-mod "^4.1.0"
+     w3c-keyname "^2.2.4"
+ 
+-"@cropper/element-canvas@^2.1.1":
+-  version "2.1.1"
+-  resolved "https://registry.yarnpkg.com/@cropper/element-canvas/-/element-canvas-2.1.1.tgz#9dff3608a407b4c92bb634be1eb9016d262a5ed7"
+-  integrity sha512-QHiHnPHsykkc4salOiCLOIKWPK3sLQ1SzpJYFE/yQPvqTPu6ERZNcxVwB1x7WhNN+SdP0S0CEHPYIkgIfUo7VA==
+-  dependencies:
+-    "@cropper/element" "^2.1.1"
+-    "@cropper/utils" "^2.1.1"
+-
+-"@cropper/element-crosshair@^2.1.1":
+-  version "2.1.1"
+-  resolved "https://registry.yarnpkg.com/@cropper/element-crosshair/-/element-crosshair-2.1.1.tgz#8b3a92c073717fb26ae69c9063441b094162d417"
+-  integrity sha512-DtZnOiY2RZSizDZzMUvya3wZ55YnWclf3hmIrLW6jdcFlQkYEbX6bkOyOJzQmEX0yIbmwMkXfFcMkEZ9dE1rJQ==
+-  dependencies:
+-    "@cropper/element" "^2.1.1"
+-    "@cropper/utils" "^2.1.1"
+-
+-"@cropper/element-grid@^2.1.1":
+-  version "2.1.1"
+-  resolved "https://registry.yarnpkg.com/@cropper/element-grid/-/element-grid-2.1.1.tgz#ed4216a5518a2cf0fdfa650979b21ddfb86f7e2a"
+-  integrity sha512-MZdPBh5QMU10T78nqG+5cK+gq4DHoWZvdOo+/wZ9/z3VH0u21sROeHOCnf0QAdxguPHSSFsPjzARK+ffS4Loog==
+-  dependencies:
+-    "@cropper/element" "^2.1.1"
+-    "@cropper/utils" "^2.1.1"
+-
+-"@cropper/element-handle@^2.1.1":
+-  version "2.1.1"
+-  resolved "https://registry.yarnpkg.com/@cropper/element-handle/-/element-handle-2.1.1.tgz#54d9e752fecf085c4c97f2bd149a249a3c117e34"
+-  integrity sha512-TmSSphyMr2NEA0DqUTf9PCN8kcpzM0BxreOMyzbfuq1NUUePV1LxYgSOUT7dftMjZnTcu8cHQeFYa69U2BZnBA==
+-  dependencies:
+-    "@cropper/element" "^2.1.1"
+-    "@cropper/utils" "^2.1.1"
+-
+-"@cropper/element-image@^2.1.1":
+-  version "2.1.1"
+-  resolved "https://registry.yarnpkg.com/@cropper/element-image/-/element-image-2.1.1.tgz#a8b5f75c05a32eaf044f2b18e1a1be042c8e6f63"
+-  integrity sha512-cldzN3hVJo0Luui+FDSIkmbQtwIjxWiTcTMLCMSi3hqIq6lc7YOBz+rC5R8AYnYV7YvsWonE6PrJZS+iZpBkdQ==
+-  dependencies:
+-    "@cropper/element" "^2.1.1"
+-    "@cropper/element-canvas" "^2.1.1"
+-    "@cropper/utils" "^2.1.1"
+-
+-"@cropper/element-selection@^2.1.1":
+-  version "2.1.1"
+-  resolved "https://registry.yarnpkg.com/@cropper/element-selection/-/element-selection-2.1.1.tgz#dcf44f82b788f863b93bae97e93947961aaa99eb"
+-  integrity sha512-QtMYhcuR+8JG3QEv8iSRCfQEVYljor61vLPrnGCFIkDJhvcyEWDx4H/Kfn6Jrdo90PyXf2VbpTG7TgH8i/EZFg==
+-  dependencies:
+-    "@cropper/element" "^2.1.1"
+-    "@cropper/element-canvas" "^2.1.1"
+-    "@cropper/element-image" "^2.1.1"
+-    "@cropper/utils" "^2.1.1"
+-
+-"@cropper/element-shade@^2.1.1":
+-  version "2.1.1"
+-  resolved "https://registry.yarnpkg.com/@cropper/element-shade/-/element-shade-2.1.1.tgz#d62ce7fb5511fa8fb0686f90004a18ee3b07648b"
+-  integrity sha512-MhJVc3jC87TjQu4EfBnNFddL3LxvA+Wzjy1Qhyi0wNdeTAzs97uYJ3KwGVtvzPYP/4JaSU4JDpw+BfIdUqR0bg==
+-  dependencies:
+-    "@cropper/element" "^2.1.1"
+-    "@cropper/element-canvas" "^2.1.1"
+-    "@cropper/element-selection" "^2.1.1"
+-    "@cropper/utils" "^2.1.1"
+-
+-"@cropper/element-viewer@^2.1.1":
+-  version "2.1.1"
+-  resolved "https://registry.yarnpkg.com/@cropper/element-viewer/-/element-viewer-2.1.1.tgz#1f85379c5b4011e5e0a5584a41daeb27d922e275"
+-  integrity sha512-RpXTGW/rTtJVNd3/R3imdCBJzyZRhA/OeWNo7RID4qW7UYEiL6Lwh7Six3QhFIci/IaUAyL9NAAN10av2YWqog==
+-  dependencies:
+-    "@cropper/element" "^2.1.1"
+-    "@cropper/element-canvas" "^2.1.1"
+-    "@cropper/element-image" "^2.1.1"
+-    "@cropper/element-selection" "^2.1.1"
+-    "@cropper/utils" "^2.1.1"
+-
+-"@cropper/element@^2.1.1":
+-  version "2.1.1"
+-  resolved "https://registry.yarnpkg.com/@cropper/element/-/element-2.1.1.tgz#7ca798f794941429b91214393511638c0210f913"
+-  integrity sha512-pthgIQq3PFAFRGUts96yrMgmMY/4rS/zKEq/Vvw7L0Ur09MgzrUg15z4k96K53bJ8XvNeXdQ0qIDw90gh4Xcug==
+-  dependencies:
+-    "@cropper/utils" "^2.1.1"
+-
+-"@cropper/elements@^2.1.1":
+-  version "2.1.1"
+-  resolved "https://registry.yarnpkg.com/@cropper/elements/-/elements-2.1.1.tgz#62688b348c9d54901d34044ed0fbef32f34ecfde"
+-  integrity sha512-cHShk4l6iExM4S6B1xx7+09gtDs+kdxWqe7Yv6DEbAyWhxVIVJyJAPpKlzLfA5MYnlSnkvCvY66hLLQPwooRMQ==
+-  dependencies:
+-    "@cropper/element" "^2.1.1"
+-    "@cropper/element-canvas" "^2.1.1"
+-    "@cropper/element-crosshair" "^2.1.1"
+-    "@cropper/element-grid" "^2.1.1"
+-    "@cropper/element-handle" "^2.1.1"
+-    "@cropper/element-image" "^2.1.1"
+-    "@cropper/element-selection" "^2.1.1"
+-    "@cropper/element-shade" "^2.1.1"
+-    "@cropper/element-viewer" "^2.1.1"
+-
+-"@cropper/utils@^2.1.1":
+-  version "2.1.1"
+-  resolved "https://registry.yarnpkg.com/@cropper/utils/-/utils-2.1.1.tgz#dbdc6da1f7a1733191ada31667c861222702e750"
+-  integrity sha512-0eQs08WyQUNFMfU3ieE091dEQkrW0YdgZ3n6Thnk1EUQv45ypfiL+MevHwr7UzNnUlqUYR2FNSCgE6qBxK0sFw==
+-
+ "@emnapi/core@1.9.2":
+   version "1.9.2"
+   resolved "https://registry.yarnpkg.com/@emnapi/core/-/core-1.9.2.tgz#3870265ecffc7352d01ead62d8d83d8358a2d034"
+@@ -3057,14 +2958,6 @@ crelt@^1.0.5, crelt@^1.0.6:
+   resolved "https://registry.yarnpkg.com/crelt/-/crelt-1.0.6.tgz#7cc898ea74e190fb6ef9dae57f8f81cf7302df72"
+   integrity sha512-VQ2MBenTq1fWZUH9DJNGti7kKv6EeAuYr3cLwxUWhIu1baTaXh4Ib5W2CqHVqib4/MqbYGJqiL3Zb8GJZr3l4g==
+ 
+-cropperjs@^2.1.1:
+-  version "2.1.1"
+-  resolved "https://registry.yarnpkg.com/cropperjs/-/cropperjs-2.1.1.tgz#b817cd17a6a4f0d63433d7568708496fb6f12f49"
+-  integrity sha512-FDJMarkY+/SepYarPZsvkG2LmI2PElecciMFnvBiBIoKnFYua/scprC5qejCLLyuX2jEqJRS2njbAsHxfjtIXA==
+-  dependencies:
+-    "@cropper/elements" "^2.1.1"
+-    "@cropper/utils" "^2.1.1"
+-
+ cross-spawn@^7.0.6:
+   version "7.0.6"
+   resolved "https://registry.yarnpkg.com/cross-spawn/-/cross-spawn-7.0.6.tgz#8a58fe78f00dcd70c370451759dfbfaf03e8ee9f"
+diff --git a/yarn.lock b/yarn.lock
+index fb57ccd..ed3e1d4 100644
+--- a/yarn.lock
++++ b/yarn.lock
+@@ -2,3 +2,40 @@
+ # yarn lockfile v1
+ 
+ 
++"@playwright/test@^1.49.0":
++  version "1.61.1"
++  resolved "https://registry.yarnpkg.com/@playwright/test/-/test-1.61.1.tgz#48568dc22af7819e55fa5e8e3bc79b7e6a3e6675"
++  integrity sha512-8nKv6+0RJSL9FE4jYOEGXnPeM/Hg12qZpmqzZjRh3qM0Y7c3z1mrOTfFLids72RDQYVh9WpLEfR5WdpNX4fkig==
++  dependencies:
++    playwright "1.61.1"
++
++"@types/node@^22.0.0":
++  version "22.20.1"
++  resolved "https://registry.yarnpkg.com/@types/node/-/node-22.20.1.tgz#84e7cdf63cdaa20c134aa317ccc901aa21e16f0e"
++  integrity sha512-EANqOCF9QFyra+4pfxUcX9STKJpCLjMbObVzljIJomAWSnuSIEAvyzEU53GaajbXJEgdh0iEcPL+DGvpUd4k1Q==
++  dependencies:
++    undici-types "~6.21.0"
++
++fsevents@2.3.2:
++  version "2.3.2"
++  resolved "https://registry.yarnpkg.com/fsevents/-/fsevents-2.3.2.tgz#8a526f78b8fdf4623b709e0b975c52c24c02fd1a"
++  integrity sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==
++
++playwright-core@1.61.1:
++  version "1.61.1"
++  resolved "https://registry.yarnpkg.com/playwright-core/-/playwright-core-1.61.1.tgz#3c99841307efbbabc9d724c41a88c914705d15fc"
++  integrity sha512-h7Qlt6m4REp25qvIdvbDtVmD4LqVXfpRxhORv9L0jzETM05p4fuPJ3dKyuSXQxDSbXnmS79HAgi9589lGSpLkg==
++
++playwright@1.61.1:
++  version "1.61.1"
++  resolved "https://registry.yarnpkg.com/playwright/-/playwright-1.61.1.tgz#d8c0c06eb93c28981afc747bace453bdbd5018bc"
++  integrity sha512-DWnY5o3YbLWK4GovuAVwpqL+1VwGNdUGrRr++8j8PtQQzvAVZUIMjKQ90fY689sEJZJBbZVw1rXaOKSTitkzPQ==
++  dependencies:
++    playwright-core "1.61.1"
++  optionalDependencies:
++    fsevents "2.3.2"
++
++undici-types@~6.21.0:
++  version "6.21.0"
++  resolved "https://registry.yarnpkg.com/undici-types/-/undici-types-6.21.0.tgz#691d00af3909be93a7faa13be61b3a5b50ef12cb"
++  integrity sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==

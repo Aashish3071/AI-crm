@@ -1,0 +1,4 @@
+app: frappe/crm
+branch: develop
+base_commit: 988211bcd2e29d4860a0e69bc310c30d82386a6e
+captured: 20260722-225027
