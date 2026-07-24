@@ -597,6 +597,28 @@ index 94890df..0ff7ba1 100644
          </div>
          <p class="text-p-base text-ink-gray-6">
            {{
+diff --git a/frontend/src/components/Settings/LeadSyncing/LeadSyncSources.vue b/frontend/src/components/Settings/LeadSyncing/LeadSyncSources.vue
+index 56a75dc..aa95942 100644
+--- a/frontend/src/components/Settings/LeadSyncing/LeadSyncSources.vue
++++ b/frontend/src/components/Settings/LeadSyncing/LeadSyncSources.vue
+@@ -25,6 +25,9 @@
+       </div>
+     </div>
+ 
++    <!-- Capture leads from any platform via webhook (Zapier / Make / etc.) -->
++    <WebhookCard />
++
+     <!-- loading state -->
+     <div
+       v-if="sources.loading"
+@@ -125,6 +128,7 @@ import { Switch, Dropdown, toast, Badge } from 'frappe-ui'
+ import { useTelemetry } from 'frappe-ui/frappe'
+ import { ref, computed, inject } from 'vue'
+ import EmptyState from '../../ListViews/EmptyState.vue'
++import WebhookCard from './WebhookCard.vue'
+ import { ConfirmDelete } from '../../../utils'
+ 
+ const emit = defineEmits(['updateStep'])
 diff --git a/frontend/src/components/Settings/Settings.vue b/frontend/src/components/Settings/Settings.vue
 index e6eea57..18f4d74 100644
 --- a/frontend/src/components/Settings/Settings.vue

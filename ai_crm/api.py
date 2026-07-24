@@ -652,3 +652,48 @@ def capture_lead(**kwargs):
         frappe.throw(_("Could not create the lead from the provided data."))
 
     return {"status": "success", "lead": lead.name}
+
+
+# ---------------------------------------------------------------------------
+# API: Webhook configuration for the Lead Syncing settings UI
+# ---------------------------------------------------------------------------
+
+_WEBHOOK_METHOD_PATH = "/api/method/ai_crm.api.capture_lead"
+
+
+def _require_system_manager():
+    if "System Manager" not in frappe.get_roles():
+        frappe.throw(_("Only administrators can manage the lead webhook."), frappe.PermissionError)
+
+
+def _generate_and_store_webhook_token():
+    """Create a fresh webhook secret and persist it to site config."""
+    import secrets
+    from frappe.installer import update_site_config
+
+    token = secrets.token_hex(24)
+    update_site_config("crm_lead_webhook_token", token)
+    # Reflect immediately in the current request's config
+    frappe.local.conf["crm_lead_webhook_token"] = token
+    return token
+
+
+@frappe.whitelist()
+def get_lead_webhook_config():
+    """Return the lead-capture webhook path + token for the settings UI.
+
+    System Manager only. Generates and stores a token on first access, so the
+    webhook is ready to use without any shell command."""
+    _require_system_manager()
+    token = frappe.conf.get("crm_lead_webhook_token")
+    if not token:
+        token = _generate_and_store_webhook_token()
+    return {"path": _WEBHOOK_METHOD_PATH, "token": token, "header": "X-CRM-Webhook-Token"}
+
+
+@frappe.whitelist()
+def regenerate_lead_webhook_token():
+    """Rotate the webhook secret. System Manager only."""
+    _require_system_manager()
+    token = _generate_and_store_webhook_token()
+    return {"path": _WEBHOOK_METHOD_PATH, "token": token, "header": "X-CRM-Webhook-Token"}

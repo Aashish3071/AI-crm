@@ -23,13 +23,15 @@ AI enhancements for [Frappe CRM](https://github.com/frappe/crm): predictive lead
 
 A single endpoint captures leads from any platform, so you are not limited to the built-in Facebook sync.
 
-**1. Enable it** (server-side secret, never exposed by any API):
+**Easiest: use the UI.** Go to **Settings → Lead Syncing → Other Platforms (Webhook)**. The card shows your Webhook URL and Secret Token (auto-generated on first view), copy buttons, a Regenerate button, and step-by-step Zapier/Make instructions. No shell access needed.
+
+**Or enable it from the shell** (server-side secret, never exposed by any public API):
 
 ```bash
 bench --site <your-site> set-config crm_lead_webhook_token "$(openssl rand -hex 24)"
 ```
 
-**2. Point Zapier / Make / a web form at:**
+**Then point Zapier / Make / a web form at:**
 
 ```
 POST https://<your-domain>/api/method/ai_crm.api.capture_lead
