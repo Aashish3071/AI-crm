@@ -1,5 +1,6 @@
 import frappe
 import json
+import hmac
 import requests
 from frappe import _
 from frappe.rate_limiter import rate_limit
@@ -554,5 +555,100 @@ def chat_query(query):
     # Strip thinking tags from chat responses too
     import re
     response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL).strip()
-        
+
     return {"response": response}
+
+
+# ---------------------------------------------------------------------------
+# API: Generic Lead-Capture Webhook (Zapier / Make / any external platform)
+# ---------------------------------------------------------------------------
+
+# Only these fields may be written from an external payload. Everything else is
+# ignored, so a malicious caller cannot set owner, permissions, scores, etc.
+_WEBHOOK_DATA_FIELDS = {
+    "first_name", "last_name", "email", "mobile_no", "phone",
+    "organization", "job_title", "website", "lead_name",
+    "biggest_challenge",
+}
+# Link fields are accepted but validated against existing records before use,
+# so an unknown value from an ad platform can't break lead creation.
+_WEBHOOK_LINK_FIELDS = {
+    "source": "CRM Lead Source",
+    "territory": "CRM Territory",
+    "industry": "CRM Industry",
+}
+_WEBHOOK_MESSAGE_ALIASES = ("message", "notes", "comments", "description", "enquiry")
+
+
+@frappe.whitelist(allow_guest=True, methods=["POST"])
+@rate_limit(key="crm_lead_webhook", limit=120, seconds=60)
+def capture_lead(**kwargs):
+    """Public webhook that turns an external payload into a CRM Lead.
+
+    Auth: a shared secret in site config (`crm_lead_webhook_token`), supplied
+    either as the `X-CRM-Webhook-Token` request header or a `token` field.
+    Set it with:  bench --site <site> set-config crm_lead_webhook_token <secret>
+
+    Designed for Zapier/Make/webhook sources so leads from Google, Meta,
+    LinkedIn, TikTok, web forms, etc. can all be captured through one endpoint.
+    """
+    # 1. Authenticate the caller with a constant-time secret comparison
+    expected = frappe.conf.get("crm_lead_webhook_token")
+    if not expected:
+        # Webhook is disabled until an admin configures a secret
+        frappe.throw(_("Lead capture webhook is not enabled."), frappe.ValidationError)
+
+    token = frappe.get_request_header("X-CRM-Webhook-Token") or kwargs.get("token") or ""
+    if not hmac.compare_digest(str(token), str(expected)):
+        raise frappe.PermissionError(_("Invalid webhook token."))
+
+    # 2. Collect only allow-listed data fields, each length-capped
+    data = {}
+    for field in _WEBHOOK_DATA_FIELDS:
+        val = kwargs.get(field)
+        if val not in (None, ""):
+            data[field] = str(val)[:1000]
+
+    # Map a free-text message onto the AI "biggest_challenge" field
+    if not data.get("biggest_challenge"):
+        for alias in _WEBHOOK_MESSAGE_ALIASES:
+            if kwargs.get(alias):
+                data["biggest_challenge"] = str(kwargs.get(alias))[:2000]
+                break
+
+    # 3. Accept link fields only when the target record actually exists
+    for field, doctype in _WEBHOOK_LINK_FIELDS.items():
+        val = kwargs.get(field)
+        if val and frappe.db.exists(doctype, str(val)):
+            data[field] = str(val)
+
+    # 4. Validate email if present
+    if data.get("email"):
+        from frappe.utils import validate_email_address
+        data["email"] = validate_email_address(data["email"], throw=False) or ""
+        if not data["email"]:
+            data.pop("email")
+
+    # 5. Require at least one identifying field so we don't create empty junk
+    if not any(data.get(f) for f in ("email", "mobile_no", "phone", "organization", "first_name")):
+        frappe.throw(
+            _("Provide at least one of: email, mobile_no, phone, organization, first_name."),
+            frappe.ValidationError,
+        )
+
+    data.setdefault("first_name", "New")
+    data.setdefault("last_name", "Lead")
+
+    # 6. Create the lead. ignore_permissions is intentional: the caller is an
+    #    anonymous webhook, authorised by the secret token above, not by a user.
+    try:
+        lead = frappe.get_doc(dict(doctype="CRM Lead", **data))
+        lead.insert(ignore_permissions=True)
+        frappe.db.commit()
+    except frappe.ValidationError:
+        raise
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), "Lead Webhook Error")
+        frappe.throw(_("Could not create the lead from the provided data."))
+
+    return {"status": "success", "lead": lead.name}
