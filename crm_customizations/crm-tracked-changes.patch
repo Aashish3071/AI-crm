@@ -299,7 +299,7 @@ index f78450d..06a2fc2 100644
  
      <!-- PWA -->
 diff --git a/frontend/src/components/Layouts/AppSidebar.vue b/frontend/src/components/Layouts/AppSidebar.vue
-index 6f4172a..b11fd23 100644
+index 6f4172a..2d78e3d 100644
 --- a/frontend/src/components/Layouts/AppSidebar.vue
 +++ b/frontend/src/components/Layouts/AppSidebar.vue
 @@ -71,10 +71,6 @@
@@ -340,8 +340,9 @@ index 6f4172a..b11fd23 100644
        v-if="showHelpModal"
        v-model="showHelpModal"
        v-model:articles="articles"
+-      :logo="CRMLogo"
 +      :title="brand.name || 'CRM'"
-       :logo="CRMLogo"
++      :logo="brandLogo"
        :afterSkip="(step) => capture('onboarding_step_skipped_' + step)"
        :afterSkipAll="() => capture('onboarding_steps_skipped')"
        :afterReset="(step) => capture('onboarding_step_reset_' + step)"
@@ -366,6 +367,15 @@ index 6f4172a..b11fd23 100644
  import { showSettings, activeSettingsPage } from '@/composables/settings'
  import { showChangePasswordModal } from '@/composables/modals'
  import { useBroadcast } from '@/composables/useBroadcast.js'
+@@ -205,7 +187,7 @@ import {
+ import router from '@/router'
+ import { useStorage } from '@vueuse/core'
+ import { useDemoData } from '@/composables/demoData'
+-import { ref, reactive, computed, markRaw, onMounted } from 'vue'
++import { ref, reactive, computed, markRaw, onMounted, h } from 'vue'
+ 
+ const { getPinnedViews, getPublicViews } = viewsStore()
+ const { toggle: toggleNotificationPanel } = notificationsStore()
 @@ -217,7 +199,6 @@ const isSidebarCollapsed = useStorage('isSidebarCollapsed', false)
  
  const isFCSite = ref(window.is_fc_site)
@@ -374,15 +384,26 @@ index 6f4172a..b11fd23 100644
  
  const links = [
    {
-@@ -337,6 +318,7 @@ function getIcon(routeName, icon) {
+@@ -337,6 +318,18 @@ function getIcon(routeName, icon) {
  // onboarding
  const { user } = sessionStore()
  const { users, isManager } = usersStore()
 +const { brand } = getSettings()
++
++// Use the custom brand logo (Settings > Custom Branding) in the onboarding
++// modal, falling back to the default logo when none is set.
++const brandLogo = computed(() => {
++  if (brand.logo) {
++    const src = brand.logo
++    return () => h('img', { src, class: 'object-cover' })
++  }
++  return CRMLogo
++})
++
  const { isOnboardingStepsCompleted, setUp } = useOnboarding('frappecrm')
  
  async function getFirstLead() {
-@@ -635,7 +617,7 @@ const articles = ref([
+@@ -635,7 +628,7 @@ const articles = ref([
      ],
    },
    {
@@ -663,7 +684,7 @@ index 2a127ee..d58efb8 100644
  
  export function validateInputs(state, isCustom) {
 diff --git a/frontend/src/components/UserDropdown.vue b/frontend/src/components/UserDropdown.vue
-index c30b025..c64d775 100644
+index c30b025..c562b06 100644
 --- a/frontend/src/components/UserDropdown.vue
 +++ b/frontend/src/components/UserDropdown.vue
 @@ -72,7 +72,13 @@ const apps = createResource({
@@ -705,15 +726,20 @@ index c30b025..c64d775 100644
  })
  
  function dropdownItemObj(item) {
-@@ -133,6 +141,7 @@ function getStandardItem(item) {
+@@ -129,10 +137,12 @@ function dropdownItemObj(item) {
+ function getStandardItem(item) {
+   switch (item.name1) {
+     case 'app_selector':
++      // White-label: hide the Apps/Desk switcher — customers only see the CRM
+       return {
          icon: markRaw(AppsIcon),
          label: __(item.label),
          submenu: appMenuItems(),
-+        condition: () => appMenuItems().length > 0,
++        condition: () => false,
        }
      case 'settings':
        return {
-@@ -142,17 +151,19 @@ function getStandardItem(item) {
+@@ -142,17 +152,20 @@ function getStandardItem(item) {
          condition: () => !isMobileView.value,
        }
      case 'login_to_fc':
@@ -726,11 +752,12 @@ index c30b025..c64d775 100644
 +        condition: () => false,
        }
      case 'about':
++      // White-label: hide the About dialog entirely
        return {
          icon: item.icon,
          label: __(item.label),
          onClick: () => (showAboutModal.value = true),
-+        condition: () => user.value.name === 'Administrator',
++        condition: () => false,
        }
      case 'logout':
        return {
