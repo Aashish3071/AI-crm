@@ -307,7 +307,9 @@ def _build_lead_context(lead):
                 "reference_doctype": "CRM Lead",
                 "reference_docname": lead.name
             },
-            fields=["title", "content"]
+            fields=["title", "content"],
+            order_by="creation desc",
+            limit=10,
         )
         if notes:
             note_strings = []
@@ -346,7 +348,9 @@ def _build_deal_context(deal):
                 "reference_doctype": "CRM Deal",
                 "reference_docname": deal.name
             },
-            fields=["title", "content"]
+            fields=["title", "content"],
+            order_by="creation desc",
+            limit=10,
         )
         if notes:
             note_strings = []
