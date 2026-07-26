@@ -581,7 +581,7 @@ _WEBHOOK_MESSAGE_ALIASES = ("message", "notes", "comments", "description", "enqu
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])
-@rate_limit(key="crm_lead_webhook", limit=120, seconds=60)
+@rate_limit(limit=120, seconds=60)
 def capture_lead(**kwargs):
     """Public webhook that turns an external payload into a CRM Lead.
 
@@ -678,7 +678,7 @@ def _generate_and_store_webhook_token():
     return token
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def get_lead_webhook_config():
     """Return the lead-capture webhook path + token for the settings UI.
 
@@ -691,7 +691,7 @@ def get_lead_webhook_config():
     return {"path": _WEBHOOK_METHOD_PATH, "token": token, "header": "X-CRM-Webhook-Token"}
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def regenerate_lead_webhook_token():
     """Rotate the webhook secret. System Manager only."""
     _require_system_manager()

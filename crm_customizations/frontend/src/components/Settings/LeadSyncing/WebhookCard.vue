@@ -123,11 +123,13 @@ const copied = reactive({ url: false, token: false })
 
 const config = createResource({
   url: 'ai_crm.api.get_lead_webhook_config',
+  method: 'POST',
   auto: true,
 })
 
 const regen = createResource({
   url: 'ai_crm.api.regenerate_lead_webhook_token',
+  method: 'POST',
   onSuccess: (data) => {
     config.setData(data)
     revealed.value = true
