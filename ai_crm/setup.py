@@ -43,6 +43,35 @@ def after_install():
             }
         ]
     }, update=True)
-    
+
+    hide_upstream_navbar_links()
+
     # Commit database changes
     frappe.db.commit()
+
+
+def hide_upstream_navbar_links():
+    """Hide admin-UI menu entries that point at the upstream vendor.
+
+    The Desk help menu ships a "Frappe Support" entry linking to
+    frappe.io/support. Only administrators can reach the Desk, but this is a
+    white-labelled product — the vendor's support link should not be offered
+    to whoever administers a customer's system. Runs on install so every
+    deployment gets it, and is safe to re-run.
+    """
+    try:
+        settings = frappe.get_single("Navbar Settings")
+        changed = False
+        for item in (settings.get("help_dropdown") or []):
+            route = (item.get("route") or "")
+            if "frappe.io" in route or "frappecloud.com" in route:
+                if not item.hidden:
+                    item.hidden = 1
+                    changed = True
+        if changed:
+            settings.flags.ignore_permissions = True
+            settings.save(ignore_permissions=True)
+            frappe.clear_cache()
+    except Exception:
+        # Cosmetic — never fail an install over it
+        frappe.log_error(frappe.get_traceback(), "AI CRM: navbar cleanup failed")
