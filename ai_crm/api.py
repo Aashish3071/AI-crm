@@ -122,7 +122,7 @@ def _llm_budget_available(automated=False):
 # LLM Caller
 # ---------------------------------------------------------------------------
 
-def call_llm(system_prompt, user_prompt, json_response=False):
+def call_llm(system_prompt, user_prompt, json_response=False, temperature=0.3):
     """Invoke the configured OpenAI-compatible chat completions endpoint."""
     # Background jobs mark themselves so they draw on the automation budget
     automated = bool(getattr(frappe.flags, "ai_crm_automated", False))
@@ -144,7 +144,7 @@ def call_llm(system_prompt, user_prompt, json_response=False):
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ],
-        "temperature": 0.3,
+        "temperature": temperature,
         "max_tokens": 2048
     }
     
@@ -528,6 +528,88 @@ def recommend_action(lead_name):
 
 
 # ---------------------------------------------------------------------------
+# Permission-aware aggregation helpers
+# ---------------------------------------------------------------------------
+#
+# The CRM's own Leads list hides leads that have been converted into deals, so
+# a converted lead is no longer "a lead" to the user. Counting raw rows made the
+# assistant report totals the user could not reconcile with their own screen.
+OPEN_LEAD_FILTER = {"converted": 0}
+
+
+# Safety valve: never pull an unbounded result set into memory for a chat reply.
+MAX_STATS_ROWS = 20000
+
+
+def _permitted_rows(doctype, fields, filters=None):
+    """Fetch rows for statistics, respecting the user's row-level permissions.
+
+    `limit_page_length=0` is essential: frappe.get_list otherwise caps at 20
+    rows, so counting the result silently under-reports on any real dataset.
+    Aggregating in SQL would be cheaper, but Frappe 16 rejects function calls
+    in `fields`, so we count in Python over a bounded fetch instead.
+    """
+    try:
+        return frappe.get_list(
+            doctype,
+            filters=filters or {},
+            fields=fields,
+            limit_page_length=MAX_STATS_ROWS,
+            ignore_permissions=False,
+        )
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), "AI CRM: stats query failed")
+        return []
+
+
+def _permitted_counts(doctype, group_field, filters=None):
+    """Count rows grouped by one field, respecting permissions."""
+    counts = {}
+    for row in _permitted_rows(doctype, [group_field], filters=filters):
+        counts[row.get(group_field)] = counts.get(row.get(group_field), 0) + 1
+    return [{"key": k, "count": v} for k, v in counts.items()]
+
+
+def _permitted_total(doctype, filters=None):
+    """Total row count for a doctype, respecting permissions."""
+    return len(_permitted_rows(doctype, ["name"], filters=filters))
+
+
+#: How many records of each kind to lay out in full for the assistant.
+ROSTER_LIMIT = 40
+
+
+def _render_roster(label, doctype, fields, filters=None):
+    """Render a compact, escaped table of real records for the prompt.
+
+    Totals alone force the assistant to guess when asked "which" or "who".
+    Giving it the actual rows — bounded, and clearly marked when truncated —
+    lets it answer from data instead.
+    """
+    rows = _permitted_rows(doctype, fields, filters=filters)
+    if not rows:
+        return f"{label}: none.\n\n"
+
+    shown = rows[:ROSTER_LIMIT]
+    lines = []
+    for r in shown:
+        parts = []
+        for f in fields:
+            val = r.get(f)
+            if val not in (None, "", 0):
+                parts.append(f"{f}={_clean_untrusted(val)}")
+        lines.append("- " + "; ".join(parts))
+
+    note = ""
+    if len(rows) > len(shown):
+        note = (
+            f"\n(Showing the first {len(shown)} of {len(rows)}. "
+            f"Use the summary totals above for counts, not this list.)"
+        )
+    return f"{label} ({len(rows)} total):\n" + "\n".join(lines) + note + "\n\n"
+
+
+# ---------------------------------------------------------------------------
 # API: Chat-based Insights
 # ---------------------------------------------------------------------------
 
@@ -549,57 +631,48 @@ def chat_query(query):
     except Exception:
         return {"response": "I apologize, but you do not have permission to view CRM data."}
         
-    # Gather real statistics from the database (respecting user permissions / Sales Hierarchy)
-    all_permitted_leads = frappe.get_list("CRM Lead", fields=["status", "industry"], ignore_permissions=False)
-    lead_count = len(all_permitted_leads)
-    
-    # Lead status breakdown (from permitted leads)
-    lead_status_map = {}
-    industry_counts = {}
-    for l in all_permitted_leads:
-        status = l.get("status") or "Unknown"
-        lead_status_map[status] = lead_status_map.get(status, 0) + 1
-        ind = l.get("industry")
-        if ind:
-            industry_counts[ind] = industry_counts.get(ind, 0) + 1
-            
-    lead_statuses = [{"status": k, "count": v} for k, v in lead_status_map.items()]
-    
+    # Gather real statistics from the database (respecting user permissions / Sales Hierarchy).
+    # These use SQL GROUP BY rather than counting fetched rows: frappe.get_list caps at 20
+    # records by default, which would silently under-report totals on any real dataset.
+    lead_status_rows = _permitted_counts("CRM Lead", "status", filters=OPEN_LEAD_FILTER)
+    lead_count = sum(r["count"] for r in lead_status_rows)
+    lead_statuses = [{"status": r["key"] or "Unknown", "count": r["count"]} for r in lead_status_rows]
+
+    industry_rows = _permitted_counts("CRM Lead", "industry", filters=OPEN_LEAD_FILTER)
+    industry_counts = {r["key"]: r["count"] for r in industry_rows if r["key"]}
+
     # Organization count (respecting permissions)
     org_count = 0
     if frappe.db.exists("DocType", "CRM Organization"):
-        org_count = len(frappe.get_list("CRM Organization", fields=["name"], ignore_permissions=False))
-    
+        org_count = _permitted_total("CRM Organization")
+
     # Deal statistics (respecting permissions)
     deal_stats = ""
     if frappe.db.exists("DocType", "CRM Deal"):
-        all_deals = frappe.get_list("CRM Deal", fields=["status", "deal_value"], ignore_permissions=False)
-        deal_count = len(all_deals)
-        deal_breakdown = {}
-        for d in all_deals:
+        deal_rows = _permitted_rows("CRM Deal", ["status", "deal_value"])
+        deal_count = len(deal_rows)
+        deal_agg = {}
+        for d in deal_rows:
             status = d.get("status") or "Unknown"
-            val = float(d.get("deal_value") or 0.0)
-            if status not in deal_breakdown:
-                deal_breakdown[status] = {"count": 0, "total_value": 0.0}
-            deal_breakdown[status]["count"] += 1
-            deal_breakdown[status]["total_value"] += val
-            
-        deal_breakdown_list = [{"status": k, "count": v["count"], "total_value": v["total_value"]} for k, v in deal_breakdown.items()]
+            entry = deal_agg.setdefault(status, {"count": 0, "total_value": 0.0})
+            entry["count"] += 1
+            entry["total_value"] += float(d.get("deal_value") or 0.0)
+        deal_breakdown_list = [
+            {"status": k, "count": v["count"], "total_value": v["total_value"]}
+            for k, v in deal_agg.items()
+        ]
         deal_stats = f"Total Deals: {deal_count}\nDeal breakdown: {json.dumps(deal_breakdown_list, default=str)}"
-    
+
     # Task / Follow-up statistics (respecting permissions)
     task_stats = ""
     if frappe.db.exists("DocType", "CRM Task"):
-        all_tasks = frappe.get_list("CRM Task", fields=["status"], ignore_permissions=False)
-        task_count = len(all_tasks)
-        pending_count = 0
-        task_breakdown = {}
-        for t in all_tasks:
-            status = t.get("status") or "Unknown"
-            task_breakdown[status] = task_breakdown.get(status, 0) + 1
-            if status not in ["Done", "Canceled"]:
-                pending_count += 1
-                
+        task_rows = _permitted_counts("CRM Task", "status")
+        task_count = sum(r["count"] for r in task_rows)
+        task_breakdown = {(r["key"] or "Unknown"): r["count"] for r in task_rows}
+        pending_count = sum(
+            c for s, c in task_breakdown.items() if s not in ("Done", "Canceled")
+        )
+
         task_breakdown_list = [{"status": k, "count": v} for k, v in task_breakdown.items()]
         task_stats = f"Total Tasks/Follow-ups: {task_count}\nPending/Left Follow-ups: {pending_count}\nTask status breakdown: {json.dumps(task_breakdown_list, default=str)}"
     
@@ -638,6 +711,7 @@ def chat_query(query):
                     ["organization", "like", f"%{term}%"],
                     ["email", "like", f"%{term}%"]
                 ],
+                filters=OPEN_LEAD_FILTER,
                 fields=["name"],
                 limit=3,
                 ignore_permissions=False
@@ -677,34 +751,75 @@ def chat_query(query):
             specific_contexts.append(f"--- MATCHING DEAL DETAILED INFO ({deal_name}) ---\n" + _build_deal_context(deal_doc))
         
     specific_context_str = "\n\n".join(specific_contexts) if specific_contexts else "No specific leads or deals were matched in this query."
-    
+
+    # Include an actual roster of records, not just totals, so questions like
+    # "which leads are still open?" are answered from data instead of guesswork.
+    contact_count = _permitted_total("Contact") if frappe.db.exists("DocType", "Contact") else 0
+    lead_roster = _render_roster(
+        "Open Leads", "CRM Lead",
+        ["name", "lead_name", "organization", "status", "email"],
+        filters=OPEN_LEAD_FILTER,
+    )
+    deal_roster = _render_roster(
+        "Deals", "CRM Deal",
+        ["name", "organization", "status", "deal_value"],
+    ) if frappe.db.exists("DocType", "CRM Deal") else ""
+    task_roster = _render_roster(
+        "Open Tasks / Follow-ups", "CRM Task",
+        ["name", "title", "status", "priority", "due_date"],
+        filters={"status": ["not in", ["Done", "Canceled"]]},
+    ) if frappe.db.exists("DocType", "CRM Task") else ""
+
     context = (
-        f"CRM Database Summary:\n"
-        f"- Total Leads: {lead_count}\n"
-        f"- Lead Status Breakdown: {json.dumps(lead_statuses, default=str)}\n"
+        f"CRM Database Summary (authoritative totals — use these exact numbers):\n"
+        f"- Total Open Leads: {lead_count} "
+        f"(open leads only — leads already converted into deals are counted under Deals, "
+        f"never as leads. This matches the CRM's own Leads list.)\n"
+        f"- Lead Status Breakdown (open leads): {json.dumps(lead_statuses, default=str)}\n"
         f"- Total Organizations: {org_count}\n"
+        f"- Total Contacts: {contact_count}\n"
         f"- {deal_stats}\n"
         f"- {task_stats}\n"
         f"- Top Industries: {json.dumps(industries, default=str)}\n\n"
-        f"Specific CRM Data matched for your query:\n"
+        f"{lead_roster}{deal_roster}{task_roster}"
+        f"Records matched to this specific question:\n"
         f"{specific_context_str}"
     )
     
     system_prompt = (
-        f"You are the AI Sales Assistant / Advisor for an AI-powered CRM system.\n\n"
+        f"You are the sales assistant built into this CRM. You report on the data in "
+        f"THIS CRM and nothing else.\n\n"
         f"{DATA_ONLY_RULE}\n"
-        f"Here is the database summary and matched records:\n{_fence(context)}\n\n"
-        f"CRITICAL SYSTEM INSTRUCTIONS:\n"
-        f"1. GROUNDING: Ground all answers strictly in the provided data. If the user asks about a specific contact, you must search the matches. Do not hallucinate names, emails, values, or metrics.\n"
-        f"2. SPECIFICITY OVER JARGON: When drafting emails, you MUST prioritize the specific requirements and challenges listed in 'Biggest Challenge' or 'Recent Interaction Notes' (e.g., transition from spreadsheets, email integration, team collaboration, implementation timeline). Address these details directly in the email body.\n"
-        f"3. BAN CORPO-JARGON: Never write generic filler phrases like 'explore strategic initiatives', 'understand your goals', 'explore how we can align', or 'position our offerings'. Speak like a real human offering to solve a real, concrete problem.\n"
-        f"4. DRAFT FORMAT: If the user asks to draft a follow-up email, output the subject line and email body cleanly. Keep the email concise (under 120 words), direct, and highly relevant to the lead's notes.\n"
-        f"5. NO DATA FALLBACK: If no specific contact information is matched, do not draft a placeholder email. Ask the user for the contact's name or specific context."
+        f"=== THE ONLY DATA YOU HAVE ===\n{_fence(context)}\n"
+        f"=== END OF DATA ===\n\n"
+        f"ANSWERING RULES (in priority order):\n"
+        f"1. CLOSED WORLD. The block above is the complete extent of your knowledge. "
+        f"Treat it as the only thing that exists. You have no web access, no memory of "
+        f"other systems, and no general knowledge about these companies or people.\n"
+        f"2. NEVER INVENT. Do not state any name, email, phone number, amount, date, "
+        f"status or count that does not appear verbatim above. Never estimate, "
+        f"extrapolate, round, or 'fill in' a plausible value.\n"
+        f"3. SAY WHEN YOU DON'T KNOW. If the answer is not in the data, reply plainly "
+        f"that the CRM does not hold that information, and say what would be needed "
+        f"(for example the contact's name). Never substitute outside knowledge.\n"
+        f"4. NUMBERS COME FROM THE SUMMARY. Use the counts exactly as given. Do not "
+        f"recompute totals by counting records shown, since only a sample is included. "
+        f"Leads already converted into deals are counted as deals, never as leads.\n"
+        f"5. OFF-TOPIC. If asked about anything outside this CRM's records — world "
+        f"facts, news, general business advice, other software, or how to do something "
+        f"unrelated — briefly say you only cover this CRM's data, and offer what you "
+        f"can report instead.\n"
+        f"6. DRAFTING. When asked to draft an email, ground every specific in the "
+        f"matched record's own challenge and notes. If no record matched, ask which "
+        f"contact rather than inventing one. Keep it under 120 words, concrete, and "
+        f"free of filler like 'strategic initiatives' or 'align with your goals'.\n"
+        f"7. Be brief and factual. Prefer short lists of real values over prose."
     )
-    
-    response = call_llm(system_prompt, query, json_response=False)
+
+    # temperature 0: this is a reporting tool, not a creative one
+    response = call_llm(system_prompt, query, json_response=False, temperature=0)
     if not response:
-        return {"response": "I apologize, I'm unable to connect to the AI model right now. Please check if LM Studio is running."}
+        return {"response": "The AI service is unavailable or the daily AI limit has been reached."}
     
     # Strip thinking tags from chat responses too
     import re

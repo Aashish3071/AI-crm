@@ -1,5 +1,6 @@
 import frappe
 import datetime
+from frappe import _
 from frappe.utils import now_datetime
 
 
@@ -11,6 +12,52 @@ def trigger_lead_scoring(doc, method=None):
         timeout=120,
         lead_name=doc.name
     )
+
+
+#: Desk lives at /app on Frappe 15 and /desk on Frappe 16 — block both.
+_DESK_PREFIXES = ("/app", "/desk")
+
+
+def restrict_desk_access():
+    """Keep ordinary CRM users out of the Frappe Desk interface.
+
+    Hiding the menu entry only removes the link; the route stays reachable by
+    typing the URL, which exposes the raw framework UI (and its branding) to a
+    customer's sales staff. Enforce it server-side instead, and send them back
+    to the CRM. Administrators keep access so the system stays maintainable.
+
+    Set `allow_desk_access: 1` in site config to disable this restriction.
+    """
+    try:
+        if frappe.conf.get("allow_desk_access"):
+            return
+        request = getattr(frappe.local, "request", None)
+        if not request:
+            return
+
+        path = "/" + (request.path or "").strip("/")
+        if not any(path == p or path.startswith(p + "/") for p in _DESK_PREFIXES):
+            return
+
+        user = getattr(frappe.session, "user", None)
+        # Guests get the normal login flow; don't interfere with it
+        if not user or user == "Guest":
+            return
+        if "System Manager" in frappe.get_roles(user):
+            return
+
+        # before_request runs ahead of path resolution, so raising frappe.Redirect
+        # here would not attach a Location header. Deny outright instead: Frappe
+        # renders its standard not-permitted response, and the user still has the
+        # CRM at /crm.
+        raise frappe.PermissionError(
+            _("The admin interface is not available. Please use the CRM at /crm")
+        )
+    except frappe.PermissionError:
+        raise
+    except Exception:
+        # Never let this guard break request handling
+        frappe.log_error(frappe.get_traceback(), "AI CRM: desk guard failed")
 
 
 def sync_brand_to_website(doc, method=None):

@@ -989,10 +989,41 @@ index e11e6e6..93bb7d9 100644
 +usePageMeta(() => ({ title: __('Welcome to CRM') }))
  </script>
 diff --git a/frontend/vite.config.js b/frontend/vite.config.js
-index 51dc041..e4d9fe2 100644
+index 51dc041..69ca3ca 100644
 --- a/frontend/vite.config.js
 +++ b/frontend/vite.config.js
-@@ -18,11 +18,10 @@ export default defineConfig(async ({ mode }) => {
+@@ -4,11 +4,30 @@ import vueJsx from '@vitejs/plugin-vue-jsx'
+ import path from 'path'
+ import { VitePWA } from 'vite-plugin-pwa'
+ 
++// White-label: some bundled UI-library components carry upstream URLs as default
++// prop values. We override those props, so the defaults are never used — but the
++// literals still ship inside the JS and are visible to anyone reading the bundle.
++// Strip them at build time, which also survives a node_modules reinstall.
++const stripUpstreamUrls = () => ({
++  name: 'strip-upstream-urls',
++  enforce: 'post',
++  apply: 'build',
++  renderChunk(code) {
++    const replaced = code
++      .replaceAll('https://docs.frappe.io/crm', '')
++      .replaceAll('https://frappe.io/crm', '')
++      .replaceAll('https://support.frappe.io', '')
++      .replaceAll('https://frappecloud.com', '')
++    return replaced === code ? null : { code: replaced, map: null }
++  },
++})
++
+ // https://vitejs.dev/config/
+ export default defineConfig(async ({ mode }) => {
+   const isDev = mode === 'development'
+   const config = {
+     plugins: [
++      stripUpstreamUrls(),
+       vue(),
+       vueJsx(),
+       VitePWA({
+@@ -18,11 +37,10 @@ export default defineConfig(async ({ mode }) => {
          },
          manifest: {
            display: 'standalone',
@@ -1007,7 +1038,7 @@ index 51dc041..e4d9fe2 100644
            icons: [
              {
                src: '/assets/crm/manifest/manifest-icon-192.maskable.png',
-@@ -95,7 +94,7 @@ export default defineConfig(async ({ mode }) => {
+@@ -95,7 +113,7 @@ export default defineConfig(async ({ mode }) => {
        buildConfig: {
          indexHtmlPath: '../crm/www/crm.html',
          emptyOutDir: true,

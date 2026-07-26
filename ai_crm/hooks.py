@@ -9,6 +9,9 @@ app_license = "mit"
 
 home_page = "crm"
 
+# White-label: ordinary CRM users must not reach the Frappe Desk UI by URL
+before_request = ["ai_crm.events.restrict_desk_access"]
+
 # Run setup scripts on installation
 after_install = "ai_crm.setup.after_install"
 
