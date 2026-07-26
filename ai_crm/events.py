@@ -13,6 +13,33 @@ def trigger_lead_scoring(doc, method=None):
     )
 
 
+def sync_brand_to_website(doc, method=None):
+    """Mirror the CRM's Custom Branding onto the framework's own pages.
+
+    The CRM portal reads brand name/logo/favicon from FCRM Settings, but the
+    framework login page reads Website Settings. Without this, a customer sets
+    their branding in the CRM and still meets a generic login screen.
+
+    Note: no frappe.db.commit() here — Frappe 16 forbids committing inside
+    document hooks; the surrounding transaction handles persistence.
+    """
+    try:
+        values = {}
+        if doc.get("brand_logo"):
+            values["app_logo"] = doc.brand_logo
+        if doc.get("favicon"):
+            values["favicon"] = doc.favicon
+        if doc.get("brand_name"):
+            values["app_name"] = doc.brand_name
+        if not values:
+            return
+        frappe.db.set_single_value("Website Settings", values)
+        frappe.clear_cache()
+    except Exception:
+        # Branding is cosmetic — never block saving CRM settings over it
+        frappe.log_error(frappe.get_traceback(), "AI CRM: brand sync failed")
+
+
 def _run_as_system(fn, lead_name, label):
     """Run an AI job for a single lead with system privileges.
 

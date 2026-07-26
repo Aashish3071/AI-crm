@@ -16,7 +16,11 @@ after_install = "ai_crm.setup.after_install"
 doc_events = {
     "CRM Lead": {
         "after_insert": "ai_crm.events.trigger_lead_scoring",
-    }
+    },
+    # Keep the framework login page on the customer's own branding
+    "FCRM Settings": {
+        "on_update": "ai_crm.events.sync_brand_to_website",
+    },
 }
 
 # JS file injection (Desk-side only, CRM portal uses Vue component)
