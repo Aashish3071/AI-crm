@@ -299,7 +299,7 @@ index f78450d..06a2fc2 100644
  
      <!-- PWA -->
 diff --git a/frontend/src/components/Layouts/AppSidebar.vue b/frontend/src/components/Layouts/AppSidebar.vue
-index 6f4172a..2d78e3d 100644
+index 6f4172a..7aaae0f 100644
 --- a/frontend/src/components/Layouts/AppSidebar.vue
 +++ b/frontend/src/components/Layouts/AppSidebar.vue
 @@ -71,10 +71,6 @@
@@ -336,13 +336,14 @@ index 6f4172a..2d78e3d 100644
        <SidebarLink
          :label="isSidebarCollapsed ? __('Expand') : __('Collapse')"
          :isCollapsed="isSidebarCollapsed"
-@@ -138,12 +120,12 @@
+@@ -138,12 +120,13 @@
        v-if="showHelpModal"
        v-model="showHelpModal"
        v-model:articles="articles"
 -      :logo="CRMLogo"
 +      :title="brand.name || 'CRM'"
 +      :logo="brandLogo"
++      docsLink=""
        :afterSkip="(step) => capture('onboarding_step_skipped_' + step)"
        :afterSkipAll="() => capture('onboarding_steps_skipped')"
        :afterReset="(step) => capture('onboarding_step_reset_' + step)"
@@ -351,7 +352,7 @@ index 6f4172a..2d78e3d 100644
      />
      <IntermediateStepModal
        v-model="showIntermediateModal"
-@@ -179,7 +161,6 @@ import HelpIcon from '@/components/Icons/HelpIcon.vue'
+@@ -179,7 +162,6 @@ import HelpIcon from '@/components/Icons/HelpIcon.vue'
  import SidebarLink from '@/components/SidebarLink.vue'
  import Notifications from '@/components/Notifications.vue'
  import Settings from '@/components/Settings/Settings.vue'
@@ -359,7 +360,7 @@ index 6f4172a..2d78e3d 100644
  import { viewsStore } from '@/stores/views'
  import {
    unreadNotificationsCount,
-@@ -187,6 +168,7 @@ import {
+@@ -187,6 +169,7 @@ import {
  } from '@/stores/notifications'
  import { usersStore } from '@/stores/users'
  import { sessionStore } from '@/stores/session'
@@ -367,7 +368,7 @@ index 6f4172a..2d78e3d 100644
  import { showSettings, activeSettingsPage } from '@/composables/settings'
  import { showChangePasswordModal } from '@/composables/modals'
  import { useBroadcast } from '@/composables/useBroadcast.js'
-@@ -205,7 +187,7 @@ import {
+@@ -205,7 +188,7 @@ import {
  import router from '@/router'
  import { useStorage } from '@vueuse/core'
  import { useDemoData } from '@/composables/demoData'
@@ -376,7 +377,7 @@ index 6f4172a..2d78e3d 100644
  
  const { getPinnedViews, getPublicViews } = viewsStore()
  const { toggle: toggleNotificationPanel } = notificationsStore()
-@@ -217,7 +199,6 @@ const isSidebarCollapsed = useStorage('isSidebarCollapsed', false)
+@@ -217,7 +200,6 @@ const isSidebarCollapsed = useStorage('isSidebarCollapsed', false)
  
  const isFCSite = ref(window.is_fc_site)
  const isDemoSite = ref(window.is_demo_site)
@@ -384,7 +385,7 @@ index 6f4172a..2d78e3d 100644
  
  const links = [
    {
-@@ -337,6 +318,18 @@ function getIcon(routeName, icon) {
+@@ -337,6 +319,18 @@ function getIcon(routeName, icon) {
  // onboarding
  const { user } = sessionStore()
  const { users, isManager } = usersStore()
@@ -403,7 +404,7 @@ index 6f4172a..2d78e3d 100644
  const { isOnboardingStepsCompleted, setUp } = useOnboarding('frappecrm')
  
  async function getFirstLead() {
-@@ -635,7 +628,7 @@ const articles = ref([
+@@ -635,7 +629,7 @@ const articles = ref([
      ],
    },
    {
