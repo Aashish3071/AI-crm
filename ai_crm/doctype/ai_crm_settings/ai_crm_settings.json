@@ -6,11 +6,22 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "provider",
   "api_url",
   "model_name",
-  "api_key"
+  "credentials_section",
+  "api_key",
+  "api_key_help"
  ],
  "fields": [
+  {
+   "fieldname": "provider",
+   "fieldtype": "Select",
+   "label": "AI Provider",
+   "options": "Local (LM Studio / Ollama)\nOpenAI\nAnthropic\nCustom (OpenAI-compatible)",
+   "default": "Local (LM Studio / Ollama)",
+   "description": "Choosing a hosted provider fills in its standard API URL. Any OpenAI-compatible endpoint works."
+  },
   {
    "fieldname": "api_url",
    "fieldtype": "Data",
@@ -26,15 +37,27 @@
    "default": "meta-llama-3-8b-instruct"
   },
   {
+   "fieldname": "credentials_section",
+   "fieldtype": "Section Break",
+   "label": "Credentials"
+  },
+  {
    "fieldname": "api_key",
    "fieldtype": "Password",
-   "label": "API Key"
+   "label": "API Key",
+   "description": "Stored encrypted. Never sent to the browser or any API response. Leave blank for a local model that needs no key."
+  },
+  {
+   "fieldname": "api_key_help",
+   "fieldtype": "HTML",
+   "label": "API Key Help",
+   "options": "<div class=\"text-muted small\">For maximum secrecy the key can instead be placed in the server's <code>site_config.json</code> as <code>ai_crm_api_key</code>. A key set there takes precedence, is never written to the database, and cannot be read back through any HTTP endpoint.</div>"
   }
  ],
- "index_web_pages_for_search": 1,
+ "index_web_pages_for_search": 0,
  "issingle": 1,
  "links": [],
- "modified": "2026-07-19 17:00:00.000000",
+ "modified": "2026-07-24 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "AI CRM",
  "name": "AI CRM Settings",
