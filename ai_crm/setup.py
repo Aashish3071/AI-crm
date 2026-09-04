@@ -46,6 +46,8 @@ def after_install():
 
     hide_upstream_navbar_links()
 
+    disable_frappe_telemetry()
+
     # Commit database changes
     frappe.db.commit()
 
@@ -75,3 +77,18 @@ def hide_upstream_navbar_links():
     except Exception:
         # Cosmetic — never fail an install over it
         frappe.log_error(frappe.get_traceback(), "AI CRM: navbar cleanup failed")
+
+
+def disable_frappe_telemetry():
+    """Guarantee no usage data ever leaves a customer's server.
+
+    Frappe's telemetry (PostHog/Sentry) only fires when posthog config keys are
+    present AND System Settings `enable_telemetry` is on -- but that flag
+    defaults to 1 on a fresh install. Force it off on install so every
+    deployment is private by default, regardless of the framework default.
+    """
+    try:
+        if frappe.db.get_single_value("System Settings", "enable_telemetry"):
+            frappe.db.set_single_value("System Settings", "enable_telemetry", 0)
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), "AI CRM: could not disable telemetry")

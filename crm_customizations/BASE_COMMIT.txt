@@ -1,4 +1,12 @@
 app: frappe/crm
 branch: develop
-base_commit: 988211bcd2e29d4860a0e69bc310c30d82386a6e
-captured: 20260722-225027
+base_commit: 9dea8705c32096a5553b38fec5d092da40dbc081
+base_commit_date: 2026-09-03 05:59:49 +0530
+frappe_framework: version-16 (16.33.0)
+captured: 2026-09-04T09:37:31Z
+note: Rebased from original base 988211bc (2026-07-18) after that commit's
+      288-commit drift required manual conflict resolution in 6 files:
+      AppSidebar.vue, DesktopLayout.vue, AboutModal.vue, Settings.vue,
+      emailConfig.js, README.md. Notably the "Customization/Home Actions" tab
+      and "SalesHierarchyBanner" were independently removed upstream, so
+      those parts of the original patch became no-ops.
