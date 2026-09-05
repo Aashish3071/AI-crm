@@ -1,0 +1,8 @@
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+httpx==0.28.1
+pydantic==2.13.5
+psycopg[binary]>=3.2,<4
+cryptography>=44,<47
+boto3>=1.35,<2
+openpyxl>=3.1,<4

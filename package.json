@@ -1,0 +1,19 @@
+{
+  "name": "insurevoice-ai",
+  "version": "1.0.0",
+  "description": "AI Voice Calling Follow-up Engine with Frappe CRM Integration for Insurance Sector",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "ai-voice",
+    "frappe-crm",
+    "insurance",
+    "voice-agent",
+    "crm-integration"
+  ],
+  "author": "Antigravity Engineering",
+  "license": "MIT"
+}

@@ -1,0 +1,12 @@
+{
+  "dataset": "Synthetic and anonymized broker acceptance workflows",
+  "containsLivePersonalData": false,
+  "scenarios": [
+    {"id": "UAT-01", "persona": "New-business broker", "flow": "ad enquiry -> deduplicate -> assign -> schedule meeting -> quote -> convert -> issue"},
+    {"id": "UAT-02", "persona": "Renewal broker", "flow": "60-day renewal -> compare three quotations -> approval -> successor policy"},
+    {"id": "UAT-03", "persona": "Account manager", "flow": "customer 360 -> endorsement -> document version -> insurer follow-up -> completion"},
+    {"id": "UAT-04", "persona": "Team manager", "flow": "overdue notification -> reassign -> snooze -> activity report"},
+    {"id": "UAT-05", "persona": "Administrator", "flow": "import validation -> duplicate merge -> audit review -> backup -> restore"},
+    {"id": "UAT-06", "persona": "Read-only auditor", "flow": "search and inspect permitted records -> mutation denied -> backup denied"}
+  ]
+}
