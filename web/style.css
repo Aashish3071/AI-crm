@@ -457,3 +457,20 @@ button.wa-token:hover { background: #0F172A; color: #fff; border-color: #0F172A;
 .viz-day-label { font-size: 10px; color: #94A3B8; }
 
 .panel-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; border: 1px solid #E2E8F0; border-radius: 6px; padding: 8px 10px; background: #fff; }
+
+/* Account menu in the sidebar footer — profile lives in Settings, so this is sign-out only */
+.account-trigger { width: 100%; display: flex; align-items: center; gap: 8px; padding: 5px 4px; border: none; background: none; border-radius: 6px; cursor: pointer; text-align: left; }
+.account-trigger:hover { background: #131A29; }
+.account-bell { position: absolute; right: 34px; bottom: 12px; }
+.account-menu { position: absolute; left: 10px; right: 10px; bottom: calc(100% - 4px); background: #1A2233; border: 1px solid #2A3548; border-radius: 8px; padding: 4px; box-shadow: 0 12px 28px -8px rgba(0,0,0,.6); z-index: 60; }
+.account-menu-item { width: 100%; display: flex; align-items: center; gap: 8px; padding: 7px 10px; border: none; background: none; color: #CBD5E1; font-size: 12px; font-weight: 500; border-radius: 5px; cursor: pointer; text-align: left; }
+.account-menu-item:hover { background: #B91C1C; color: #fff; }
+
+/* Dashboard layout — two columns so the page is scannable without a long scroll */
+.dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; align-items: start; }
+.dash-body { max-height: 320px; overflow-y: auto; }
+.day-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+.day-tile { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; }
+.day-tile-value { display: block; font-size: 26px; font-weight: 600; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.day-tile-label { display: block; font-size: 11px; color: #64748B; }
+@media (max-width: 900px) { .dash-grid { grid-template-columns: 1fr; } }

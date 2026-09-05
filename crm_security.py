@@ -322,7 +322,8 @@ def may_mutate_path(role: str, path: str) -> bool:
     admin_only = ("/api/users", "/api/settings", "/api/backups", "/api/admin")
     if path.startswith(admin_only):
         return level == "admin"
-    management_only = ("/api/channels", "/api/imports", "/api/assignment-rules")
+    # /api/leads/import is the legacy bulk path; it must carry the same permission as /api/imports.
+    management_only = ("/api/channels", "/api/imports", "/api/leads/import", "/api/assignment-rules")
     if path.startswith(management_only):
         return level in {"admin", "manager"}
     return level in {"admin", "manager", "broker"}

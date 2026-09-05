@@ -63,7 +63,23 @@ app.mount("/static", StaticFiles(directory="web"), name="static")
 
 @app.get("/")
 def read_root():
-    return FileResponse("web/index.html")
+    """Serve the shell with asset versions derived from file modification times.
+
+    The version string used to be typed by hand, so a stylesheet change shipped
+    behind a stale cache key and users kept the old CSS. Deriving it means the
+    browser refetches exactly when the file actually changes.
+    """
+    try:
+        html = open("web/index.html", encoding="utf-8").read()
+        stamp = lambda f: str(int(os.path.getmtime(f))) if os.path.exists(f) else "0"
+        html = re.sub(r'(/static/style\.css)\?v=[^"\']*', lambda m: f"{m.group(1)}?v={stamp('web/style.css')}", html)
+        html = re.sub(r'(/static/app\.js)\?v=[^"\']*', lambda m: f"{m.group(1)}?v={stamp('web/app.js')}", html)
+        # The shell carries the asset version stamps, so it must never be cached itself —
+        # a cached shell pins the browser to old CSS/JS no matter what changed on disk.
+        return Response(content=html, media_type="text/html",
+                        headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache"})
+    except OSError:
+        return FileResponse("web/index.html")
 
 DB_FILE = os.environ.get("CRM_DB_FILE", "crm_db.json")
 DOCUMENT_ROOT = os.environ.get("DOCUMENT_ROOT", "crm_documents")
@@ -838,9 +854,9 @@ def get_dashboard():
     renewals = sorted([l for l in leads if _expiring_within(l, 15)],
                       key=lambda l: l.get("daysRemaining", 999))
 
-    # Seven-day work trend: what was scheduled versus what actually got finished.
+    # 30 days of history; the dashboard slices the range the user picked (7/14/30).
     trend = []
-    for offset in range(6, -1, -1):
+    for offset in range(29, -1, -1):
         day = today - timedelta(days=offset)
         key = day.strftime("%Y-%m-%d")
         trend.append({
@@ -997,7 +1013,7 @@ def transition_lead_stage(id: str, payload: StageTransitionPayload):
         "associatedTitle": f"{lead.get('name')} ({lead.get('organization')})",
         "category": "Stage Progression",
         "content": note_content,
-        "author": payload.author or "Sarah Connor",
+        "author": current_actor(payload.author or "System"),
         "pinned": False,
         "createdAt": now_str
     })
@@ -1375,7 +1391,7 @@ def create_note(n: NoteModel):
         "associatedTitle": n.associatedTitle or "General Note",
         "category": n.category or "Underwriting Note",
         "content": n.content,
-        "author": n.author or "Sarah Connor",
+        "author": current_actor(n.author or "System"),
         "pinned": n.pinned or False,
         "createdAt": datetime.utcnow().isoformat() + "Z"
     }
@@ -3413,6 +3429,7 @@ EXTRACTORS = {"meta": _extract_meta_lead, "whatsapp": _extract_whatsapp, "google
 
 class ChannelModel(BaseModel):
     provider: str
+    allowDuplicate: Optional[bool] = False
     name: Optional[str] = ""
     credentials: Optional[Dict[str, str]] = None
     fieldMapping: Optional[Dict[str, str]] = None
@@ -3437,6 +3454,13 @@ def create_channel(payload: ChannelModel, request: Request):
     if payload.provider not in PROVIDER_SPECS:
         raise HTTPException(status_code=422, detail="Unknown lead source")
     spec = PROVIDER_SPECS[payload.provider]
+    # A second connection for the same provider means two callback URLs to maintain and
+    # enquiries split across both. Almost always an accident, so it must be deliberate.
+    existing = next((c for c in load_db().get("channels", []) if c.get("provider") == payload.provider), None)
+    if existing and not payload.allowDuplicate:
+        raise HTTPException(status_code=409, detail=(
+            f"{spec['label']} is already connected as “{existing.get('name')}”. "
+            "Finish setting that one up, or choose to add a second deliberately if you run separate ad accounts."))
     creds = dict(payload.credentials or {})
     for field in spec["credentials"]:
         if field.get("generate") and not creds.get(field["key"]):
@@ -4603,15 +4627,47 @@ def purge_demo_data(payload: Optional[Dict[str, Any]] = None):
             "remainingLeads": len(db.get("leads", []))}
 
 # ─── Profile, team & sales hierarchy ────────────────────────────────
+def _self_record(db: Dict[str, Any]) -> Dict[str, Any]:
+    """The roster record belonging to the signed-in session — never a shared setting.
+
+    Reading a company-wide "currentUserId" meant every user saw and edited whichever
+    profile that setting pointed at, which is impersonation inside an audited system.
+    """
+    users = db.get("users", [])
+    session = crm_security.current_user()
+    if not session:
+        if AUTH_DISABLED and users:
+            return users[0]
+        raise HTTPException(status_code=401, detail="Sign in to continue")
+
+    identity_id = session.get("sub")
+    email = (session.get("email") or "").strip().lower()
+    name = (session.get("name") or "").strip().lower()
+    user = next((u for u in users if u.get("identityUserId") == identity_id), None)
+    if not user and email:
+        user = next((u for u in users if (u.get("email") or "").strip().lower() == email), None)
+    if not user and name:
+        user = next((u for u in users if (u.get("name") or "").strip().lower() == name), None)
+    if not user:
+        # A signed-in identity with no roster row yet: create one bound to this identity
+        # rather than silently showing somebody else's profile.
+        user = {"id": f"U_{uuid.uuid4().hex[:8]}", "identityUserId": identity_id,
+                "name": session.get("name", ""), "email": session.get("email", ""),
+                "role": session.get("role", "Sales Executive"), "status": "Active",
+                "createdAt": datetime.utcnow().isoformat() + "Z"}
+        db.setdefault("users", []).append(user)
+        save_db(db)
+    elif not user.get("identityUserId") and identity_id:
+        user["identityUserId"] = identity_id
+        save_db(db)
+    return user
+
 @app.get("/api/profile")
 def get_profile():
-    """The signed-in user. Until authentication exists this is the configured default."""
+    """The signed-in user's own profile, resolved from the session."""
     db = load_db()
     users = db.get("users", [])
-    current_id = (db.get("settings", {}).get("profile") or {}).get("currentUserId")
-    user = next((u for u in users if u.get("id") == current_id), None) or (users[0] if users else None)
-    if not user:
-        raise HTTPException(status_code=404, detail="No team members exist yet")
+    user = _self_record(db)
     manager = next((u for u in users if u.get("id") == user.get("reportsTo")), None)
     reports = [u for u in users if u.get("reportsTo") == user.get("id")]
     leads = db.get("leads", [])
@@ -4624,28 +4680,22 @@ def get_profile():
                 "openTasks": len([t for t in db.get("tasks", []) if t.get("assignedTo") == user.get("name") and t.get("status") not in ["Completed", "Archived"]])}}
 
 class ProfileUpdate(BaseModel):
+    currentUserId: Optional[str] = None      # rejected: kept so the attempt is refused, not ignored
     name: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
     role: Optional[str] = None
     territory: Optional[str] = None
-    currentUserId: Optional[str] = None
 
 @app.put("/api/profile")
 def update_profile(payload: ProfileUpdate):
-    db = load_db()
-    users = db.get("users", [])
     if payload.currentUserId:
-        if not any(u.get("id") == payload.currentUserId for u in users):
-            raise HTTPException(status_code=404, detail="That team member does not exist")
-        db.setdefault("settings", {}).setdefault("profile", {})["currentUserId"] = payload.currentUserId
-        save_db(db)
-        return get_profile()
-
-    current_id = (db.get("settings", {}).get("profile") or {}).get("currentUserId")
-    user = next((u for u in users if u.get("id") == current_id), None) or (users[0] if users else None)
-    if not user:
-        raise HTTPException(status_code=404, detail="No team members exist yet")
+        raise HTTPException(status_code=422,
+                            detail="A profile edit applies to your own account. To change another team member, use Settings → Users.")
+    db = load_db()
+    # Profile edits apply to the caller alone. Changing somebody else is an
+    # administrative action against /api/users/{id}, which is role-gated.
+    user = _self_record(db)
     old_name = user.get("name")
     changes = {k: v for k, v in payload.model_dump().items() if v is not None and k != "currentUserId"}
     user.update(changes)

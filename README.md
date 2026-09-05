@@ -18,6 +18,14 @@ Optional real PostgreSQL adapter checks use `CRM_BLUEPRINT_PG_DSN` pointing to a
 
 The assessment is snapshot-specific: compare its recorded product hashes with the current files before relying on its results. Product edits after a run require a new assessment.
 
+### Identity truthfulness and dashboard layout — 5 September 2026
+
+Profile was bound to a shared company setting, so every user saw and could edit whichever team member that setting pointed at — signed in as one person, editing another. It now resolves the signed-in session; attempting to act as another user is refused with an explanation rather than ignored. Note authorship derives from the session instead of a caller-supplied label, and the legacy bulk-import path carries the same permission as the current one. All four identity acceptance criteria pass; blueprint acceptance moved from 43 to 47 passing.
+
+Static assets are versioned by modification time and the shell is served no-cache. A hand-typed cache key had not been bumped, so browsers kept old CSS and JavaScript: fixes that were shipped, including the lead-source back button, appeared missing.
+
+The dashboard is two columns rather than one long scroll, tiles align their figure above its label, and the work-trend chart has a 7/14/30-day range control with thirty days of history behind it. Connecting a lead source that already exists is now refused by the server, not only warned about in the browser; a genuine second ad account is added explicitly. Profile lives in Settings, so the sidebar footer is a dropdown containing sign out.
+
 ### Dashboard, visibility and cleanup — 5 September 2026
 
 The dashboard was rebuilt around the day's work. Four status tiles lead: overdue, due today, completed today and the next seven days. "My day" lists what actually needs attention, overdue first. The renewal radar, a seven-day scheduled-versus-completed chart, pipeline by stage, the week ahead and the audit activity feed follow. Every panel can be reordered or hidden per user; the arrangement is stored against the signed-in identity and does not affect anyone else.

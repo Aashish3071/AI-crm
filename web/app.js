@@ -118,6 +118,17 @@ function confirmLogout() {
     if (confirm('Sign out of InsureCRM?')) logout();
 }
 
+function toggleAccountMenu(event) {
+    event.stopPropagation();
+    const menu = document.getElementById('account-menu');
+    const open = menu.classList.toggle('hidden') === false;
+    event.currentTarget.setAttribute('aria-expanded', String(open));
+    if (open) {
+        const close = e => { if (!menu.contains(e.target)) { menu.classList.add('hidden'); document.removeEventListener('click', close); } };
+        setTimeout(() => document.addEventListener('click', close), 0);
+    }
+}
+
 function switchSettingsTo(tab) {
     openSettingsModal();
     switchSettingTab(tab);
@@ -1750,9 +1761,18 @@ async function loadDashboard() {
             { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 
         const hidden = new Set(layout.hidden || []);
-        document.getElementById('dashboard-panels').innerHTML =
-            layout.order.filter(id => !hidden.has(id)).map(id => renderDashboardPanel(id, data)).join('')
-            || '<div class="text-xs text-slate-400 text-center py-10">Every panel is hidden. Use Customise to bring some back.</div>';
+        const visible = layout.order.filter(id => !hidden.has(id));
+        // "today" spans the full width; the rest sit in two columns so the page is
+        // scannable in one screen rather than a single long scroll.
+        const full = visible.filter(id => id === 'today');
+        const rest = visible.filter(id => id !== 'today');
+        const host = document.getElementById('dashboard-panels');
+        host.innerHTML = visible.length ? `
+            ${full.map(id => renderDashboardPanel(id, data)).join('')}
+            <div class="dash-grid">
+                ${rest.map(id => `<div class="dash-cell" data-panel="${id}">${renderDashboardPanel(id, data)}</div>`).join('')}
+            </div>`
+            : '<div class="text-xs text-slate-400 text-center py-10">Every panel is hidden. Use Customise to bring some back.</div>';
         drawWorkTrend(data.workTrend || []);
     } catch (e) { console.error(e); }
 }
@@ -1764,7 +1784,7 @@ function dashPanel(title, subtitle, body, action = '') {
                  <p class="text-[11px] text-slate-500 mt-0.5">${esc(subtitle)}</p></div>
             ${action}
         </div>
-        <div class="p-4">${body}</div>
+        <div class="p-4 dash-body">${body}</div>
     </section>`;
 }
 
@@ -1791,10 +1811,11 @@ function renderDashboardPanel(id, d) {
             ['Next 7 days', c.next7Days, '', "switchView('calendar')"],
         ];
         return dashPanel('Today at a glance', 'Your workload right now',
-            `<div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            `<div class="day-tiles">
                 ${tiles.map(([label, value, tone, go]) => `
                     <button onclick="${go}" class="day-tile ${tone}">
-                        <strong>${value ?? 0}</strong><span>${label}</span>
+                        <strong class="day-tile-value">${value ?? 0}</strong>
+                        <span class="day-tile-label">${label}</span>
                     </button>`).join('')}
             </div>`);
     }
@@ -1819,8 +1840,12 @@ function renderDashboardPanel(id, d) {
             `<button onclick="switchView('renewals')" class="text-[11px] font-semibold text-slate-600">Renewals</button>`);
     }
     if (id === 'trend') {
-        return dashPanel('Work trend', 'Scheduled versus completed, last 7 days',
-            `<div id="work-trend" class="viz-root"></div>`);
+        const range = Number(localStorage.getItem('crm_trend_days') || 7);
+        return dashPanel('Work trend', `Scheduled versus completed, last ${range} days`,
+            `<div id="work-trend" class="viz-root"></div>`,
+            `<select onchange="setTrendRange(this.value)" class="corp-input text-[11px] py-0.5 w-auto">
+                ${[7, 14, 30].map(d => `<option value="${d}" ${d === range ? 'selected' : ''}>${d} days</option>`).join('')}
+             </select>`);
     }
     if (id === 'pipeline') {
         const stages = d.pipelineByStage || {};
@@ -1866,9 +1891,21 @@ function filterLeadsByStage(stage) {
 
 // Grouped bars: two series, one shared count axis. Colours are the validated
 // categorical slots 1 and 2; identity is carried by a legend AND direct labels.
+function setTrendRange(days) {
+    localStorage.setItem('crm_trend_days', days);
+    loadDashboard();
+}
+
 function drawWorkTrend(trend) {
     const host = document.getElementById('work-trend');
-    if (!host || !trend.length) return;
+    if (!host) return;
+    const days = Number(localStorage.getItem('crm_trend_days') || 7);
+    trend = (trend || []).slice(-days);
+    if (!trend.length) {
+        host.innerHTML = '<p class="text-xs text-slate-400 py-8 text-center">No task history in this period yet.</p>';
+        return;
+    }
+    const hasData = trend.some(d => d.due || d.completed);
     const max = Math.max(1, ...trend.map(d => Math.max(d.due, d.completed)));
     const H = 120;
     host.innerHTML = `
@@ -1876,7 +1913,8 @@ function drawWorkTrend(trend) {
             <span><i style="background:var(--viz-series-1)"></i>Scheduled</span>
             <span><i style="background:var(--viz-series-2)"></i>Completed</span>
         </div>
-        <div class="viz-bars" role="img" aria-label="Tasks scheduled versus completed over the last seven days">
+        ${hasData ? '' : '<p class="text-[11px] text-slate-400 mb-2">No tasks scheduled or completed in this period — the axis is shown for scale.</p>'}
+        <div class="viz-bars" role="img" aria-label="Tasks scheduled versus completed per day">
             ${trend.map(d => `
                 <div class="viz-day">
                     <div class="viz-pair" style="height:${H}px">
@@ -3078,6 +3116,7 @@ function chooseProvider(provider) {
         // Guard the case from the screenshot: two identical Google Ads connections, made by
         // reopening the picker instead of going back. Two callback URLs to maintain and
         // enquiries split across both is almost never what someone means to do.
+        let allowDuplicate = false;
         const duplicate = (window.crmChannels || []).find(c => c.provider === provider);
         if (duplicate) {
             const proceed = await confirmDestructive({
@@ -3086,11 +3125,12 @@ function chooseProvider(provider) {
                 confirmLabel: 'Add a second one anyway', tone: 'neutral'
             });
             if (!proceed) { closeInsuranceForm(); loadChannels(); return; }
+            allowDuplicate = true;
         }
         try {
             const created = await apiJson('/api/channels', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ provider, name: values.name || spec.label, credentials,
+                body: JSON.stringify({ provider, name: values.name || spec.label, credentials, allowDuplicate,
                     defaults: { policyType: values.policyType || '' } })
             });
             window.justCreatedChannelId = created.id;

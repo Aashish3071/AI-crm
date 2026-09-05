@@ -48,6 +48,8 @@ Production uses `docker-compose.yml` to start `web`, `worker`, `postgres`, `mini
 
 Every authenticated request resolves a signed session to an active identity and places its `companyId` in request context. Business reads/writes, documents, backups, webhooks and worker runs derive their company scope from that context; callers cannot submit a company identifier to override it.
 
+Identity is resolved from the session on every request. `/api/profile` reads and writes the caller's own roster row, matched by `identityUserId` then email then name; a request carrying another user's ID is refused rather than silently ignored. Note, task and communication authorship uses the session actor, so a caller-supplied author label cannot impersonate a colleague in the audit record. Changing another team member is an administrative action against `/api/users/{id}`, and the legacy `/api/leads/import` path carries the same management permission as `/api/imports`.
+
 Authentication behavior:
 
 - PBKDF2-SHA256 password hashes with 310,000 iterations and per-password salts.
@@ -77,6 +79,8 @@ Visibility is enforced at record level, not only by path. `visible_owners()` res
 | Broker | Only records assigned to them |
 
 The boundary is applied to lead lists and single-lead fetches, tasks, deals, policies, renewals, customers, the dashboard and the calendar, so a scoped user cannot reach another broker's record by requesting its ID; the response is 404, not a redacted record. The blueprint treats assigned-only visibility as a company policy rather than a constant, so it is stored as `settings.access.assignedOnlyVisibility` and defaults on. Company isolation remains mandatory and independent of this setting.
+
+Static assets are versioned by file modification time and the shell is served `no-cache`. A hand-typed cache key had gone stale, so browsers kept old CSS and JavaScript while the server served new files, which made fixed defects look unfixed.
 
 ## 4. Persistence and relationships
 
