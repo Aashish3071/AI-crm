@@ -1,10 +1,12 @@
 # Blueprint Assessment
 
-Generated: 2026-09-05T15:02:47.909361+00:00
+Snapshot notice: `pipecat_server.py` changed after this run completed (detected on 5 September 2026). Results below apply to the source hashes recorded in `blueprint-results.json`, not the subsequent backend revision. This assessment did not make that product change. Rerun the comparison after concurrent product edits settle before using these results as the latest release decision.
+
+Generated: 2026-09-05T15:08:19.145441+00:00
 
 Decision: the current CRM does not yet meet the commercial blueprint. This report records demonstrated gaps without modifying the product to conceal them.
 
-Test cases: {'PASS': 75, 'FAIL': 44, 'BLOCKED': 4, 'ERROR': 10}. Criterion register: {'PASS': 6, 'FAIL': 40, 'NOT VERIFIED': 3, 'PARTIAL': 32, 'BLOCKED': 3}.
+Test cases: {'PASS': 81, 'FAIL': 44, 'BLOCKED': 4}. Criterion register: {'PASS': 6, 'FAIL': 40, 'PARTIAL': 35, 'BLOCKED': 3}.
 
 Read the [target blueprint](CRM_BLUEPRINT.md) first. [Machine-readable evidence](blueprint-results.json) contains source hashes, individual results and the endpoint observation inventory.
 
@@ -38,18 +40,17 @@ Passing scenarios demonstrate only their assertions. PARTIAL is not a release pa
   - PASS: `test_dashboard_lead_conversion_and_customer_360` ([test](../tests/test_browser_flows.py#L100)). 
   - PASS: `test_mobile_navigation_and_lead_dialog_remain_usable` ([test](../tests/test_browser_flows.py#L154)). 
 - **M01.2 — FAIL**: “Tasks due today” contains only today's active tasks, excluding future, completed and archived work.
-  - FAIL: `test_dashboard_today_filters_dates_and_archives` ([test](../tests/test_blueprint_acceptance.py#L83)). Items in the first set but not the second: 'tomorrow' 'archived' : Dashboard due-today must exclude tomorrow, completed and archived tasks
+  - FAIL: `test_dashboard_today_filters_dates_and_archives` ([test](../tests/test_blueprint_acceptance.py#L83)). Items in the first set but not the second: 'archived' 'tomorrow' : Dashboard due-today must exclude tomorrow, completed and archived tasks
 - **M01.3 — FAIL**: pipeline premium preserves decimal amounts and excludes closed opportunities from open-pipeline value; date-labelled KPIs use their stated period.
   - FAIL: `test_dashboard_preserves_decimal_premium` ([test](../tests/test_blueprint_acceptance.py#L93)). 100050.0 != 1000.5 within 2 places (99049.5 difference) : Pipeline premium must not turn 1000.50 into 100050
 
 ### M02 — Login, users, profile and hierarchy
 
-- **M02.1 — NOT VERIFIED**: unauthenticated access and missing-CSRF mutations fail; tenant and read-only boundaries hold, including direct record requests.
+- **M02.1 — PARTIAL**: unauthenticated access and missing-CSRF mutations fail; tenant and read-only boundaries hold, including direct record requests.
   - PASS: `test_auth_csrf_roles_and_company_isolation` ([test](../test_security_foundation.py#L40)). 
   - PASS: `test_read_contract_api_auth_status` ([test](../tests/test_blueprint_acceptance.py#L705)). 
   - PASS: `test_logout_clears_current_browser_access` ([test](../tests/test_blueprint_acceptance.py#L677)). 
-  - ERROR: `test_postgres_same_record_ids_remain_company_isolated` ([test](../tests/test_blueprint_postgres.py#L93)). RuntimeError: PostgreSQL mode requires psycopg[binary]
-  - ERROR: `test_postgres_same_record_ids_remain_company_isolated` ([test](../tests/test_blueprint_postgres.py#L93)). RuntimeError: PostgreSQL mode requires psycopg[binary]
+  - PASS: `test_postgres_same_record_ids_remain_company_isolated` ([test](../tests/test_blueprint_postgres.py#L93)). 
 - **M02.2 — FAIL**: profile editing changes the signed-in user's identity/profile, not another team member selected by a shared company setting.
   - FAIL: `test_profile_is_signed_in_identity` ([test](../tests/test_blueprint_acceptance.py#L633)). 'admin@blueprint.invalid' != 'broker@blueprint.invalid' - admin@blueprint.invalid ? ^^^^^ + broker@blueprint.invalid ? ^^^^^^ : Profile endpoint returned another company team member
 - **M02.3 — PARTIAL**: deactivation revokes access immediately and a user cannot become their own manager or form a reporting cycle.
@@ -63,7 +64,7 @@ Passing scenarios demonstrate only their assertions. PARTIAL is not a release pa
   - PASS: `test_lead_source_connect_test_ingest_and_deduplicate` ([test](../test_insurance_operations.py#L247)). 
   - PASS: `test_source_update_sample_disconnect_and_invalid_oauth` ([test](../tests/test_blueprint_acceptance.py#L590)). 
 - **M03.2 — FAIL**: an ingested lead has a linked canonical first task and contact/organization relationships, matching direct-entry behavior.
-  - FAIL: `test_webhook_ingestion_has_canonical_task_reference` ([test](../tests/test_blueprint_acceptance.py#L100)). None not found in {'T_6160a4c6'} : Source lead lacks canonical nextActionTaskId
+  - FAIL: `test_webhook_ingestion_has_canonical_task_reference` ([test](../tests/test_blueprint_acceptance.py#L100)). None not found in {'T_fe5507ed'} : Source lead lacks canonical nextActionTaskId
 - **M03.3 — BLOCKED**: a real provider sandbox completes authorization, asset selection, subscription, delivery, token renewal and disconnect without manual database edits.
   - BLOCKED: `test_real_lead_source_oauth_lifecycle` ([test](../tests/test_blueprint_acceptance.py#L687)). No authorized provider sandbox/asset and callback subscription supplied for this audit
 
@@ -115,7 +116,7 @@ Passing scenarios demonstrate only their assertions. PARTIAL is not a release pa
   - PASS: `test_conversion_retry_does_not_duplicate` ([test](../tests/test_blueprint_acceptance.py#L186)). 
   - PASS: `test_dashboard_lead_conversion_and_customer_360` ([test](../tests/test_browser_flows.py#L100)). 
 - **M08.2 — FAIL**: choosing a different organization during conversion produces a valid organization ID and consistent customer/contact/policy relationships.
-  - FAIL: `test_conversion_new_organization_has_stable_relationship` ([test](../tests/test_blueprint_acceptance.py#L195)). '' not found in {'O1_ea3c': {'id': 'O1_ea3c', 'name': 'Blueprint Co', 'website': '', 'industry': 'Commercial', 'annualRevenue': '₹ 1,00,00,000', 'territory': 'West India', 'noOfEmployees': '11-50', 'lastModified': '2026-09-05T15:02:32.883447Z'}} : Conversion accepted a new organization label without its master record
+  - FAIL: `test_conversion_new_organization_has_stable_relationship` ([test](../tests/test_blueprint_acceptance.py#L195)). '' not found in {'O1_80a7': {'id': 'O1_80a7', 'name': 'Blueprint Co', 'website': '', 'industry': 'Commercial', 'annualRevenue': '₹ 1,00,00,000', 'territory': 'West India', 'noOfEmployees': '11-50', 'lastModified': '2026-09-05T15:08:01.375340Z'}} : Conversion accepted a new organization label without its master record
 - **M08.3 — PASS**: already scheduled lead appointments and follow-ups remain visible under the converted customer.
   - PASS: `test_calendar_canonical_projection_and_two_way_sync` ([test](../test_insurance_operations.py#L94)). 
   - PASS: `test_conversion_keeps_appointments_and_followups_in_360` ([test](../tests/test_blueprint_acceptance.py#L482)). 
@@ -129,7 +130,7 @@ Passing scenarios demonstrate only their assertions. PARTIAL is not a release pa
 - **M09.2 — FAIL**: profile edits show consistently in linked active policy/customer labels without changing IDs or historical snapshots.
   - FAIL: `test_customer_rename_updates_policy_label` ([test](../tests/test_blueprint_acceptance.py#L214)). 'Blueprint Customer' != 'Renamed Customer' - Blueprint Customer + Renamed Customer : Active policy still displays old customer name
 - **M09.3 — FAIL**: 360° includes related appointments, tasks, notes, communications, documents and servicing, including policy-linked items.
-  - FAIL: `test_customer_360_includes_servicing` ([test](../tests/test_blueprint_acceptance.py#L492)). 'SR_25564062' not found in set() : Customer 360 omits servicing records
+  - FAIL: `test_customer_360_includes_servicing` ([test](../tests/test_blueprint_acceptance.py#L492)). 'SR_f1757308' not found in set() : Customer 360 omits servicing records
 
 ### M10 — Organizations
 
@@ -190,8 +191,7 @@ Passing scenarios demonstrate only their assertions. PARTIAL is not a release pa
   - PASS: `test_relational_repair_service_request_and_scheduler` ([test](../test_insurance_operations.py#L317)). 
   - FAIL: `test_overdue_escalation_reaches_configured_manager` ([test](../tests/test_blueprint_acceptance.py#L500)). False is not true : Escalation has no configured-manager recipient
   - PASS: `test_read_contract_api_admin_jobs` ([test](../tests/test_blueprint_acceptance.py#L705)). 
-  - ERROR: `test_postgres_scheduler_lock_excludes_second_worker` ([test](../tests/test_blueprint_postgres.py#L101)). RuntimeError: PostgreSQL mode requires psycopg[binary]
-  - ERROR: `test_postgres_scheduler_lock_excludes_second_worker` ([test](../tests/test_blueprint_postgres.py#L101)). RuntimeError: PostgreSQL mode requires psycopg[binary]
+  - PASS: `test_postgres_scheduler_lock_excludes_second_worker` ([test](../tests/test_blueprint_postgres.py#L101)). 
 
 ### M15 — Activity Notes
 
@@ -319,21 +319,21 @@ Passing scenarios demonstrate only their assertions. PARTIAL is not a release pa
   - FAIL: `test_configured_stage_is_used_by_transition_engine` ([test](../tests/test_blueprint_acceptance.py#L451)). 422 != 200 : Settings accepted a stage the transition engine rejects
 - **M25.3 — FAIL**: product and insurer choices drive relevant forms and validation consistently; existing records survive configuration changes.
   - FAIL: `test_configured_product_choices_are_enforced` ([test](../tests/test_blueprint_acceptance.py#L510)). 200 != 422 : Configured product choices do not constrain policy entry
+  - PASS: `test_settings_sections_load_and_highlight_selected_section` ([test](../tests/test_blueprint_browser.py#L52)). 
 
 ### M26 — Duplicates, merge, archive and deletion
 
 - **M26.1 — PARTIAL**: merge relinks operational references and refuses implicit merging of distinct converted customers.
   - PASS: `test_archive_restore_duplicate_merge_and_report` ([test](../test_insurance_operations.py#L221)). 
   - PASS: `test_merge_relinks_appointments_and_converted_customer` ([test](../tests/test_workflow_integrity.py#L71)). 
-- **M26.2 — NOT VERIFIED**: archive/restore does not reopen previously archived tasks; lead deletion retains archived notes.
+- **M26.2 — PARTIAL**: archive/restore does not reopen previously archived tasks; lead deletion retains archived notes.
   - PASS: `test_archive_restore_duplicate_merge_and_report` ([test](../test_insurance_operations.py#L221)). 
   - PASS: `test_lead_delete_cascades_but_archives_notes` ([test](../test_insurance_operations.py#L169)). 
   - PASS: `test_archive_restore_does_not_reopen_previously_archived_tasks` ([test](../tests/test_workflow_integrity.py#L106)). 
   - PASS: `test_policy_archive_restore_retains_identity` ([test](../tests/test_blueprint_acceptance.py#L543)). 
   - PASS: `test_read_contract_api_archived_leads` ([test](../tests/test_blueprint_acceptance.py#L705)). 
   - PASS: `test_read_contract_api_demo_data` ([test](../tests/test_blueprint_acceptance.py#L705)). 
-  - ERROR: `test_postgres_archive_reference_and_restore` ([test](../tests/test_blueprint_postgres.py#L80)). RuntimeError: PostgreSQL mode requires psycopg[binary]
-  - ERROR: `test_postgres_archive_reference_and_restore` ([test](../tests/test_blueprint_postgres.py#L80)). RuntimeError: PostgreSQL mode requires psycopg[binary]
+  - PASS: `test_postgres_archive_reference_and_restore` ([test](../tests/test_blueprint_postgres.py#L80)). 
 - **M26.3 — FAIL**: deleting a lead removes dependent servicing/endorsement/calendar relationships while retaining independent shared records; no dangling IDs remain.
   - FAIL: `test_lead_delete_removes_dependent_service_graph` ([test](../tests/test_blueprint_acceptance.py#L461)). True is not false : Cascade left servicing records pointing at deleted policy/customer
 
@@ -356,39 +356,34 @@ Passing scenarios demonstrate only their assertions. PARTIAL is not a release pa
   - PASS: `test_restore_replaces_changed_data_and_keeps_safety_copy` ([test](../test_insurance_operations.py#L345)). 
   - PASS: `test_concurrent_writers_reject_stale_snapshot_without_lost_update` ([test](../tests/test_workflow_integrity.py#L80)). 
   - PASS: `test_corrupt_database_is_not_overwritten_with_demo_records` ([test](../tests/test_workflow_integrity.py#L98)). 
-- **M28.2 — NOT VERIFIED**: production PostgreSQL migration, constraints, concurrent writes, worker restarts and database-plus-object recovery are rehearsed with measured RPO/RTO.
+- **M28.2 — PARTIAL**: production PostgreSQL migration, constraints, concurrent writes, worker restarts and database-plus-object recovery are rehearsed with measured RPO/RTO.
   - BLOCKED: `test_postgres_migration_and_combined_recovery` ([test](../tests/test_blueprint_acceptance.py#L699)). Requires designated disposable PostgreSQL/object-store environment and measured restore drill
-  - ERROR: `test_postgres_archive_reference_and_restore` ([test](../tests/test_blueprint_postgres.py#L80)). RuntimeError: PostgreSQL mode requires psycopg[binary]
-  - ERROR: `test_postgres_archive_reference_and_restore` ([test](../tests/test_blueprint_postgres.py#L80)). RuntimeError: PostgreSQL mode requires psycopg[binary]
-  - ERROR: `test_postgres_competing_writers_have_one_winner` ([test](../tests/test_blueprint_postgres.py#L60)). RuntimeError: PostgreSQL mode requires psycopg[binary]
-  - ERROR: `test_postgres_competing_writers_have_one_winner` ([test](../tests/test_blueprint_postgres.py#L60)). RuntimeError: PostgreSQL mode requires psycopg[binary]
-  - ERROR: `test_postgres_roundtrip_stale_revision_and_rollback` ([test](../tests/test_blueprint_postgres.py#L45)). RuntimeError: PostgreSQL mode requires psycopg[binary]
-  - ERROR: `test_postgres_roundtrip_stale_revision_and_rollback` ([test](../tests/test_blueprint_postgres.py#L45)). RuntimeError: PostgreSQL mode requires psycopg[binary]
-  - ERROR: `test_postgres_same_record_ids_remain_company_isolated` ([test](../tests/test_blueprint_postgres.py#L93)). RuntimeError: PostgreSQL mode requires psycopg[binary]
-  - ERROR: `test_postgres_same_record_ids_remain_company_isolated` ([test](../tests/test_blueprint_postgres.py#L93)). RuntimeError: PostgreSQL mode requires psycopg[binary]
-  - ERROR: `test_postgres_scheduler_lock_excludes_second_worker` ([test](../tests/test_blueprint_postgres.py#L101)). RuntimeError: PostgreSQL mode requires psycopg[binary]
-  - ERROR: `test_postgres_scheduler_lock_excludes_second_worker` ([test](../tests/test_blueprint_postgres.py#L101)). RuntimeError: PostgreSQL mode requires psycopg[binary]
+  - PASS: `test_postgres_archive_reference_and_restore` ([test](../tests/test_blueprint_postgres.py#L80)). 
+  - PASS: `test_postgres_competing_writers_have_one_winner` ([test](../tests/test_blueprint_postgres.py#L60)). 
+  - PASS: `test_postgres_roundtrip_stale_revision_and_rollback` ([test](../tests/test_blueprint_postgres.py#L45)). 
+  - PASS: `test_postgres_same_record_ids_remain_company_isolated` ([test](../tests/test_blueprint_postgres.py#L93)). 
+  - PASS: `test_postgres_scheduler_lock_excludes_second_worker` ([test](../tests/test_blueprint_postgres.py#L101)). 
 - **M28.3 — PARTIAL**: authenticated screens load without JavaScript/request failures, mobile layouts avoid horizontal overflow, and full keyboard/screen-reader and load testing are completed.
   - PASS: `test_mobile_navigation_and_lead_dialog_remain_usable` ([test](../tests/test_browser_flows.py#L154)). 
   - PASS: `test_every_main_navigation_module_loads` ([test](../tests/test_blueprint_browser.py#L20)). 
+  - PASS: `test_settings_sections_load_and_highlight_selected_section` ([test](../tests/test_blueprint_browser.py#L52)). 
 
 ## Endpoint observation scope
 
-Registered routes: 152; observed by API tests: 143; unobserved by API tests: 9.
+Registered routes: 151; observed by API tests: 143; unobserved by API tests: 8.
 
 Observed TestClient method/path requests only. Browser requests are not counted. A route hit is not full functional coverage.
 
 Unobserved routes remain explicitly unverified at the request level; some may be visited in browser tests. AI advisor routes are outside the CRM acceptance boundary.
 
-- `GET /api/webhooks/{company_id}/{channel_id}` — `verify_company_channel_webhook`, pipecat_server.py:3602
-- `POST /api/webhooks/{company_id}/{channel_id}` — `receive_company_channel_webhook`, pipecat_server.py:3609
-- `GET /api/webhooks/{channel_id}` — `verify_channel_webhook`, pipecat_server.py:3616
-- `POST /api/channel-events/{id}/reprocess` — `reprocess_channel_event`, pipecat_server.py:3687
-- `POST /api/demo-data/purge` — `purge_demo_data`, pipecat_server.py:4339
-- `PUT /api/users/{id}` — `update_user`, pipecat_server.py:4878
-- `GET /api/ai-advisor/status` — `advisor_status`, pipecat_server.py:5341
-- `POST /api/ai-advisor` — `ai_advisor_query`, pipecat_server.py:5368
-- `POST /api/ai-advisor/legacy` — `ai_advisor_legacy`, pipecat_server.py:5389
+- `GET /api/webhooks/{company_id}/{channel_id}` — `verify_company_channel_webhook`, pipecat_server.py:3652
+- `POST /api/webhooks/{company_id}/{channel_id}` — `receive_company_channel_webhook`, pipecat_server.py:3659
+- `GET /api/webhooks/{channel_id}` — `verify_channel_webhook`, pipecat_server.py:3666
+- `POST /api/channel-events/{id}/reprocess` — `reprocess_channel_event`, pipecat_server.py:3737
+- `POST /api/demo-data/purge` — `purge_demo_data`, pipecat_server.py:4395
+- `PUT /api/users/{id}` — `update_user`, pipecat_server.py:4934
+- `GET /api/ai-advisor/status` — `advisor_status`, pipecat_server.py:5397
+- `POST /api/ai-advisor` — `ai_advisor_query`, pipecat_server.py:5424
 
 ## Repeat the comparison
 

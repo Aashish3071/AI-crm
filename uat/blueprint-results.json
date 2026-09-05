@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-05T15:02:47.909361+00:00",
+  "generatedAt": "2026-09-05T15:08:19.145441+00:00",
   "blueprint": "uat/CRM_BLUEPRINT.md",
   "blueprintSha256": "10a70c619ad3dec4e19a1e91295f286e7ced69c20af98637594935c4bde234d5",
   "productSha256": {
-    "pipecat_server.py": "3f568b7957775c4caf80ff00100a9df7b59038ceb3efdc006acfa8438ccaf2a6",
+    "pipecat_server.py": "b961cb94d6c7c6c1831b07469eeae1615bc9f30b3949aa741d3c73b55a550160",
     "crm_store.py": "807b160368dd32c36b225e0d6b9a6aeecbe9878575ff3d54877570f10a41272c",
     "crm_security.py": "bbb12238ce58b353d526fce1582fb9ec442d41d0561912d9f288f2a51fadbcce",
     "crm_storage.py": "8069d8a1d0161dad1a067fdeb457ceeb518de26cc461744f4597e777e8107804",
@@ -13,16 +13,14 @@
   },
   "environment": "Disposable JSON companies; authenticated API security/browser suites; no provider sends; real disposable PostgreSQL adapter checks",
   "testCounts": {
-    "PASS": 75,
+    "PASS": 81,
     "FAIL": 44,
-    "BLOCKED": 4,
-    "ERROR": 10
+    "BLOCKED": 4
   },
   "criterionCounts": {
     "PASS": 6,
     "FAIL": 40,
-    "NOT VERIFIED": 3,
-    "PARTIAL": 32,
+    "PARTIAL": 35,
     "BLOCKED": 3
   },
   "modules": {
@@ -86,7 +84,7 @@
           "message": "",
           "source": "tests/test_browser_flows.py",
           "line": 100,
-          "seconds": 2.65
+          "seconds": 2.585
         },
         {
           "test": "tests.test_browser_flows.CommercialCrmBrowserFlows.test_mobile_navigation_and_lead_dialog_remain_usable",
@@ -99,7 +97,7 @@
           "message": "",
           "source": "tests/test_browser_flows.py",
           "line": 154,
-          "seconds": 1.278
+          "seconds": 1.142
         }
       ]
     },
@@ -115,10 +113,10 @@
             "M01.2"
           ],
           "completeCriterion": true,
-          "message": "Items in the first set but not the second:\n'tomorrow'\n'archived' : Dashboard due-today must exclude tomorrow, completed and archived tasks",
+          "message": "Items in the first set but not the second:\n'archived'\n'tomorrow' : Dashboard due-today must exclude tomorrow, completed and archived tasks",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 83,
-          "seconds": 0.026
+          "seconds": 0.085
         }
       ]
     },
@@ -137,14 +135,14 @@
           "message": "100050.0 != 1000.5 within 2 places (99049.5 difference) : Pipeline premium must not turn 1000.50 into 100050",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 93,
-          "seconds": 0.005
+          "seconds": 0.009
         }
       ]
     },
     {
       "id": "M02.1",
       "requirement": "unauthenticated access and missing-CSRF mutations fail; tenant and read-only boundaries hold, including direct record requests.",
-      "status": "NOT VERIFIED",
+      "status": "PARTIAL",
       "evidence": [
         {
           "test": "test_security_foundation.SecurityFoundationTests.test_auth_csrf_roles_and_company_isolation",
@@ -185,29 +183,16 @@
         },
         {
           "test": "tests.test_blueprint_postgres.BlueprintPostgresAcceptance.test_postgres_same_record_ids_remain_company_isolated",
-          "status": "ERROR",
+          "status": "PASS",
           "criteria": [
             "M02.1",
             "M28.2"
           ],
           "completeCriterion": false,
-          "message": "RuntimeError: PostgreSQL mode requires psycopg[binary]",
+          "message": "",
           "source": "tests/test_blueprint_postgres.py",
           "line": 93,
-          "seconds": 0.001
-        },
-        {
-          "test": "tests.test_blueprint_postgres.BlueprintPostgresAcceptance.test_postgres_same_record_ids_remain_company_isolated",
-          "status": "ERROR",
-          "criteria": [
-            "M02.1",
-            "M28.2"
-          ],
-          "completeCriterion": false,
-          "message": "RuntimeError: PostgreSQL mode requires psycopg[binary]",
-          "source": "tests/test_blueprint_postgres.py",
-          "line": 93,
-          "seconds": 0.001
+          "seconds": 0.096
         }
       ]
     },
@@ -226,7 +211,7 @@
           "message": "'admin@blueprint.invalid' != 'broker@blueprint.invalid'\n- admin@blueprint.invalid\n? ^^^^^\n+ broker@blueprint.invalid\n? ^^^^^^\n : Profile endpoint returned another company team member",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 633,
-          "seconds": 0.107
+          "seconds": 0.106
         }
       ]
     },
@@ -270,7 +255,7 @@
           "message": "",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 476,
-          "seconds": 0.006
+          "seconds": 0.007
         }
       ]
     },
@@ -289,7 +274,7 @@
           "message": "",
           "source": "test_insurance_operations.py",
           "line": 247,
-          "seconds": 0.016
+          "seconds": 0.015
         },
         {
           "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_source_update_sample_disconnect_and_invalid_oauth",
@@ -317,7 +302,7 @@
             "M03.2"
           ],
           "completeCriterion": false,
-          "message": "None not found in {'T_6160a4c6'} : Source lead lacks canonical nextActionTaskId",
+          "message": "None not found in {'T_fe5507ed'} : Source lead lacks canonical nextActionTaskId",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 100,
           "seconds": 0.008
@@ -358,7 +343,7 @@
           "message": "",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 109,
-          "seconds": 0.01
+          "seconds": 0.011
         },
         {
           "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_read_contract_api_imports",
@@ -389,7 +374,7 @@
           "message": "None not found in set() : Imported lead lacks canonical task reference",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 117,
-          "seconds": 0.008
+          "seconds": 0.009
         }
       ]
     },
@@ -408,7 +393,7 @@
           "message": "404 != 200 : Import rollback must not discard subsequently edited leads",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 124,
-          "seconds": 0.014
+          "seconds": 0.015
         }
       ]
     },
@@ -427,7 +412,7 @@
           "message": "",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 531,
-          "seconds": 0.015
+          "seconds": 0.018
         },
         {
           "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_rule_preview_does_not_consume_rotation",
@@ -439,7 +424,7 @@
           "message": "",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 135,
-          "seconds": 0.006
+          "seconds": 0.007
         }
       ]
     },
@@ -459,7 +444,7 @@
           "message": "",
           "source": "test_insurance_operations.py",
           "line": 186,
-          "seconds": 0.014
+          "seconds": 0.012
         },
         {
           "test": "tests.test_workflow_integrity.WorkflowIntegrityTests.test_bulk_assignment_moves_appointment_and_notification_together",
@@ -472,7 +457,7 @@
           "message": "",
           "source": "tests/test_workflow_integrity.py",
           "line": 57,
-          "seconds": 0.012
+          "seconds": 0.015
         }
       ]
     },
@@ -513,7 +498,7 @@
           "message": "",
           "source": "tests/test_browser_flows.py",
           "line": 100,
-          "seconds": 2.65
+          "seconds": 2.585
         }
       ]
     },
@@ -533,7 +518,7 @@
           "message": "",
           "source": "test_insurance_operations.py",
           "line": 186,
-          "seconds": 0.014
+          "seconds": 0.012
         },
         {
           "test": "tests.test_workflow_integrity.WorkflowIntegrityTests.test_canonical_task_rename_date_and_completion_update_lead",
@@ -546,7 +531,7 @@
           "message": "",
           "source": "tests/test_workflow_integrity.py",
           "line": 27,
-          "seconds": 0.008
+          "seconds": 0.009
         },
         {
           "test": "tests.test_workflow_integrity.WorkflowIntegrityTests.test_task_and_calendar_moves_cannot_bypass_conflicts",
@@ -559,7 +544,7 @@
           "message": "",
           "source": "tests/test_workflow_integrity.py",
           "line": 37,
-          "seconds": 0.012
+          "seconds": 0.014
         }
       ]
     },
@@ -578,7 +563,7 @@
           "message": "",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 152,
-          "seconds": 0.006
+          "seconds": 0.007
         }
       ]
     },
@@ -616,7 +601,7 @@
           "message": "'Open' != 'Won'\n- Open\n+ Won\n : Existing deal did not advance on conversion",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 167,
-          "seconds": 0.007
+          "seconds": 0.008
         }
       ]
     },
@@ -635,7 +620,7 @@
           "message": "",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 178,
-          "seconds": 0.012
+          "seconds": 0.028
         }
       ]
     },
@@ -657,7 +642,7 @@
           "message": "",
           "source": "test_insurance_operations.py",
           "line": 151,
-          "seconds": 0.02
+          "seconds": 0.024
         },
         {
           "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_conversion_retry_does_not_duplicate",
@@ -669,7 +654,7 @@
           "message": "",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 186,
-          "seconds": 0.008
+          "seconds": 0.009
         },
         {
           "test": "tests.test_browser_flows.CommercialCrmBrowserFlows.test_dashboard_lead_conversion_and_customer_360",
@@ -684,7 +669,7 @@
           "message": "",
           "source": "tests/test_browser_flows.py",
           "line": 100,
-          "seconds": 2.65
+          "seconds": 2.585
         }
       ]
     },
@@ -700,10 +685,10 @@
             "M08.2"
           ],
           "completeCriterion": false,
-          "message": "'' not found in {'O1_ea3c': {'id': 'O1_ea3c', 'name': 'Blueprint Co', 'website': '', 'industry': 'Commercial', 'annualRevenue': '₹ 1,00,00,000', 'territory': 'West India', 'noOfEmployees': '11-50', 'lastModified': '2026-09-05T15:02:32.883447Z'}} : Conversion accepted a new organization label without its master record",
+          "message": "'' not found in {'O1_80a7': {'id': 'O1_80a7', 'name': 'Blueprint Co', 'website': '', 'industry': 'Commercial', 'annualRevenue': '₹ 1,00,00,000', 'territory': 'West India', 'noOfEmployees': '11-50', 'lastModified': '2026-09-05T15:08:01.375340Z'}} : Conversion accepted a new organization label without its master record",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 195,
-          "seconds": 0.007
+          "seconds": 0.009
         }
       ]
     },
@@ -723,7 +708,7 @@
           "message": "",
           "source": "test_insurance_operations.py",
           "line": 94,
-          "seconds": 0.023
+          "seconds": 0.022
         },
         {
           "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_conversion_keeps_appointments_and_followups_in_360",
@@ -735,7 +720,7 @@
           "message": "",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 482,
-          "seconds": 0.009
+          "seconds": 0.014
         }
       ]
     },
@@ -770,7 +755,7 @@
           "message": "",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 203,
-          "seconds": 0.018
+          "seconds": 0.017
         },
         {
           "test": "tests.test_browser_flows.CommercialCrmBrowserFlows.test_dashboard_lead_conversion_and_customer_360",
@@ -785,7 +770,7 @@
           "message": "",
           "source": "tests/test_browser_flows.py",
           "line": 100,
-          "seconds": 2.65
+          "seconds": 2.585
         }
       ]
     },
@@ -804,7 +789,7 @@
           "message": "'Blueprint Customer' != 'Renamed Customer'\n- Blueprint Customer\n+ Renamed Customer\n : Active policy still displays old customer name",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 214,
-          "seconds": 0.009
+          "seconds": 0.011
         }
       ]
     },
@@ -820,7 +805,7 @@
             "M09.3"
           ],
           "completeCriterion": false,
-          "message": "'SR_25564062' not found in set() : Customer 360 omits servicing records",
+          "message": "'SR_f1757308' not found in set() : Customer 360 omits servicing records",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 492,
           "seconds": 0.008
@@ -857,7 +842,7 @@
           "message": "",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 221,
-          "seconds": 0.008
+          "seconds": 0.007
         }
       ]
     },
@@ -931,7 +916,7 @@
           "message": "",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 203,
-          "seconds": 0.018
+          "seconds": 0.017
         }
       ]
     },
@@ -950,7 +935,7 @@
           "message": "",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 241,
-          "seconds": 0.009
+          "seconds": 0.008
         }
       ]
     },
@@ -990,7 +975,7 @@
           "message": "",
           "source": "tests/test_workflow_integrity.py",
           "line": 27,
-          "seconds": 0.008
+          "seconds": 0.009
         },
         {
           "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_deleting_appointment_task_archives_calendar_and_resolves_alert",
@@ -1034,7 +1019,7 @@
           "message": "",
           "source": "tests/test_browser_flows.py",
           "line": 189,
-          "seconds": 1.564
+          "seconds": 1.436
         }
       ]
     },
@@ -1053,7 +1038,7 @@
           "message": "",
           "source": "tests/test_blueprint_browser.py",
           "line": 38,
-          "seconds": 1.565
+          "seconds": 1.906
         }
       ]
     },
@@ -1073,7 +1058,7 @@
           "message": "",
           "source": "test_insurance_operations.py",
           "line": 94,
-          "seconds": 0.023
+          "seconds": 0.022
         },
         {
           "test": "tests.test_workflow_integrity.WorkflowIntegrityTests.test_legacy_same_day_task_is_not_mistaken_for_next_action",
@@ -1097,7 +1082,7 @@
           "message": "",
           "source": "tests/test_browser_flows.py",
           "line": 166,
-          "seconds": 2.0
+          "seconds": 2.288
         }
       ]
     },
@@ -1117,7 +1102,7 @@
           "message": "",
           "source": "test_insurance_operations.py",
           "line": 123,
-          "seconds": 0.025
+          "seconds": 0.022
         },
         {
           "test": "tests.test_workflow_integrity.WorkflowIntegrityTests.test_conflicts_across_midnight_and_invalid_duration",
@@ -1129,7 +1114,7 @@
           "message": "",
           "source": "tests/test_workflow_integrity.py",
           "line": 50,
-          "seconds": 0.011
+          "seconds": 0.012
         },
         {
           "test": "tests.test_workflow_integrity.WorkflowIntegrityTests.test_task_and_calendar_moves_cannot_bypass_conflicts",
@@ -1142,7 +1127,7 @@
           "message": "",
           "source": "tests/test_workflow_integrity.py",
           "line": 37,
-          "seconds": 0.012
+          "seconds": 0.014
         }
       ]
     },
@@ -1161,7 +1146,7 @@
           "message": "200 not found in {409, 422} : 02:30 does not exist on the spring DST transition day",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 254,
-          "seconds": 0.006
+          "seconds": 0.007
         }
       ]
     },
@@ -1181,7 +1166,7 @@
           "message": "",
           "source": "test_insurance_operations.py",
           "line": 123,
-          "seconds": 0.025
+          "seconds": 0.022
         },
         {
           "test": "test_insurance_operations.InsuranceOperationsTests.test_policy_document_checklist_and_notification_workflow",
@@ -1221,7 +1206,7 @@
           "message": "",
           "source": "tests/test_workflow_integrity.py",
           "line": 57,
-          "seconds": 0.012
+          "seconds": 0.015
         },
         {
           "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_deleting_appointment_task_archives_calendar_and_resolves_alert",
@@ -1253,7 +1238,7 @@
           "message": "True is not false : Closed renewal retains an unread overdue alert",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 260,
-          "seconds": 0.015
+          "seconds": 0.016
         }
       ]
     },
@@ -1273,7 +1258,7 @@
           "message": "",
           "source": "test_insurance_operations.py",
           "line": 354,
-          "seconds": 0.007
+          "seconds": 0.006
         },
         {
           "test": "test_insurance_operations.InsuranceOperationsTests.test_relational_repair_service_request_and_scheduler",
@@ -1315,29 +1300,16 @@
         },
         {
           "test": "tests.test_blueprint_postgres.BlueprintPostgresAcceptance.test_postgres_scheduler_lock_excludes_second_worker",
-          "status": "ERROR",
+          "status": "PASS",
           "criteria": [
             "M14.3",
             "M28.2"
           ],
           "completeCriterion": false,
-          "message": "RuntimeError: PostgreSQL mode requires psycopg[binary]",
+          "message": "",
           "source": "tests/test_blueprint_postgres.py",
           "line": 101,
-          "seconds": 0.0
-        },
-        {
-          "test": "tests.test_blueprint_postgres.BlueprintPostgresAcceptance.test_postgres_scheduler_lock_excludes_second_worker",
-          "status": "ERROR",
-          "criteria": [
-            "M14.3",
-            "M28.2"
-          ],
-          "completeCriterion": false,
-          "message": "RuntimeError: PostgreSQL mode requires psycopg[binary]",
-          "source": "tests/test_blueprint_postgres.py",
-          "line": 101,
-          "seconds": 0.001
+          "seconds": 0.048
         }
       ]
     },
@@ -1369,7 +1341,7 @@
           "message": "",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 608,
-          "seconds": 0.008
+          "seconds": 0.009
         }
       ]
     },
@@ -1426,7 +1398,7 @@
           "message": "200 not found in {409, 422} : Expired quote was selectable",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 283,
-          "seconds": 0.011
+          "seconds": 0.014
         },
         {
           "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_quote_from_another_renewal_cannot_be_selected",
@@ -1469,7 +1441,7 @@
           "message": "False is not true : Quote validity field is not projected into Calendar",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 289,
-          "seconds": 0.011
+          "seconds": 0.012
         }
       ]
     },
@@ -1531,7 +1503,7 @@
           "message": "200 != 422 : Policy expiry before inception accepted",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 314,
-          "seconds": 0.007
+          "seconds": 0.008
         }
       ]
     },
@@ -1564,7 +1536,7 @@
           "message": "200 != 422 : Policy issued without any stored supporting documents",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 326,
-          "seconds": 0.007
+          "seconds": 0.009
         },
         {
           "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_policy_activation_cannot_bypass_issuance",
@@ -1598,7 +1570,7 @@
           "message": "",
           "source": "test_insurance_operations.py",
           "line": 151,
-          "seconds": 0.02
+          "seconds": 0.024
         },
         {
           "test": "test_insurance_operations.InsuranceOperationsTests.test_policy_document_checklist_and_notification_workflow",
@@ -1656,7 +1628,7 @@
           "message": "True is not false : Draft policy entered renewal pipeline",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 333,
-          "seconds": 0.007
+          "seconds": 0.008
         }
       ]
     },
@@ -1678,7 +1650,7 @@
           "message": "",
           "source": "test_insurance_operations.py",
           "line": 151,
-          "seconds": 0.02
+          "seconds": 0.024
         },
         {
           "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_renewal_completion_retry_is_idempotent",
@@ -1690,7 +1662,7 @@
           "message": "3 != 2 : Repeated completion created multiple successor policies",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 340,
-          "seconds": 0.017
+          "seconds": 0.019
         }
       ]
     },
@@ -1712,7 +1684,7 @@
           "message": "",
           "source": "test_insurance_operations.py",
           "line": 151,
-          "seconds": 0.02
+          "seconds": 0.024
         },
         {
           "test": "test_insurance_operations.InsuranceOperationsTests.test_policy_renewal_and_quotation_flow",
@@ -1900,7 +1872,7 @@
           "message": "2 != 1 : Retry dispatched an already sent message twice",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 518,
-          "seconds": 0.009
+          "seconds": 0.01
         }
       ]
     },
@@ -1982,7 +1954,7 @@
           "message": "200 != 409 : Customer-linked communication bypassed lead opt-out",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 389,
-          "seconds": 0.009
+          "seconds": 0.011
         },
         {
           "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_read_contract_api_consents",
@@ -2176,7 +2148,7 @@
           "message": "",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 659,
-          "seconds": 0.11
+          "seconds": 0.109
         }
       ]
     },
@@ -2195,7 +2167,7 @@
           "message": "False is not true : Global search cannot find action tasks",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 419,
-          "seconds": 0.004
+          "seconds": 0.005
         }
       ]
     },
@@ -2214,7 +2186,7 @@
           "message": "100.0 != 50 : Labelled conversion metric uses closed-only win-rate denominator",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 425,
-          "seconds": 0.009
+          "seconds": 0.014
         }
       ]
     },
@@ -2248,7 +2220,7 @@
           "message": "",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 433,
-          "seconds": 0.007
+          "seconds": 0.006
         }
       ]
     },
@@ -2267,7 +2239,7 @@
           "message": "",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 705,
-          "seconds": 0.002
+          "seconds": 0.003
         },
         {
           "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_report_period_filters_population",
@@ -2298,7 +2270,7 @@
           "message": "",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 445,
-          "seconds": 0.007
+          "seconds": 0.008
         }
       ]
     },
@@ -2337,6 +2309,19 @@
           "source": "tests/test_blueprint_acceptance.py",
           "line": 510,
           "seconds": 0.007
+        },
+        {
+          "test": "tests.test_blueprint_browser.BlueprintBrowserAcceptance.test_settings_sections_load_and_highlight_selected_section",
+          "status": "PASS",
+          "criteria": [
+            "M25.3",
+            "M28.3"
+          ],
+          "completeCriterion": false,
+          "message": "",
+          "source": "tests/test_blueprint_browser.py",
+          "line": 52,
+          "seconds": 1.816
         }
       ]
     },
@@ -2356,7 +2341,7 @@
           "message": "",
           "source": "test_insurance_operations.py",
           "line": 221,
-          "seconds": 0.033
+          "seconds": 0.031
         },
         {
           "test": "tests.test_workflow_integrity.WorkflowIntegrityTests.test_merge_relinks_appointments_and_converted_customer",
@@ -2368,14 +2353,14 @@
           "message": "",
           "source": "tests/test_workflow_integrity.py",
           "line": 71,
-          "seconds": 0.013
+          "seconds": 0.017
         }
       ]
     },
     {
       "id": "M26.2",
       "requirement": "archive/restore does not reopen previously archived tasks; lead deletion retains archived notes.",
-      "status": "NOT VERIFIED",
+      "status": "PARTIAL",
       "evidence": [
         {
           "test": "test_insurance_operations.InsuranceOperationsTests.test_archive_restore_duplicate_merge_and_report",
@@ -2388,7 +2373,7 @@
           "message": "",
           "source": "test_insurance_operations.py",
           "line": 221,
-          "seconds": 0.033
+          "seconds": 0.031
         },
         {
           "test": "test_insurance_operations.InsuranceOperationsTests.test_lead_delete_cascades_but_archives_notes",
@@ -2413,7 +2398,7 @@
           "message": "",
           "source": "tests/test_workflow_integrity.py",
           "line": 106,
-          "seconds": 0.014
+          "seconds": 0.02
         },
         {
           "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_policy_archive_restore_retains_identity",
@@ -2425,7 +2410,7 @@
           "message": "",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 543,
-          "seconds": 0.014
+          "seconds": 0.013
         },
         {
           "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_read_contract_api_archived_leads",
@@ -2453,29 +2438,16 @@
         },
         {
           "test": "tests.test_blueprint_postgres.BlueprintPostgresAcceptance.test_postgres_archive_reference_and_restore",
-          "status": "ERROR",
+          "status": "PASS",
           "criteria": [
             "M28.2",
             "M26.2"
           ],
           "completeCriterion": false,
-          "message": "RuntimeError: PostgreSQL mode requires psycopg[binary]",
+          "message": "",
           "source": "tests/test_blueprint_postgres.py",
           "line": 80,
-          "seconds": 0.001
-        },
-        {
-          "test": "tests.test_blueprint_postgres.BlueprintPostgresAcceptance.test_postgres_archive_reference_and_restore",
-          "status": "ERROR",
-          "criteria": [
-            "M28.2",
-            "M26.2"
-          ],
-          "completeCriterion": false,
-          "message": "RuntimeError: PostgreSQL mode requires psycopg[binary]",
-          "source": "tests/test_blueprint_postgres.py",
-          "line": 80,
-          "seconds": 0.001
+          "seconds": 0.325
         }
       ]
     },
@@ -2494,7 +2466,7 @@
           "message": "True is not false : Cascade left servicing records pointing at deleted policy/customer",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 461,
-          "seconds": 0.011
+          "seconds": 0.013
         }
       ]
     },
@@ -2514,7 +2486,7 @@
           "message": "",
           "source": "test_insurance_operations.py",
           "line": 354,
-          "seconds": 0.007
+          "seconds": 0.006
         },
         {
           "test": "test_insurance_operations.InsuranceOperationsTests.test_master_record_editing_customer_360_and_audit",
@@ -2560,7 +2532,7 @@
           "message": "1 not greater than 1 : Policy migration mutates without an audit event",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 469,
-          "seconds": 0.007
+          "seconds": 0.008
         }
       ]
     },
@@ -2591,7 +2563,7 @@
           "message": "200 not found in {403, 422} : Broker can switch shared profile and rename another team member",
           "source": "tests/test_blueprint_acceptance.py",
           "line": 639,
-          "seconds": 0.112
+          "seconds": 0.11
         }
       ]
     },
@@ -2635,7 +2607,7 @@
           "message": "",
           "source": "tests/test_workflow_integrity.py",
           "line": 80,
-          "seconds": 0.002
+          "seconds": 0.003
         },
         {
           "test": "tests.test_workflow_integrity.WorkflowIntegrityTests.test_corrupt_database_is_not_overwritten_with_demo_records",
@@ -2654,7 +2626,7 @@
     {
       "id": "M28.2",
       "requirement": "production PostgreSQL migration, constraints, concurrent writes, worker restarts and database-plus-object recovery are rehearsed with measured RPO/RTO.",
-      "status": "NOT VERIFIED",
+      "status": "PARTIAL",
       "evidence": [
         {
           "test": "tests.test_blueprint_acceptance.BlueprintExternalAcceptance.test_postgres_migration_and_combined_recovery",
@@ -2670,129 +2642,66 @@
         },
         {
           "test": "tests.test_blueprint_postgres.BlueprintPostgresAcceptance.test_postgres_archive_reference_and_restore",
-          "status": "ERROR",
+          "status": "PASS",
           "criteria": [
             "M28.2",
             "M26.2"
           ],
           "completeCriterion": false,
-          "message": "RuntimeError: PostgreSQL mode requires psycopg[binary]",
+          "message": "",
           "source": "tests/test_blueprint_postgres.py",
           "line": 80,
-          "seconds": 0.001
-        },
-        {
-          "test": "tests.test_blueprint_postgres.BlueprintPostgresAcceptance.test_postgres_archive_reference_and_restore",
-          "status": "ERROR",
-          "criteria": [
-            "M28.2",
-            "M26.2"
-          ],
-          "completeCriterion": false,
-          "message": "RuntimeError: PostgreSQL mode requires psycopg[binary]",
-          "source": "tests/test_blueprint_postgres.py",
-          "line": 80,
-          "seconds": 0.001
+          "seconds": 0.325
         },
         {
           "test": "tests.test_blueprint_postgres.BlueprintPostgresAcceptance.test_postgres_competing_writers_have_one_winner",
-          "status": "ERROR",
+          "status": "PASS",
           "criteria": [
             "M28.2"
           ],
           "completeCriterion": false,
-          "message": "RuntimeError: PostgreSQL mode requires psycopg[binary]",
+          "message": "",
           "source": "tests/test_blueprint_postgres.py",
           "line": 60,
-          "seconds": 0.001
-        },
-        {
-          "test": "tests.test_blueprint_postgres.BlueprintPostgresAcceptance.test_postgres_competing_writers_have_one_winner",
-          "status": "ERROR",
-          "criteria": [
-            "M28.2"
-          ],
-          "completeCriterion": false,
-          "message": "RuntimeError: PostgreSQL mode requires psycopg[binary]",
-          "source": "tests/test_blueprint_postgres.py",
-          "line": 60,
-          "seconds": 0.001
+          "seconds": 0.089
         },
         {
           "test": "tests.test_blueprint_postgres.BlueprintPostgresAcceptance.test_postgres_roundtrip_stale_revision_and_rollback",
-          "status": "ERROR",
+          "status": "PASS",
           "criteria": [
             "M28.2"
           ],
           "completeCriterion": false,
-          "message": "RuntimeError: PostgreSQL mode requires psycopg[binary]",
+          "message": "",
           "source": "tests/test_blueprint_postgres.py",
           "line": 45,
-          "seconds": 0.001
-        },
-        {
-          "test": "tests.test_blueprint_postgres.BlueprintPostgresAcceptance.test_postgres_roundtrip_stale_revision_and_rollback",
-          "status": "ERROR",
-          "criteria": [
-            "M28.2"
-          ],
-          "completeCriterion": false,
-          "message": "RuntimeError: PostgreSQL mode requires psycopg[binary]",
-          "source": "tests/test_blueprint_postgres.py",
-          "line": 45,
-          "seconds": 0.001
+          "seconds": 0.133
         },
         {
           "test": "tests.test_blueprint_postgres.BlueprintPostgresAcceptance.test_postgres_same_record_ids_remain_company_isolated",
-          "status": "ERROR",
+          "status": "PASS",
           "criteria": [
             "M02.1",
             "M28.2"
           ],
           "completeCriterion": false,
-          "message": "RuntimeError: PostgreSQL mode requires psycopg[binary]",
+          "message": "",
           "source": "tests/test_blueprint_postgres.py",
           "line": 93,
-          "seconds": 0.001
-        },
-        {
-          "test": "tests.test_blueprint_postgres.BlueprintPostgresAcceptance.test_postgres_same_record_ids_remain_company_isolated",
-          "status": "ERROR",
-          "criteria": [
-            "M02.1",
-            "M28.2"
-          ],
-          "completeCriterion": false,
-          "message": "RuntimeError: PostgreSQL mode requires psycopg[binary]",
-          "source": "tests/test_blueprint_postgres.py",
-          "line": 93,
-          "seconds": 0.001
+          "seconds": 0.096
         },
         {
           "test": "tests.test_blueprint_postgres.BlueprintPostgresAcceptance.test_postgres_scheduler_lock_excludes_second_worker",
-          "status": "ERROR",
+          "status": "PASS",
           "criteria": [
             "M14.3",
             "M28.2"
           ],
           "completeCriterion": false,
-          "message": "RuntimeError: PostgreSQL mode requires psycopg[binary]",
+          "message": "",
           "source": "tests/test_blueprint_postgres.py",
           "line": 101,
-          "seconds": 0.0
-        },
-        {
-          "test": "tests.test_blueprint_postgres.BlueprintPostgresAcceptance.test_postgres_scheduler_lock_excludes_second_worker",
-          "status": "ERROR",
-          "criteria": [
-            "M14.3",
-            "M28.2"
-          ],
-          "completeCriterion": false,
-          "message": "RuntimeError: PostgreSQL mode requires psycopg[binary]",
-          "source": "tests/test_blueprint_postgres.py",
-          "line": 101,
-          "seconds": 0.001
+          "seconds": 0.048
         }
       ]
     },
@@ -2812,7 +2721,7 @@
           "message": "",
           "source": "tests/test_browser_flows.py",
           "line": 154,
-          "seconds": 1.278
+          "seconds": 1.142
         },
         {
           "test": "tests.test_blueprint_browser.BlueprintBrowserAcceptance.test_every_main_navigation_module_loads",
@@ -2824,7 +2733,20 @@
           "message": "",
           "source": "tests/test_blueprint_browser.py",
           "line": 20,
-          "seconds": 1.618
+          "seconds": 1.519
+        },
+        {
+          "test": "tests.test_blueprint_browser.BlueprintBrowserAcceptance.test_settings_sections_load_and_highlight_selected_section",
+          "status": "PASS",
+          "criteria": [
+            "M25.3",
+            "M28.3"
+          ],
+          "completeCriterion": false,
+          "message": "",
+          "source": "tests/test_blueprint_browser.py",
+          "line": 52,
+          "seconds": 1.816
         }
       ]
     }
@@ -2973,7 +2895,7 @@
       "message": "",
       "source": "test_insurance_operations.py",
       "line": 221,
-      "seconds": 0.033
+      "seconds": 0.031
     },
     {
       "test": "test_insurance_operations.InsuranceOperationsTests.test_audit_chain_and_scheduler_concurrency_guard",
@@ -2986,7 +2908,7 @@
       "message": "",
       "source": "test_insurance_operations.py",
       "line": 354,
-      "seconds": 0.007
+      "seconds": 0.006
     },
     {
       "test": "test_insurance_operations.InsuranceOperationsTests.test_calendar_canonical_projection_and_two_way_sync",
@@ -2999,7 +2921,7 @@
       "message": "",
       "source": "test_insurance_operations.py",
       "line": 94,
-      "seconds": 0.023
+      "seconds": 0.022
     },
     {
       "test": "test_insurance_operations.InsuranceOperationsTests.test_calendar_conflicts_reminders_archive_and_repair",
@@ -3012,7 +2934,7 @@
       "message": "",
       "source": "test_insurance_operations.py",
       "line": 123,
-      "seconds": 0.025
+      "seconds": 0.022
     },
     {
       "test": "test_insurance_operations.InsuranceOperationsTests.test_document_versioning_backup_and_health",
@@ -3040,7 +2962,7 @@
       "message": "",
       "source": "test_insurance_operations.py",
       "line": 151,
-      "seconds": 0.02
+      "seconds": 0.024
     },
     {
       "test": "test_insurance_operations.InsuranceOperationsTests.test_lead_delete_cascades_but_archives_notes",
@@ -3066,7 +2988,7 @@
       "message": "",
       "source": "test_insurance_operations.py",
       "line": 186,
-      "seconds": 0.014
+      "seconds": 0.012
     },
     {
       "test": "test_insurance_operations.InsuranceOperationsTests.test_lead_source_connect_test_ingest_and_deduplicate",
@@ -3078,7 +3000,7 @@
       "message": "",
       "source": "test_insurance_operations.py",
       "line": 247,
-      "seconds": 0.016
+      "seconds": 0.015
     },
     {
       "test": "test_insurance_operations.InsuranceOperationsTests.test_master_record_editing_customer_360_and_audit",
@@ -3223,7 +3145,7 @@
       "message": "",
       "source": "tests/test_workflow_integrity.py",
       "line": 106,
-      "seconds": 0.014
+      "seconds": 0.02
     },
     {
       "test": "tests.test_workflow_integrity.WorkflowIntegrityTests.test_bulk_assignment_moves_appointment_and_notification_together",
@@ -3236,7 +3158,7 @@
       "message": "",
       "source": "tests/test_workflow_integrity.py",
       "line": 57,
-      "seconds": 0.012
+      "seconds": 0.015
     },
     {
       "test": "tests.test_workflow_integrity.WorkflowIntegrityTests.test_canonical_task_rename_date_and_completion_update_lead",
@@ -3249,7 +3171,7 @@
       "message": "",
       "source": "tests/test_workflow_integrity.py",
       "line": 27,
-      "seconds": 0.008
+      "seconds": 0.009
     },
     {
       "test": "tests.test_workflow_integrity.WorkflowIntegrityTests.test_concurrent_writers_reject_stale_snapshot_without_lost_update",
@@ -3261,7 +3183,7 @@
       "message": "",
       "source": "tests/test_workflow_integrity.py",
       "line": 80,
-      "seconds": 0.002
+      "seconds": 0.003
     },
     {
       "test": "tests.test_workflow_integrity.WorkflowIntegrityTests.test_conflicts_across_midnight_and_invalid_duration",
@@ -3273,7 +3195,7 @@
       "message": "",
       "source": "tests/test_workflow_integrity.py",
       "line": 50,
-      "seconds": 0.011
+      "seconds": 0.012
     },
     {
       "test": "tests.test_workflow_integrity.WorkflowIntegrityTests.test_corrupt_database_is_not_overwritten_with_demo_records",
@@ -3309,7 +3231,7 @@
       "message": "",
       "source": "tests/test_workflow_integrity.py",
       "line": 71,
-      "seconds": 0.013
+      "seconds": 0.017
     },
     {
       "test": "tests.test_workflow_integrity.WorkflowIntegrityTests.test_task_and_calendar_moves_cannot_bypass_conflicts",
@@ -3322,7 +3244,7 @@
       "message": "",
       "source": "tests/test_workflow_integrity.py",
       "line": 37,
-      "seconds": 0.012
+      "seconds": 0.014
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_assignment_rule_crud_and_preview",
@@ -3334,7 +3256,7 @@
       "message": "",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 531,
-      "seconds": 0.015
+      "seconds": 0.018
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_calendar_rejects_dst_nonexistent_time",
@@ -3346,7 +3268,7 @@
       "message": "200 not found in {409, 422} : 02:30 does not exist on the spring DST transition day",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 254,
-      "seconds": 0.006
+      "seconds": 0.007
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_completed_renewal_resolves_renewal_alert",
@@ -3358,7 +3280,7 @@
       "message": "True is not false : Closed renewal retains an unread overdue alert",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 260,
-      "seconds": 0.015
+      "seconds": 0.016
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_configured_product_choices_are_enforced",
@@ -3407,7 +3329,7 @@
       "message": "",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 482,
-      "seconds": 0.009
+      "seconds": 0.014
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_conversion_metric_uses_all_eligible_leads",
@@ -3419,7 +3341,7 @@
       "message": "100.0 != 50 : Labelled conversion metric uses closed-only win-rate denominator",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 425,
-      "seconds": 0.009
+      "seconds": 0.014
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_conversion_new_organization_has_stable_relationship",
@@ -3428,10 +3350,10 @@
         "M08.2"
       ],
       "completeCriterion": false,
-      "message": "'' not found in {'O1_ea3c': {'id': 'O1_ea3c', 'name': 'Blueprint Co', 'website': '', 'industry': 'Commercial', 'annualRevenue': '₹ 1,00,00,000', 'territory': 'West India', 'noOfEmployees': '11-50', 'lastModified': '2026-09-05T15:02:32.883447Z'}} : Conversion accepted a new organization label without its master record",
+      "message": "'' not found in {'O1_80a7': {'id': 'O1_80a7', 'name': 'Blueprint Co', 'website': '', 'industry': 'Commercial', 'annualRevenue': '₹ 1,00,00,000', 'territory': 'West India', 'noOfEmployees': '11-50', 'lastModified': '2026-09-05T15:08:01.375340Z'}} : Conversion accepted a new organization label without its master record",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 195,
-      "seconds": 0.007
+      "seconds": 0.009
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_conversion_retry_does_not_duplicate",
@@ -3443,7 +3365,7 @@
       "message": "",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 186,
-      "seconds": 0.008
+      "seconds": 0.009
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_conversion_updates_existing_deal",
@@ -3455,7 +3377,7 @@
       "message": "'Open' != 'Won'\n- Open\n+ Won\n : Existing deal did not advance on conversion",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 167,
-      "seconds": 0.007
+      "seconds": 0.008
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_customer_360_includes_servicing",
@@ -3464,7 +3386,7 @@
         "M09.3"
       ],
       "completeCriterion": false,
-      "message": "'SR_25564062' not found in set() : Customer 360 omits servicing records",
+      "message": "'SR_f1757308' not found in set() : Customer 360 omits servicing records",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 492,
       "seconds": 0.008
@@ -3479,7 +3401,7 @@
       "message": "'Blueprint Customer' != 'Renamed Customer'\n- Blueprint Customer\n+ Renamed Customer\n : Active policy still displays old customer name",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 214,
-      "seconds": 0.009
+      "seconds": 0.011
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_dashboard_preserves_decimal_premium",
@@ -3491,7 +3413,7 @@
       "message": "100050.0 != 1000.5 within 2 places (99049.5 difference) : Pipeline premium must not turn 1000.50 into 100050",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 93,
-      "seconds": 0.005
+      "seconds": 0.009
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_dashboard_today_filters_dates_and_archives",
@@ -3500,10 +3422,10 @@
         "M01.2"
       ],
       "completeCriterion": true,
-      "message": "Items in the first set but not the second:\n'tomorrow'\n'archived' : Dashboard due-today must exclude tomorrow, completed and archived tasks",
+      "message": "Items in the first set but not the second:\n'archived'\n'tomorrow' : Dashboard due-today must exclude tomorrow, completed and archived tasks",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 83,
-      "seconds": 0.026
+      "seconds": 0.085
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_deal_close_is_projected_to_calendar",
@@ -3515,7 +3437,7 @@
       "message": "",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 178,
-      "seconds": 0.012
+      "seconds": 0.028
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_deleting_appointment_task_archives_calendar_and_resolves_alert",
@@ -3588,7 +3510,7 @@
       "message": "200 not found in {409, 422} : Expired quote was selectable",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 283,
-      "seconds": 0.011
+      "seconds": 0.014
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_explicit_note_delete_and_list",
@@ -3600,7 +3522,7 @@
       "message": "",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 608,
-      "seconds": 0.008
+      "seconds": 0.009
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_global_search_finds_task_work",
@@ -3612,7 +3534,7 @@
       "message": "False is not true : Global search cannot find action tasks",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 419,
-      "seconds": 0.004
+      "seconds": 0.005
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_import_mapping_and_error_download",
@@ -3624,7 +3546,7 @@
       "message": "",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 109,
-      "seconds": 0.01
+      "seconds": 0.011
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_import_retry_and_rollback_preserves_edited_lead",
@@ -3636,7 +3558,7 @@
       "message": "404 != 200 : Import rollback must not discard subsequently edited leads",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 124,
-      "seconds": 0.014
+      "seconds": 0.015
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_imported_lead_links_canonical_task",
@@ -3648,7 +3570,7 @@
       "message": "None not found in set() : Imported lead lacks canonical task reference",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 117,
-      "seconds": 0.008
+      "seconds": 0.009
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_independent_deal_creation_exists",
@@ -3672,7 +3594,7 @@
       "message": "200 != 422 : Policy issued without any stored supporting documents",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 326,
-      "seconds": 0.007
+      "seconds": 0.009
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_lead_delete_removes_dependent_service_graph",
@@ -3684,7 +3606,7 @@
       "message": "True is not false : Cascade left servicing records pointing at deleted policy/customer",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 461,
-      "seconds": 0.011
+      "seconds": 0.013
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_lead_invalid_stage_and_loss_reason",
@@ -3696,7 +3618,7 @@
       "message": "",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 152,
-      "seconds": 0.006
+      "seconds": 0.007
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_lead_opt_out_survives_customer_conversion",
@@ -3708,7 +3630,7 @@
       "message": "200 != 409 : Customer-linked communication bypassed lead opt-out",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 389,
-      "seconds": 0.009
+      "seconds": 0.011
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_legacy_policy_migration_is_audited",
@@ -3720,7 +3642,7 @@
       "message": "1 not greater than 1 : Policy migration mutates without an audit event",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 469,
-      "seconds": 0.007
+      "seconds": 0.008
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_missing_template_reference_rejected",
@@ -3745,7 +3667,7 @@
       "message": "",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 203,
-      "seconds": 0.018
+      "seconds": 0.017
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_negative_policy_premium_rejected",
@@ -3793,7 +3715,7 @@
       "message": "",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 221,
-      "seconds": 0.008
+      "seconds": 0.007
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_organization_rename_updates_customer_label",
@@ -3853,7 +3775,7 @@
       "message": "",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 543,
-      "seconds": 0.014
+      "seconds": 0.013
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_policy_financial_calculation",
@@ -3901,7 +3823,7 @@
       "message": "False is not true : Quote validity field is not projected into Calendar",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 289,
-      "seconds": 0.011
+      "seconds": 0.012
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_read_contract_",
@@ -4033,7 +3955,7 @@
       "message": "",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 705,
-      "seconds": 0.002
+      "seconds": 0.003
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_read_contract_api_users_hierarchy",
@@ -4069,7 +3991,7 @@
       "message": "3 != 2 : Repeated completion created multiple successor policies",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 340,
-      "seconds": 0.017
+      "seconds": 0.019
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_renewal_generation_excludes_drafts",
@@ -4081,7 +4003,7 @@
       "message": "True is not false : Draft policy entered renewal pipeline",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 333,
-      "seconds": 0.007
+      "seconds": 0.008
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_report_excludes_archived_work",
@@ -4093,7 +4015,7 @@
       "message": "",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 433,
-      "seconds": 0.007
+      "seconds": 0.006
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_report_period_filters_population",
@@ -4117,7 +4039,7 @@
       "message": "",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 476,
-      "seconds": 0.006
+      "seconds": 0.007
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_reversed_policy_term_rejected",
@@ -4129,7 +4051,7 @@
       "message": "200 != 422 : Policy expiry before inception accepted",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 314,
-      "seconds": 0.007
+      "seconds": 0.008
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_rule_preview_does_not_consume_rotation",
@@ -4141,7 +4063,7 @@
       "message": "",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 135,
-      "seconds": 0.006
+      "seconds": 0.007
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_search_and_lead_pagination",
@@ -4165,7 +4087,7 @@
       "message": "",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 241,
-      "seconds": 0.009
+      "seconds": 0.008
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_sent_message_retry_does_not_dispatch_twice",
@@ -4177,7 +4099,7 @@
       "message": "2 != 1 : Retry dispatched an already sent message twice",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 518,
-      "seconds": 0.009
+      "seconds": 0.01
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_service_completion_requires_outcome",
@@ -4213,7 +4135,7 @@
       "message": "",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 445,
-      "seconds": 0.007
+      "seconds": 0.008
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintAcceptance.test_source_update_sample_disconnect_and_invalid_oauth",
@@ -4271,7 +4193,7 @@
         "M03.2"
       ],
       "completeCriterion": false,
-      "message": "None not found in {'T_6160a4c6'} : Source lead lacks canonical nextActionTaskId",
+      "message": "None not found in {'T_fe5507ed'} : Source lead lacks canonical nextActionTaskId",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 100,
       "seconds": 0.008
@@ -4346,7 +4268,7 @@
       "message": "200 not found in {403, 422} : Broker can switch shared profile and rename another team member",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 639,
-      "seconds": 0.112
+      "seconds": 0.11
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintIdentityAcceptance.test_logout_clears_current_browser_access",
@@ -4382,7 +4304,7 @@
       "message": "",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 659,
-      "seconds": 0.11
+      "seconds": 0.109
     },
     {
       "test": "tests.test_blueprint_acceptance.BlueprintIdentityAcceptance.test_profile_is_signed_in_identity",
@@ -4394,133 +4316,70 @@
       "message": "'admin@blueprint.invalid' != 'broker@blueprint.invalid'\n- admin@blueprint.invalid\n? ^^^^^\n+ broker@blueprint.invalid\n? ^^^^^^\n : Profile endpoint returned another company team member",
       "source": "tests/test_blueprint_acceptance.py",
       "line": 633,
-      "seconds": 0.107
+      "seconds": 0.106
     },
     {
       "test": "tests.test_blueprint_postgres.BlueprintPostgresAcceptance.test_postgres_archive_reference_and_restore",
-      "status": "ERROR",
+      "status": "PASS",
       "criteria": [
         "M28.2",
         "M26.2"
       ],
       "completeCriterion": false,
-      "message": "RuntimeError: PostgreSQL mode requires psycopg[binary]",
+      "message": "",
       "source": "tests/test_blueprint_postgres.py",
       "line": 80,
-      "seconds": 0.001
-    },
-    {
-      "test": "tests.test_blueprint_postgres.BlueprintPostgresAcceptance.test_postgres_archive_reference_and_restore",
-      "status": "ERROR",
-      "criteria": [
-        "M28.2",
-        "M26.2"
-      ],
-      "completeCriterion": false,
-      "message": "RuntimeError: PostgreSQL mode requires psycopg[binary]",
-      "source": "tests/test_blueprint_postgres.py",
-      "line": 80,
-      "seconds": 0.001
+      "seconds": 0.325
     },
     {
       "test": "tests.test_blueprint_postgres.BlueprintPostgresAcceptance.test_postgres_competing_writers_have_one_winner",
-      "status": "ERROR",
+      "status": "PASS",
       "criteria": [
         "M28.2"
       ],
       "completeCriterion": false,
-      "message": "RuntimeError: PostgreSQL mode requires psycopg[binary]",
+      "message": "",
       "source": "tests/test_blueprint_postgres.py",
       "line": 60,
-      "seconds": 0.001
-    },
-    {
-      "test": "tests.test_blueprint_postgres.BlueprintPostgresAcceptance.test_postgres_competing_writers_have_one_winner",
-      "status": "ERROR",
-      "criteria": [
-        "M28.2"
-      ],
-      "completeCriterion": false,
-      "message": "RuntimeError: PostgreSQL mode requires psycopg[binary]",
-      "source": "tests/test_blueprint_postgres.py",
-      "line": 60,
-      "seconds": 0.001
+      "seconds": 0.089
     },
     {
       "test": "tests.test_blueprint_postgres.BlueprintPostgresAcceptance.test_postgres_roundtrip_stale_revision_and_rollback",
-      "status": "ERROR",
+      "status": "PASS",
       "criteria": [
         "M28.2"
       ],
       "completeCriterion": false,
-      "message": "RuntimeError: PostgreSQL mode requires psycopg[binary]",
+      "message": "",
       "source": "tests/test_blueprint_postgres.py",
       "line": 45,
-      "seconds": 0.001
-    },
-    {
-      "test": "tests.test_blueprint_postgres.BlueprintPostgresAcceptance.test_postgres_roundtrip_stale_revision_and_rollback",
-      "status": "ERROR",
-      "criteria": [
-        "M28.2"
-      ],
-      "completeCriterion": false,
-      "message": "RuntimeError: PostgreSQL mode requires psycopg[binary]",
-      "source": "tests/test_blueprint_postgres.py",
-      "line": 45,
-      "seconds": 0.001
+      "seconds": 0.133
     },
     {
       "test": "tests.test_blueprint_postgres.BlueprintPostgresAcceptance.test_postgres_same_record_ids_remain_company_isolated",
-      "status": "ERROR",
+      "status": "PASS",
       "criteria": [
         "M02.1",
         "M28.2"
       ],
       "completeCriterion": false,
-      "message": "RuntimeError: PostgreSQL mode requires psycopg[binary]",
+      "message": "",
       "source": "tests/test_blueprint_postgres.py",
       "line": 93,
-      "seconds": 0.001
-    },
-    {
-      "test": "tests.test_blueprint_postgres.BlueprintPostgresAcceptance.test_postgres_same_record_ids_remain_company_isolated",
-      "status": "ERROR",
-      "criteria": [
-        "M02.1",
-        "M28.2"
-      ],
-      "completeCriterion": false,
-      "message": "RuntimeError: PostgreSQL mode requires psycopg[binary]",
-      "source": "tests/test_blueprint_postgres.py",
-      "line": 93,
-      "seconds": 0.001
+      "seconds": 0.096
     },
     {
       "test": "tests.test_blueprint_postgres.BlueprintPostgresAcceptance.test_postgres_scheduler_lock_excludes_second_worker",
-      "status": "ERROR",
+      "status": "PASS",
       "criteria": [
         "M14.3",
         "M28.2"
       ],
       "completeCriterion": false,
-      "message": "RuntimeError: PostgreSQL mode requires psycopg[binary]",
+      "message": "",
       "source": "tests/test_blueprint_postgres.py",
       "line": 101,
-      "seconds": 0.0
-    },
-    {
-      "test": "tests.test_blueprint_postgres.BlueprintPostgresAcceptance.test_postgres_scheduler_lock_excludes_second_worker",
-      "status": "ERROR",
-      "criteria": [
-        "M14.3",
-        "M28.2"
-      ],
-      "completeCriterion": false,
-      "message": "RuntimeError: PostgreSQL mode requires psycopg[binary]",
-      "source": "tests/test_blueprint_postgres.py",
-      "line": 101,
-      "seconds": 0.001
+      "seconds": 0.048
     },
     {
       "test": "tests.test_browser_flows.CommercialCrmBrowserFlows.test_calendar_books_linked_meeting_and_follow_up",
@@ -4532,7 +4391,7 @@
       "message": "",
       "source": "tests/test_browser_flows.py",
       "line": 166,
-      "seconds": 2.0
+      "seconds": 2.288
     },
     {
       "test": "tests.test_browser_flows.CommercialCrmBrowserFlows.test_dashboard_lead_conversion_and_customer_360",
@@ -4547,7 +4406,7 @@
       "message": "",
       "source": "tests/test_browser_flows.py",
       "line": 100,
-      "seconds": 2.65
+      "seconds": 2.585
     },
     {
       "test": "tests.test_browser_flows.CommercialCrmBrowserFlows.test_mobile_navigation_and_lead_dialog_remain_usable",
@@ -4560,7 +4419,7 @@
       "message": "",
       "source": "tests/test_browser_flows.py",
       "line": 154,
-      "seconds": 1.278
+      "seconds": 1.142
     },
     {
       "test": "tests.test_browser_flows.CommercialCrmBrowserFlows.test_rejected_task_save_keeps_form_and_shows_error",
@@ -4572,7 +4431,7 @@
       "message": "",
       "source": "tests/test_browser_flows.py",
       "line": 189,
-      "seconds": 1.564
+      "seconds": 1.436
     },
     {
       "test": "tests.test_blueprint_browser.BlueprintBrowserAcceptance.test_customer_task_navigates_to_customer",
@@ -4584,7 +4443,7 @@
       "message": "",
       "source": "tests/test_blueprint_browser.py",
       "line": 38,
-      "seconds": 1.565
+      "seconds": 1.906
     },
     {
       "test": "tests.test_blueprint_browser.BlueprintBrowserAcceptance.test_every_main_navigation_module_loads",
@@ -4596,7 +4455,20 @@
       "message": "",
       "source": "tests/test_blueprint_browser.py",
       "line": 20,
-      "seconds": 1.618
+      "seconds": 1.519
+    },
+    {
+      "test": "tests.test_blueprint_browser.BlueprintBrowserAcceptance.test_settings_sections_load_and_highlight_selected_section",
+      "status": "PASS",
+      "criteria": [
+        "M25.3",
+        "M28.3"
+      ],
+      "completeCriterion": false,
+      "message": "",
+      "source": "tests/test_blueprint_browser.py",
+      "line": 52,
+      "seconds": 1.816
     }
   ],
   "routes": [
@@ -4617,7 +4489,7 @@
       "method": "GET",
       "path": "/api/auth/status",
       "handler": "auth_status",
-      "line": 657,
+      "line": 669,
       "observedStatusCodes": [
         200
       ],
@@ -4630,7 +4502,7 @@
       "method": "POST",
       "path": "/api/auth/bootstrap",
       "handler": "auth_bootstrap",
-      "line": 662,
+      "line": 674,
       "observedStatusCodes": [
         200,
         422
@@ -4650,7 +4522,7 @@
       "method": "POST",
       "path": "/api/auth/login",
       "handler": "auth_login",
-      "line": 686,
+      "line": 698,
       "observedStatusCodes": [
         200
       ],
@@ -4669,7 +4541,7 @@
       "method": "GET",
       "path": "/api/auth/me",
       "handler": "auth_me",
-      "line": 700,
+      "line": 712,
       "observedStatusCodes": [
         200
       ],
@@ -4682,7 +4554,7 @@
       "method": "POST",
       "path": "/api/auth/logout",
       "handler": "auth_logout",
-      "line": 705,
+      "line": 717,
       "observedStatusCodes": [
         200
       ],
@@ -4695,7 +4567,7 @@
       "method": "GET",
       "path": "/api/entities",
       "handler": "get_entities",
-      "line": 713,
+      "line": 725,
       "observedStatusCodes": [
         200
       ],
@@ -4708,7 +4580,7 @@
       "method": "GET",
       "path": "/api/search",
       "handler": "global_search",
-      "line": 760,
+      "line": 772,
       "observedStatusCodes": [
         200
       ],
@@ -4722,7 +4594,7 @@
       "method": "GET",
       "path": "/api/dashboard",
       "handler": "get_dashboard",
-      "line": 783,
+      "line": 795,
       "observedStatusCodes": [
         200
       ],
@@ -4736,7 +4608,7 @@
       "method": "GET",
       "path": "/api/leads",
       "handler": "get_leads",
-      "line": 823,
+      "line": 835,
       "observedStatusCodes": [
         200,
         401
@@ -4757,7 +4629,7 @@
       "method": "GET",
       "path": "/api/leads/{id}",
       "handler": "get_single_lead",
-      "line": 857,
+      "line": 869,
       "observedStatusCodes": [
         200,
         404
@@ -4774,7 +4646,7 @@
       "method": "PUT",
       "path": "/api/leads/{id}/stage",
       "handler": "transition_lead_stage",
-      "line": 875,
+      "line": 887,
       "observedStatusCodes": [
         422
       ],
@@ -4788,7 +4660,7 @@
       "method": "POST",
       "path": "/api/leads",
       "handler": "create_lead",
-      "line": 955,
+      "line": 967,
       "observedStatusCodes": [
         200,
         403
@@ -4842,7 +4714,7 @@
       "method": "PUT",
       "path": "/api/leads/{id}",
       "handler": "update_lead",
-      "line": 1106,
+      "line": 1118,
       "observedStatusCodes": [
         200
       ],
@@ -4857,7 +4729,7 @@
       "method": "POST",
       "path": "/api/leads/bulk-update",
       "handler": "bulk_update_leads",
-      "line": 1134,
+      "line": 1146,
       "observedStatusCodes": [
         200
       ],
@@ -4871,7 +4743,7 @@
       "method": "DELETE",
       "path": "/api/leads/{id}",
       "handler": "delete_lead",
-      "line": 1147,
+      "line": 1159,
       "observedStatusCodes": [
         200
       ],
@@ -4885,7 +4757,7 @@
       "method": "GET",
       "path": "/api/deals",
       "handler": "get_deals",
-      "line": 1200,
+      "line": 1212,
       "observedStatusCodes": [
         200
       ],
@@ -4899,7 +4771,7 @@
       "method": "PUT",
       "path": "/api/deals/{id}",
       "handler": "update_deal",
-      "line": 1215,
+      "line": 1227,
       "observedStatusCodes": [
         200
       ],
@@ -4912,7 +4784,7 @@
       "method": "GET",
       "path": "/api/contacts",
       "handler": "get_contacts",
-      "line": 1220,
+      "line": 1232,
       "observedStatusCodes": [
         200
       ],
@@ -4926,7 +4798,7 @@
       "method": "PUT",
       "path": "/api/contacts/{id}",
       "handler": "update_contact",
-      "line": 1233,
+      "line": 1245,
       "observedStatusCodes": [
         200
       ],
@@ -4939,7 +4811,7 @@
       "method": "GET",
       "path": "/api/organizations",
       "handler": "get_organizations",
-      "line": 1237,
+      "line": 1249,
       "observedStatusCodes": [
         200
       ],
@@ -4953,7 +4825,7 @@
       "method": "PUT",
       "path": "/api/organizations/{id}",
       "handler": "update_organization",
-      "line": 1249,
+      "line": 1261,
       "observedStatusCodes": [
         200
       ],
@@ -4967,7 +4839,7 @@
       "method": "GET",
       "path": "/api/notes",
       "handler": "get_notes",
-      "line": 1254,
+      "line": 1266,
       "observedStatusCodes": [
         200
       ],
@@ -4981,7 +4853,7 @@
       "method": "POST",
       "path": "/api/notes",
       "handler": "create_note",
-      "line": 1272,
+      "line": 1284,
       "observedStatusCodes": [
         200
       ],
@@ -4996,7 +4868,7 @@
       "method": "DELETE",
       "path": "/api/notes/{id}",
       "handler": "delete_note",
-      "line": 1293,
+      "line": 1305,
       "observedStatusCodes": [
         200
       ],
@@ -5009,7 +4881,7 @@
       "method": "GET",
       "path": "/api/tasks",
       "handler": "get_tasks",
-      "line": 1348,
+      "line": 1360,
       "observedStatusCodes": [
         200
       ],
@@ -5027,7 +4899,7 @@
       "method": "POST",
       "path": "/api/tasks",
       "handler": "create_task",
-      "line": 1363,
+      "line": 1375,
       "observedStatusCodes": [
         200,
         403,
@@ -5048,7 +4920,7 @@
       "method": "PUT",
       "path": "/api/tasks/{id}",
       "handler": "update_task",
-      "line": 1388,
+      "line": 1400,
       "observedStatusCodes": [
         200,
         409
@@ -5068,7 +4940,7 @@
       "method": "DELETE",
       "path": "/api/tasks/{id}",
       "handler": "delete_task",
-      "line": 1412,
+      "line": 1424,
       "observedStatusCodes": [
         200
       ],
@@ -5081,7 +4953,7 @@
       "method": "POST",
       "path": "/api/leads/{id}/convert",
       "handler": "convert_lead",
-      "line": 1538,
+      "line": 1560,
       "observedStatusCodes": [
         200,
         409
@@ -5107,7 +4979,7 @@
       "method": "GET",
       "path": "/api/customers",
       "handler": "get_customers",
-      "line": 1587,
+      "line": 1609,
       "observedStatusCodes": [
         200
       ],
@@ -5120,7 +4992,7 @@
       "method": "POST",
       "path": "/api/customers",
       "handler": "create_customer",
-      "line": 1595,
+      "line": 1617,
       "observedStatusCodes": [
         200
       ],
@@ -5155,7 +5027,7 @@
       "method": "GET",
       "path": "/api/customers/{id}",
       "handler": "get_customer",
-      "line": 1619,
+      "line": 1641,
       "observedStatusCodes": [
         200
       ],
@@ -5171,7 +5043,7 @@
       "method": "PUT",
       "path": "/api/customers/{id}",
       "handler": "update_customer",
-      "line": 1641,
+      "line": 1663,
       "observedStatusCodes": [
         200
       ],
@@ -5185,7 +5057,7 @@
       "method": "GET",
       "path": "/api/admin/integrity",
       "handler": "get_integrity_report",
-      "line": 1761,
+      "line": 1783,
       "observedStatusCodes": [
         200
       ],
@@ -5198,7 +5070,7 @@
       "method": "GET",
       "path": "/api/admin/audit-integrity",
       "handler": "get_audit_integrity",
-      "line": 1766,
+      "line": 1788,
       "observedStatusCodes": [
         200
       ],
@@ -5211,7 +5083,7 @@
       "method": "POST",
       "path": "/api/admin/repair-relations",
       "handler": "repair_relations",
-      "line": 1771,
+      "line": 1793,
       "observedStatusCodes": [
         200
       ],
@@ -5224,7 +5096,7 @@
       "method": "GET",
       "path": "/api/archived-leads",
       "handler": "get_archived_leads",
-      "line": 1782,
+      "line": 1804,
       "observedStatusCodes": [
         200
       ],
@@ -5237,7 +5109,7 @@
       "method": "POST",
       "path": "/api/leads/{id}/archive",
       "handler": "archive_lead",
-      "line": 1786,
+      "line": 1808,
       "observedStatusCodes": [
         200
       ],
@@ -5251,7 +5123,7 @@
       "method": "POST",
       "path": "/api/archived-leads/{id}/restore",
       "handler": "restore_lead",
-      "line": 1798,
+      "line": 1820,
       "observedStatusCodes": [
         200
       ],
@@ -5265,7 +5137,7 @@
       "method": "POST",
       "path": "/api/organizations",
       "handler": "create_organization",
-      "line": 1818,
+      "line": 1840,
       "observedStatusCodes": [
         200
       ],
@@ -5279,7 +5151,7 @@
       "method": "POST",
       "path": "/api/contacts",
       "handler": "create_contact",
-      "line": 1826,
+      "line": 1848,
       "observedStatusCodes": [
         200
       ],
@@ -5294,7 +5166,7 @@
       "method": "GET",
       "path": "/api/audit-logs",
       "handler": "get_audit_logs",
-      "line": 1833,
+      "line": 1855,
       "observedStatusCodes": [
         200
       ],
@@ -5309,7 +5181,7 @@
       "method": "POST",
       "path": "/api/policies/{id}/issue",
       "handler": "issue_policy",
-      "line": 1838,
+      "line": 1860,
       "observedStatusCodes": [
         200,
         422
@@ -5324,7 +5196,7 @@
       "method": "GET",
       "path": "/api/policies",
       "handler": "get_policies",
-      "line": 1851,
+      "line": 1873,
       "observedStatusCodes": [
         200
       ],
@@ -5341,7 +5213,7 @@
       "method": "POST",
       "path": "/api/policies",
       "handler": "create_policy",
-      "line": 1860,
+      "line": 1882,
       "observedStatusCodes": [
         200
       ],
@@ -5373,7 +5245,7 @@
       "method": "POST",
       "path": "/api/policies/migrate-leads",
       "handler": "migrate_lead_policies",
-      "line": 1876,
+      "line": 1898,
       "observedStatusCodes": [
         200
       ],
@@ -5387,7 +5259,7 @@
       "method": "PUT",
       "path": "/api/policies/{id}",
       "handler": "update_policy",
-      "line": 1898,
+      "line": 1920,
       "observedStatusCodes": [
         200
       ],
@@ -5402,7 +5274,7 @@
       "method": "GET",
       "path": "/api/service-requests",
       "handler": "get_service_requests",
-      "line": 1923,
+      "line": 1945,
       "observedStatusCodes": [
         200
       ],
@@ -5415,7 +5287,7 @@
       "method": "POST",
       "path": "/api/service-requests",
       "handler": "create_service_request",
-      "line": 1929,
+      "line": 1951,
       "observedStatusCodes": [
         200,
         422
@@ -5434,7 +5306,7 @@
       "method": "PUT",
       "path": "/api/service-requests/{id}",
       "handler": "update_service_request",
-      "line": 1945,
+      "line": 1967,
       "observedStatusCodes": [
         200
       ],
@@ -5448,7 +5320,7 @@
       "method": "GET",
       "path": "/api/endorsements",
       "handler": "get_endorsements",
-      "line": 1954,
+      "line": 1976,
       "observedStatusCodes": [
         200
       ],
@@ -5462,7 +5334,7 @@
       "method": "GET",
       "path": "/api/renewals",
       "handler": "get_renewals",
-      "line": 1958,
+      "line": 1980,
       "observedStatusCodes": [
         200
       ],
@@ -5475,7 +5347,7 @@
       "method": "POST",
       "path": "/api/renewals",
       "handler": "create_renewal",
-      "line": 1963,
+      "line": 1985,
       "observedStatusCodes": [
         200
       ],
@@ -5494,7 +5366,7 @@
       "method": "PUT",
       "path": "/api/renewals/{id}",
       "handler": "update_renewal",
-      "line": 1978,
+      "line": 2000,
       "observedStatusCodes": [
         200,
         422
@@ -5513,7 +5385,7 @@
       "method": "POST",
       "path": "/api/renewals/{id}/complete",
       "handler": "complete_renewal",
-      "line": 2003,
+      "line": 2025,
       "observedStatusCodes": [
         200
       ],
@@ -5527,7 +5399,7 @@
       "method": "GET",
       "path": "/api/lifecycle/{lead_id}",
       "handler": "get_lifecycle",
-      "line": 2025,
+      "line": 2047,
       "observedStatusCodes": [
         200
       ],
@@ -5540,7 +5412,7 @@
       "method": "POST",
       "path": "/api/renewals/generate",
       "handler": "generate_renewals",
-      "line": 2035,
+      "line": 2057,
       "observedStatusCodes": [
         200
       ],
@@ -5554,7 +5426,7 @@
       "method": "GET",
       "path": "/api/quotations",
       "handler": "get_quotations",
-      "line": 2055,
+      "line": 2077,
       "observedStatusCodes": [
         200
       ],
@@ -5567,7 +5439,7 @@
       "method": "POST",
       "path": "/api/quotations",
       "handler": "create_quotation",
-      "line": 2060,
+      "line": 2082,
       "observedStatusCodes": [
         200,
         422
@@ -5588,7 +5460,7 @@
       "method": "PUT",
       "path": "/api/quotations/{id}",
       "handler": "update_quotation",
-      "line": 2071,
+      "line": 2093,
       "observedStatusCodes": [
         200
       ],
@@ -5601,7 +5473,7 @@
       "method": "GET",
       "path": "/api/renewals/report",
       "handler": "renewal_report",
-      "line": 2083,
+      "line": 2105,
       "observedStatusCodes": [
         200
       ],
@@ -5614,7 +5486,7 @@
       "method": "GET",
       "path": "/api/communication-templates",
       "handler": "get_communication_templates",
-      "line": 2097,
+      "line": 2119,
       "observedStatusCodes": [
         200
       ],
@@ -5627,7 +5499,7 @@
       "method": "POST",
       "path": "/api/communication-templates",
       "handler": "create_communication_template",
-      "line": 2105,
+      "line": 2127,
       "observedStatusCodes": [
         200,
         422
@@ -5643,7 +5515,7 @@
       "method": "PUT",
       "path": "/api/communication-templates/{id}",
       "handler": "update_communication_template",
-      "line": 2117,
+      "line": 2139,
       "observedStatusCodes": [
         200
       ],
@@ -5656,7 +5528,7 @@
       "method": "POST",
       "path": "/api/communication-templates/{id}/restore",
       "handler": "restore_communication_template",
-      "line": 2123,
+      "line": 2145,
       "observedStatusCodes": [
         200
       ],
@@ -5669,7 +5541,7 @@
       "method": "DELETE",
       "path": "/api/communication-templates/{id}",
       "handler": "delete_communication_template",
-      "line": 2131,
+      "line": 2153,
       "observedStatusCodes": [
         200
       ],
@@ -5682,7 +5554,7 @@
       "method": "GET",
       "path": "/api/consents",
       "handler": "get_consents",
-      "line": 2146,
+      "line": 2168,
       "observedStatusCodes": [
         200
       ],
@@ -5695,7 +5567,7 @@
       "method": "POST",
       "path": "/api/consents",
       "handler": "record_consent",
-      "line": 2151,
+      "line": 2173,
       "observedStatusCodes": [
         200
       ],
@@ -5709,7 +5581,7 @@
       "method": "GET",
       "path": "/api/communications",
       "handler": "get_communications",
-      "line": 2176,
+      "line": 2198,
       "observedStatusCodes": [
         200
       ],
@@ -5723,7 +5595,7 @@
       "method": "POST",
       "path": "/api/communications",
       "handler": "create_communication",
-      "line": 2181,
+      "line": 2203,
       "observedStatusCodes": [
         200,
         409,
@@ -5745,7 +5617,7 @@
       "method": "POST",
       "path": "/api/communications/{id}/send",
       "handler": "send_communication",
-      "line": 2315,
+      "line": 2337,
       "observedStatusCodes": [
         200
       ],
@@ -5759,7 +5631,7 @@
       "method": "GET",
       "path": "/api/whatsapp-templates",
       "handler": "list_whatsapp_templates",
-      "line": 2391,
+      "line": 2413,
       "observedStatusCodes": [
         200
       ],
@@ -5772,7 +5644,7 @@
       "method": "POST",
       "path": "/api/whatsapp-templates",
       "handler": "create_whatsapp_template",
-      "line": 2395,
+      "line": 2417,
       "observedStatusCodes": [
         200
       ],
@@ -5785,7 +5657,7 @@
       "method": "POST",
       "path": "/api/whatsapp-templates/{id}/submit",
       "handler": "submit_whatsapp_template",
-      "line": 2450,
+      "line": 2472,
       "observedStatusCodes": [
         422
       ],
@@ -5798,7 +5670,7 @@
       "method": "POST",
       "path": "/api/whatsapp-templates/sync",
       "handler": "sync_whatsapp_templates",
-      "line": 2482,
+      "line": 2504,
       "observedStatusCodes": [
         422
       ],
@@ -5811,7 +5683,7 @@
       "method": "DELETE",
       "path": "/api/whatsapp-templates/{id}",
       "handler": "delete_whatsapp_template",
-      "line": 2521,
+      "line": 2543,
       "observedStatusCodes": [
         200
       ],
@@ -5824,7 +5696,7 @@
       "method": "POST",
       "path": "/api/leads/{id}/message",
       "handler": "message_lead",
-      "line": 2563,
+      "line": 2585,
       "observedStatusCodes": [
         200,
         422
@@ -5838,7 +5710,7 @@
       "method": "GET",
       "path": "/api/leads/{id}/message-options",
       "handler": "lead_message_options",
-      "line": 2629,
+      "line": 2651,
       "observedStatusCodes": [
         200
       ],
@@ -5851,7 +5723,7 @@
       "method": "POST",
       "path": "/api/communications/{id}/delivery-event",
       "handler": "record_delivery_event",
-      "line": 2665,
+      "line": 2687,
       "observedStatusCodes": [
         200
       ],
@@ -5864,7 +5736,7 @@
       "method": "GET",
       "path": "/api/notifications",
       "handler": "get_notifications",
-      "line": 2679,
+      "line": 2701,
       "observedStatusCodes": [
         200
       ],
@@ -5880,7 +5752,7 @@
       "method": "POST",
       "path": "/api/notifications/run-escalations",
       "handler": "run_escalations",
-      "line": 2687,
+      "line": 2709,
       "observedStatusCodes": [
         200
       ],
@@ -5896,7 +5768,7 @@
       "method": "GET",
       "path": "/api/admin/jobs",
       "handler": "scheduler_status",
-      "line": 2767,
+      "line": 2789,
       "observedStatusCodes": [
         200
       ],
@@ -5909,7 +5781,7 @@
       "method": "POST",
       "path": "/api/admin/jobs/run",
       "handler": "run_jobs_now",
-      "line": 2773,
+      "line": 2795,
       "observedStatusCodes": [
         200
       ],
@@ -5924,7 +5796,7 @@
       "method": "PUT",
       "path": "/api/notifications/{id}",
       "handler": "update_notification",
-      "line": 2781,
+      "line": 2803,
       "observedStatusCodes": [
         200
       ],
@@ -5937,7 +5809,7 @@
       "method": "POST",
       "path": "/api/leads/import",
       "handler": "import_leads",
-      "line": 2809,
+      "line": 2831,
       "observedStatusCodes": [
         200
       ],
@@ -5950,7 +5822,7 @@
       "method": "GET",
       "path": "/api/channel-providers",
       "handler": "list_channel_providers",
-      "line": 3260,
+      "line": 3310,
       "observedStatusCodes": [
         200
       ],
@@ -5963,7 +5835,7 @@
       "method": "GET",
       "path": "/api/channels",
       "handler": "list_channels",
-      "line": 3268,
+      "line": 3318,
       "observedStatusCodes": [
         200
       ],
@@ -5976,7 +5848,7 @@
       "method": "POST",
       "path": "/api/channels",
       "handler": "create_channel",
-      "line": 3273,
+      "line": 3323,
       "observedStatusCodes": [
         200
       ],
@@ -5992,7 +5864,7 @@
       "method": "GET",
       "path": "/api/channels/{id}/oauth/start",
       "handler": "start_channel_oauth",
-      "line": 3331,
+      "line": 3381,
       "observedStatusCodes": [
         422
       ],
@@ -6005,7 +5877,7 @@
       "method": "GET",
       "path": "/api/integrations/oauth/callback",
       "handler": "finish_channel_oauth",
-      "line": 3343,
+      "line": 3393,
       "observedStatusCodes": [
         400
       ],
@@ -6018,7 +5890,7 @@
       "method": "PUT",
       "path": "/api/channels/{id}",
       "handler": "update_channel",
-      "line": 3364,
+      "line": 3414,
       "observedStatusCodes": [
         200
       ],
@@ -6031,7 +5903,7 @@
       "method": "DELETE",
       "path": "/api/channels/{id}",
       "handler": "disconnect_channel",
-      "line": 3380,
+      "line": 3430,
       "observedStatusCodes": [
         200
       ],
@@ -6044,7 +5916,7 @@
       "method": "GET",
       "path": "/api/webhooks/{company_id}/{channel_id}",
       "handler": "verify_company_channel_webhook",
-      "line": 3602,
+      "line": 3652,
       "observedStatusCodes": [],
       "observedRequests": 0,
       "tests": []
@@ -6053,7 +5925,7 @@
       "method": "POST",
       "path": "/api/webhooks/{company_id}/{channel_id}",
       "handler": "receive_company_channel_webhook",
-      "line": 3609,
+      "line": 3659,
       "observedStatusCodes": [],
       "observedRequests": 0,
       "tests": []
@@ -6062,7 +5934,7 @@
       "method": "GET",
       "path": "/api/webhooks/{channel_id}",
       "handler": "verify_channel_webhook",
-      "line": 3616,
+      "line": 3666,
       "observedStatusCodes": [],
       "observedRequests": 0,
       "tests": []
@@ -6071,7 +5943,7 @@
       "method": "POST",
       "path": "/api/webhooks/{channel_id}",
       "handler": "receive_channel_webhook",
-      "line": 3620,
+      "line": 3670,
       "observedStatusCodes": [
         200
       ],
@@ -6084,7 +5956,7 @@
       "method": "GET",
       "path": "/api/channels/{id}/sample-payload",
       "handler": "channel_sample_payload",
-      "line": 3655,
+      "line": 3705,
       "observedStatusCodes": [
         200
       ],
@@ -6097,7 +5969,7 @@
       "method": "POST",
       "path": "/api/channels/{id}/test",
       "handler": "send_test_event",
-      "line": 3660,
+      "line": 3710,
       "observedStatusCodes": [
         200
       ],
@@ -6111,7 +5983,7 @@
       "method": "GET",
       "path": "/api/channel-events",
       "handler": "list_channel_events",
-      "line": 3678,
+      "line": 3728,
       "observedStatusCodes": [
         200
       ],
@@ -6124,7 +5996,7 @@
       "method": "POST",
       "path": "/api/channel-events/{id}/reprocess",
       "handler": "reprocess_channel_event",
-      "line": 3687,
+      "line": 3737,
       "observedStatusCodes": [],
       "observedRequests": 0,
       "tests": []
@@ -6133,7 +6005,7 @@
       "method": "POST",
       "path": "/api/imports/analyze",
       "handler": "analyze_import",
-      "line": 3866,
+      "line": 3916,
       "observedStatusCodes": [
         200
       ],
@@ -6148,7 +6020,7 @@
       "method": "POST",
       "path": "/api/imports/{import_id}/commit",
       "handler": "commit_import",
-      "line": 3911,
+      "line": 3961,
       "observedStatusCodes": [
         200,
         409
@@ -6164,7 +6036,7 @@
       "method": "GET",
       "path": "/api/imports",
       "handler": "list_imports",
-      "line": 4036,
+      "line": 4092,
       "observedStatusCodes": [
         200
       ],
@@ -6177,7 +6049,7 @@
       "method": "GET",
       "path": "/api/imports/{import_id}",
       "handler": "get_import",
-      "line": 4041,
+      "line": 4097,
       "observedStatusCodes": [
         200
       ],
@@ -6190,7 +6062,7 @@
       "method": "GET",
       "path": "/api/imports/{import_id}/rejected.csv",
       "handler": "download_rejected_rows",
-      "line": 4046,
+      "line": 4102,
       "observedStatusCodes": [
         200
       ],
@@ -6203,7 +6075,7 @@
       "method": "POST",
       "path": "/api/imports/{import_id}/rollback",
       "handler": "rollback_import",
-      "line": 4062,
+      "line": 4118,
       "observedStatusCodes": [
         200
       ],
@@ -6216,7 +6088,7 @@
       "method": "GET",
       "path": "/api/assignment-rules/options",
       "handler": "assignment_rule_options",
-      "line": 4218,
+      "line": 4274,
       "observedStatusCodes": [
         200
       ],
@@ -6229,7 +6101,7 @@
       "method": "GET",
       "path": "/api/assignment-rules",
       "handler": "list_assignment_rules",
-      "line": 4224,
+      "line": 4280,
       "observedStatusCodes": [
         200
       ],
@@ -6243,7 +6115,7 @@
       "method": "POST",
       "path": "/api/assignment-rules",
       "handler": "create_assignment_rule",
-      "line": 4228,
+      "line": 4284,
       "observedStatusCodes": [
         200
       ],
@@ -6256,7 +6128,7 @@
       "method": "PUT",
       "path": "/api/assignment-rules/{id}",
       "handler": "update_assignment_rule",
-      "line": 4248,
+      "line": 4304,
       "observedStatusCodes": [
         200
       ],
@@ -6269,7 +6141,7 @@
       "method": "POST",
       "path": "/api/assignment-rules/{id}/move",
       "handler": "reorder_assignment_rule",
-      "line": 4258,
+      "line": 4314,
       "observedStatusCodes": [
         200
       ],
@@ -6282,7 +6154,7 @@
       "method": "DELETE",
       "path": "/api/assignment-rules/{id}",
       "handler": "delete_assignment_rule",
-      "line": 4271,
+      "line": 4327,
       "observedStatusCodes": [
         200
       ],
@@ -6295,7 +6167,7 @@
       "method": "POST",
       "path": "/api/assignment-rules/preview",
       "handler": "preview_assignment_rule",
-      "line": 4280,
+      "line": 4336,
       "observedStatusCodes": [
         200
       ],
@@ -6309,7 +6181,7 @@
       "method": "GET",
       "path": "/api/demo-data",
       "handler": "preview_demo_data",
-      "line": 4334,
+      "line": 4390,
       "observedStatusCodes": [
         200
       ],
@@ -6322,7 +6194,7 @@
       "method": "POST",
       "path": "/api/demo-data/purge",
       "handler": "purge_demo_data",
-      "line": 4339,
+      "line": 4395,
       "observedStatusCodes": [],
       "observedRequests": 0,
       "tests": []
@@ -6331,7 +6203,7 @@
       "method": "GET",
       "path": "/api/profile",
       "handler": "get_profile",
-      "line": 4378,
+      "line": 4434,
       "observedStatusCodes": [
         200
       ],
@@ -6344,7 +6216,7 @@
       "method": "PUT",
       "path": "/api/profile",
       "handler": "update_profile",
-      "line": 4406,
+      "line": 4462,
       "observedStatusCodes": [
         200
       ],
@@ -6357,7 +6229,7 @@
       "method": "GET",
       "path": "/api/users/hierarchy",
       "handler": "get_sales_hierarchy",
-      "line": 4433,
+      "line": 4489,
       "observedStatusCodes": [
         200
       ],
@@ -6370,7 +6242,7 @@
       "method": "PUT",
       "path": "/api/users/{id}/manager",
       "handler": "set_user_manager",
-      "line": 4474,
+      "line": 4530,
       "observedStatusCodes": [
         200,
         422
@@ -6385,7 +6257,7 @@
       "method": "POST",
       "path": "/api/admin/repair-calendar",
       "handler": "repair_calendar_relations",
-      "line": 4616,
+      "line": 4672,
       "observedStatusCodes": [
         200
       ],
@@ -6398,7 +6270,7 @@
       "method": "GET",
       "path": "/api/calendar",
       "handler": "get_calendar",
-      "line": 4628,
+      "line": 4684,
       "observedStatusCodes": [
         200
       ],
@@ -6417,7 +6289,7 @@
       "method": "POST",
       "path": "/api/calendar/events",
       "handler": "create_calendar_event",
-      "line": 4738,
+      "line": 4794,
       "observedStatusCodes": [
         200,
         409
@@ -6441,7 +6313,7 @@
       "method": "PUT",
       "path": "/api/calendar/events/{id}",
       "handler": "update_calendar_event",
-      "line": 4784,
+      "line": 4840,
       "observedStatusCodes": [
         200,
         422
@@ -6456,7 +6328,7 @@
       "method": "DELETE",
       "path": "/api/calendar/events/{id}",
       "handler": "delete_calendar_event",
-      "line": 4813,
+      "line": 4869,
       "observedStatusCodes": [
         200
       ],
@@ -6469,7 +6341,7 @@
       "method": "POST",
       "path": "/api/calendar/reschedule",
       "handler": "reschedule_calendar_entry",
-      "line": 4824,
+      "line": 4880,
       "observedStatusCodes": [
         409
       ],
@@ -6482,7 +6354,7 @@
       "method": "GET",
       "path": "/api/users",
       "handler": "get_users",
-      "line": 4855,
+      "line": 4911,
       "observedStatusCodes": [
         200
       ],
@@ -6495,7 +6367,7 @@
       "method": "POST",
       "path": "/api/users",
       "handler": "create_user",
-      "line": 4860,
+      "line": 4916,
       "observedStatusCodes": [
         200
       ],
@@ -6514,7 +6386,7 @@
       "method": "PUT",
       "path": "/api/users/{id}",
       "handler": "update_user",
-      "line": 4878,
+      "line": 4934,
       "observedStatusCodes": [],
       "observedRequests": 0,
       "tests": []
@@ -6523,7 +6395,7 @@
       "method": "DELETE",
       "path": "/api/users/{id}",
       "handler": "deactivate_user",
-      "line": 4900,
+      "line": 4956,
       "observedStatusCodes": [
         200
       ],
@@ -6536,7 +6408,7 @@
       "method": "GET",
       "path": "/api/settings",
       "handler": "get_settings",
-      "line": 4913,
+      "line": 4969,
       "observedStatusCodes": [
         200
       ],
@@ -6549,7 +6421,7 @@
       "method": "PUT",
       "path": "/api/settings",
       "handler": "update_settings",
-      "line": 4918,
+      "line": 4974,
       "observedStatusCodes": [
         200,
         422
@@ -6566,7 +6438,7 @@
       "method": "POST",
       "path": "/api/records/{collection}/{id}/archive",
       "handler": "archive_operational_record",
-      "line": 4936,
+      "line": 4992,
       "observedStatusCodes": [
         200
       ],
@@ -6579,7 +6451,7 @@
       "method": "POST",
       "path": "/api/archived-records/{archive_id}/restore",
       "handler": "restore_operational_record",
-      "line": 4943,
+      "line": 4999,
       "observedStatusCodes": [
         200
       ],
@@ -6592,7 +6464,7 @@
       "method": "GET",
       "path": "/api/archived-records",
       "handler": "get_archived_records",
-      "line": 4957,
+      "line": 5013,
       "observedStatusCodes": [
         200
       ],
@@ -6605,7 +6477,7 @@
       "method": "GET",
       "path": "/api/documents",
       "handler": "get_documents",
-      "line": 5003,
+      "line": 5059,
       "observedStatusCodes": [
         200
       ],
@@ -6618,7 +6490,7 @@
       "method": "POST",
       "path": "/api/documents",
       "handler": "upload_document",
-      "line": 5008,
+      "line": 5064,
       "observedStatusCodes": [
         200,
         422
@@ -6634,7 +6506,7 @@
       "method": "GET",
       "path": "/api/documents/{id}/content",
       "handler": "download_document",
-      "line": 5027,
+      "line": 5083,
       "observedStatusCodes": [
         200
       ],
@@ -6648,7 +6520,7 @@
       "method": "DELETE",
       "path": "/api/documents/{id}",
       "handler": "archive_document",
-      "line": 5041,
+      "line": 5097,
       "observedStatusCodes": [
         200
       ],
@@ -6661,7 +6533,7 @@
       "method": "GET",
       "path": "/api/data-quality/lead-duplicates",
       "handler": "duplicate_candidates",
-      "line": 5046,
+      "line": 5102,
       "observedStatusCodes": [
         200
       ],
@@ -6674,7 +6546,7 @@
       "method": "POST",
       "path": "/api/leads/{target_id}/merge/{duplicate_id}",
       "handler": "merge_leads",
-      "line": 5055,
+      "line": 5111,
       "observedStatusCodes": [
         200
       ],
@@ -6688,7 +6560,7 @@
       "method": "GET",
       "path": "/api/reports/operations",
       "handler": "operations_report",
-      "line": 5077,
+      "line": 5133,
       "observedStatusCodes": [
         200
       ],
@@ -6705,7 +6577,7 @@
       "method": "GET",
       "path": "/api/saved-filters",
       "handler": "get_saved_filters",
-      "line": 5104,
+      "line": 5160,
       "observedStatusCodes": [
         200
       ],
@@ -6719,7 +6591,7 @@
       "method": "POST",
       "path": "/api/saved-filters",
       "handler": "create_saved_filter",
-      "line": 5111,
+      "line": 5167,
       "observedStatusCodes": [
         200
       ],
@@ -6733,7 +6605,7 @@
       "method": "DELETE",
       "path": "/api/saved-filters/{id}",
       "handler": "delete_saved_filter",
-      "line": 5124,
+      "line": 5180,
       "observedStatusCodes": [
         403
       ],
@@ -6746,7 +6618,7 @@
       "method": "GET",
       "path": "/api/backups",
       "handler": "list_backups",
-      "line": 5143,
+      "line": 5199,
       "observedStatusCodes": [
         200,
         403
@@ -6761,7 +6633,7 @@
       "method": "POST",
       "path": "/api/backups",
       "handler": "create_backup",
-      "line": 5149,
+      "line": 5205,
       "observedStatusCodes": [
         200
       ],
@@ -6775,7 +6647,7 @@
       "method": "POST",
       "path": "/api/backups/{name}/restore",
       "handler": "restore_backup",
-      "line": 5153,
+      "line": 5209,
       "observedStatusCodes": [
         200
       ],
@@ -6788,7 +6660,7 @@
       "method": "GET",
       "path": "/api/health",
       "handler": "health",
-      "line": 5166,
+      "line": 5222,
       "observedStatusCodes": [
         200
       ],
@@ -6801,7 +6673,7 @@
       "method": "GET",
       "path": "/api/ai-advisor/status",
       "handler": "advisor_status",
-      "line": 5341,
+      "line": 5397,
       "observedStatusCodes": [],
       "observedRequests": 0,
       "tests": []
@@ -6810,16 +6682,7 @@
       "method": "POST",
       "path": "/api/ai-advisor",
       "handler": "ai_advisor_query",
-      "line": 5368,
-      "observedStatusCodes": [],
-      "observedRequests": 0,
-      "tests": []
-    },
-    {
-      "method": "POST",
-      "path": "/api/ai-advisor/legacy",
-      "handler": "ai_advisor_legacy",
-      "line": 5389,
+      "line": 5424,
       "observedStatusCodes": [],
       "observedRequests": 0,
       "tests": []

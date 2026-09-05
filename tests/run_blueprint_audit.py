@@ -92,6 +92,15 @@ class EvidenceResult(unittest.TestResult):
             line = inspect.getsourcelines(method)[1]
         except (TypeError, ValueError):
             source, line = "", 0
+        # A setup failure and cleanup failure are two errors in one test case,
+        # not two executed tests. Retain both diagnostics without inflating counts.
+        existing = next((case for case in self.cases if case["test"] == test.id()), None)
+        if existing:
+            existing["message"] = "\n".join(filter(None, [existing["message"], message]))
+            priority = {"PASS": 0, "BLOCKED": 1, "FAIL": 2, "ERROR": 3}
+            if priority[status] > priority[existing["status"]]:
+                existing["status"] = status
+            return
         self.cases.append({"test": test.id(), "status": status, "criteria": criteria,
             "completeCriterion": getattr(method, "complete_criterion", False),
             "message": message, "source": source, "line": line,

@@ -14,6 +14,10 @@ PYTHONWARNINGS=ignore .venv/bin/python3 -m tests.run_blueprint_audit --browser
 
 The runner refuses a deployed browser target or configured application database, generates a criterion-by-criterion report and `uat/blueprint-results.json`, and exits nonzero when failures remain. Passing screen navigation is not full module acceptance; provider, production recovery and human accessibility/UAT checks remain separately classified.
 
+Optional real PostgreSQL adapter checks use `CRM_BLUEPRINT_PG_DSN` pointing to a designated disposable database named `blueprint` on localhost. They test competing writes, rollback, company isolation, archive references and scheduler locking; they do not certify combined database/document recovery. Install the declared CRM dependencies before running them. Never supply a live database or real customer records to acceptance tests.
+
+The assessment is snapshot-specific: compare its recorded product hashes with the current files before relying on its results. Product edits after a run require a new assessment.
+
 ### Workflow cleanup — 5 September 2026
 
 Single and bulk lead edits now share owner/next-action synchronization. Task renames, dates and completion update the canonical lead action by ID. Calendar moves reuse task/appointment validation, including cross-midnight conflicts. Calendar projection lookup uses indexes rather than scanning every task and policy for every lead, and legacy deduplication requires matching activity and date rather than date alone.

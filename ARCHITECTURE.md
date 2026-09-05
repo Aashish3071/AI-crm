@@ -8,6 +8,8 @@
 
 `tests/test_blueprint_acceptance.py` adds positive and negative API checks tied to criterion IDs. `tests/test_blueprint_browser.py` checks authenticated navigation breadth and customer-task navigation. `tests/run_blueprint_audit.py` runs them alongside the existing suites, records failures without expected-failure suppression, enumerates all application routes, and produces source-hashed evidence. Route observation is measured separately from acceptance; unobserved endpoints and externally blocked checks remain explicit.
 
+The browser assessment also checks all eleven settings sections and selected-section highlighting. `tests/test_blueprint_postgres.py` optionally exercises the real PostgreSQL adapter against an explicitly designated disposable local database, including optimistic concurrency, atomic rollback, company-separated identifiers, archived relationship targets and scheduler advisory locks. This is adapter evidence, not an end-to-end PostgreSQL deployment or recovery certification. The report counts each test once even if both setup and cleanup fail.
+
 This release is the commercial-insurance CRM. AI voice calling is deferred and its legacy files are excluded from the CRM container. SMS is removed. Supported outbound channels are Email and WhatsApp.
 
 The architecture favors a single connected operating workflow over independent record screens:

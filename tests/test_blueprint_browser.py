@@ -48,3 +48,27 @@ class BlueprintBrowserAcceptance(unittest.TestCase):
         self.page.locator('#app-sidebar [data-view="tasks"]').click()
         self.page.get_by_role("button", name="Task Navigation Customer", exact=False).click()
         expect(self.page.locator("#customer-360").get_by_role("heading", name="Task Navigation Customer", exact=True)).to_be_visible()
+
+    @criterion("M25.3", "M28.3")
+    def test_settings_sections_load_and_highlight_selected_section(self):
+        errors, requests = [], []
+        self.page.on("pageerror", lambda error: errors.append(str(error)))
+        self.page.on("response", lambda response: requests.append(f"{response.status} {response.url}")
+                     if "/api/" in response.url and response.status >= 400 else None)
+        self.page.goto(self.base_url, wait_until="networkidle")
+        self.page.locator('button[onclick="openSettingsModal()"]').click()
+        modal = self.page.locator("#settings-modal")
+        expect(modal).to_be_visible()
+        sections = modal.locator("[data-setting-tab]").evaluate_all(
+            "buttons => buttons.map(button => button.dataset.settingTab)")
+        self.assertEqual(len(sections), 11)
+        for section in sections:
+            with self.subTest(section=section):
+                modal.locator(f'[data-setting-tab="{section}"]').click()
+                self.page.wait_for_load_state("networkidle")
+                self.assertEqual(modal.locator(".setting-tab-btn.bg-white").get_attribute("data-setting-tab"), section)
+                self.assertTrue(modal.locator("#setting-pane-content").inner_text().strip())
+                self.assertFalse(errors, f"JavaScript errors in {section}: {errors}")
+                self.assertFalse(requests, f"API errors in {section}: {requests}")
+        modal.locator('button[onclick="closeSettingsModal()"]').click()
+        expect(modal).to_be_hidden()

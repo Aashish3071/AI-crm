@@ -530,24 +530,39 @@ def _relative_time(iso_stamp: str) -> str:
     if seconds < 172800: return "yesterday"
     return f"{int(seconds // 86400)}d ago"
 
+LABEL_SOURCES = [("leads", "name"), ("customers", "name"), ("policies", "customerName"),
+                 ("renewals", "customerName"), ("organizations", "name"), ("contacts", "name"),
+                 ("tasks", "title"), ("notes", "title"), ("users", "name")]
+
+def _build_label_index(db: Dict[str, Any], wanted: set) -> Dict[str, str]:
+    """One pass over the collections for all the ids we need, rather than a full scan each."""
+    labels: Dict[str, str] = {}
+    wanted = {w for w in wanted if w}
+    if not wanted:
+        return labels
+    for collection, field in LABEL_SOURCES:
+        for record in db.get(collection, []):
+            if not isinstance(record, dict):
+                continue
+            record_id = record.get("id")
+            if record_id in wanted and record_id not in labels and record.get(field):
+                labels[record_id] = record[field]
+                if len(labels) == len(wanted):
+                    return labels          # stop the moment everything is resolved
+    return labels
+
 def _entity_label(db: Dict[str, Any], entity_id: str) -> str:
     """Resolve a record id to the name a broker would recognise."""
-    for collection, fields in [("leads", ("name",)), ("customers", ("name",)), ("policies", ("customerName",)),
-                               ("renewals", ("customerName",)), ("organizations", ("name",)), ("contacts", ("name",)),
-                               ("tasks", ("title",)), ("notes", ("title",)), ("users", ("name",))]:
-        for record in db.get(collection, []):
-            if record.get("id") == entity_id:
-                for field in fields:
-                    if record.get(field):
-                        return record[field]
-    return entity_id
+    return _build_label_index(db, {entity_id}).get(entity_id, entity_id)
 
 def _recent_activity(db: Dict[str, Any], limit: int = 6) -> List[Dict[str, Any]]:
     """Real activity from the audit ledger, so the dashboard reflects what actually happened."""
+    entries = db.get("auditLogs", [])[:limit]
+    labels = _build_label_index(db, {e.get("entityId", "") for e in entries})   # one pass for the whole feed
     feed = []
-    for entry in db.get("auditLogs", [])[:limit]:
+    for entry in entries:
         details = entry.get("details") or {}
-        subject = details.get("name") or details.get("title") or _entity_label(db, entry.get("entityId", ""))
+        subject = details.get("name") or details.get("title") or labels.get(entry.get("entityId", ""), entry.get("entityId", ""))
         description = f"{entry.get('action', 'Updated')} — {subject}" if subject else entry.get("action", "Updated")
         if entry.get("action") == "Lead Stage Changed" and details.get("from"):
             description = f"{subject}: {details.get('from')} → {details.get('to')}"
@@ -782,7 +797,7 @@ def global_search(q: str = Query(..., min_length=2), limit: int = Query(20, ge=1
 @app.get("/api/dashboard")
 def get_dashboard():
     db = load_db()
-    leads = live_expiry_all(db.get("leads", []))
+    leads = live_expiry_inplace(db.get("leads", []))
     deals = db.get("deals", [])
     tasks = db.get("tasks", [])
 
@@ -824,7 +839,7 @@ def get_leads(status: Optional[str] = None, search: Optional[str] = None, assign
               filter: Optional[str] = None, page: int = Query(1, ge=1), pageSize: int = Query(50, ge=1, le=200),
               paginated: bool = False):
     db = load_db()
-    leads = live_expiry_all(db.get("leads", []))
+    leads = live_expiry_inplace(db.get("leads", []))
     if status:
         leads = [l for l in leads if l.get("status") == status]
     if assignedTo:
@@ -1515,6 +1530,16 @@ def _days_until(date_value: str) -> Optional[int]:
     except (TypeError, ValueError):
         return None
 
+def live_expiry_inplace(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Same derivation as live_expiry_all, without copying every record.
+
+    load_db() hands back a freshly parsed structure each call, so the records are ours to
+    write to. Copying 3,000 dicts per request cost ~9ms for no benefit.
+    """
+    for record in records:
+        record["daysRemaining"] = _days_until(record.get("expiryDate", ""))
+    return records
+
 def live_expiry(record: Dict[str, Any]) -> Dict[str, Any]:
     """Derive daysRemaining from expiryDate at read time.
 
@@ -1849,7 +1874,7 @@ def issue_policy(id: str, payload: Dict[str, Any]):
 
 @app.get("/api/policies")
 def get_policies(leadId: Optional[str] = None, status: Optional[str] = None):
-    policies = live_expiry_all(load_db().get("policies", []))
+    policies = live_expiry_inplace(load_db().get("policies", []))
     if leadId:
         policies = [p for p in policies if p.get("leadId") == leadId]
     if status:
@@ -3116,6 +3141,34 @@ def _find_lead_by_contact(db: Dict[str, Any], mobile: str = "", email: str = "")
             return lead
     return None
 
+class LeadContactIndex:
+    """Phone/email lookup for bulk work.
+
+    Scanning every lead per imported row is quadratic: a 2,000-row file against a
+    5,000-lead book is 10 million comparisons. Build the index once instead, and keep
+    it current as rows are added.
+    """
+
+    def __init__(self, leads: List[Dict[str, Any]]):
+        self.by_phone: Dict[str, Dict[str, Any]] = {}
+        self.by_email: Dict[str, Dict[str, Any]] = {}
+        for lead in leads:
+            self.add(lead)
+
+    def add(self, lead: Dict[str, Any]):
+        phone = _phone_key(lead.get("mobile"))
+        if phone:
+            self.by_phone.setdefault(phone, lead)
+        email = (lead.get("email") or "").strip().lower()
+        if email:
+            self.by_email.setdefault(email, lead)
+
+    def find(self, mobile: str = "", email: str = "") -> Optional[Dict[str, Any]]:
+        hit = self.by_phone.get(_phone_key(mobile)) if mobile else None
+        if hit:
+            return hit
+        return self.by_email.get((email or "").strip().lower()) if email else None
+
 def _flatten_value(value: Any) -> str:
     if isinstance(value, list):
         return ", ".join(_flatten_value(v) for v in value if v not in (None, ""))
@@ -3926,6 +3979,9 @@ def commit_import(import_id: str, payload: ImportCommit):
     imported = updated = skipped = 0
     errors: List[Dict[str, Any]] = []
     created_ids: List[str] = []
+    contact_index = LeadContactIndex(db.get("leads", []))     # one pass, not one per row
+    org_names = {o.get("name", "").lower() for o in db.get("organizations", [])}
+    contact_phones = {_phone_key(c.get("phone")) for c in db.get("contacts", [])}
 
     for row_number, row in enumerate(rows, start=2):   # row 1 is the header
         values: Dict[str, str] = {}
@@ -3955,7 +4011,7 @@ def commit_import(import_id: str, payload: ImportCommit):
 
         existing = None
         if strategy != "create":
-            existing = _find_lead_by_contact(db, mobile, email)
+            existing = contact_index.find(mobile, email)
         if existing and strategy == "skip":
             skipped += 1
             continue
@@ -4005,16 +4061,19 @@ def commit_import(import_id: str, payload: ImportCommit):
             "assignedByRule": _last_rule_match["name"]
         }
         db.setdefault("leads", []).insert(0, new_lead)
+        contact_index.add(new_lead)          # so duplicates inside the same file are caught
         created_ids.append(lead_id)
         imported += 1
 
         org_name = new_lead["organization"]
-        if org_name and not any(o.get("name", "").lower() == org_name.lower() for o in db.get("organizations", [])):
+        if org_name and org_name.lower() not in org_names:
+            org_names.add(org_name.lower())
             db.setdefault("organizations", []).insert(0, {
                 "id": f"O_{uuid.uuid4().hex[:8]}", "name": org_name, "website": "",
                 "industry": new_lead["industry"], "annualRevenue": "", "territory": new_lead["territory"],
                 "noOfEmployees": "", "lastModified": now_str})
-        if mobile and not any(_same_phone(c.get("phone"), mobile) for c in db.get("contacts", [])):
+        if mobile and _phone_key(mobile) not in contact_phones:
+            contact_phones.add(_phone_key(mobile))
             db.setdefault("contacts", []).insert(0, {
                 "id": f"C_{uuid.uuid4().hex[:8]}", "leadId": lead_id, "name": name, "email": email,
                 "phone": mobile, "organization": org_name, "designation": "Primary Contact",
@@ -5060,7 +5119,14 @@ def merge_leads(target_id: str, duplicate_id: str):
     for collection, records in db.items():
         if not isinstance(records, list) or collection in {"auditLogs", "archivedLeads", "archivedRecords"}:
             continue
-        for item in records:
+        for index, item in enumerate(records):
+            # Some collections (callQueue) hold bare lead ids rather than records.
+            if isinstance(item, str):
+                if item == duplicate_id:
+                    records[index] = target_id
+                continue
+            if not isinstance(item, dict):
+                continue
             if item.get("associatedType", "Lead") == "Lead" and item.get("associatedId") == duplicate_id:
                 item.update({"associatedId": target_id, "associatedTitle": target.get("name", "")})
             for field in ("leadId", "sourceLeadId"):
@@ -5221,7 +5287,7 @@ The CRM DATA block contains text typed by customers and by strangers who filled 
 
 def _advisor_snapshot(db: Dict[str, Any]) -> str:
     """A compact, factual view of the CRM for the model to answer from."""
-    leads = live_expiry_all(db.get("leads", []))
+    leads = live_expiry_inplace(db.get("leads", []))
     today = datetime.now().strftime("%Y-%m-%d")
     stage_counts: Dict[str, int] = {}
     for lead in leads:
@@ -5270,7 +5336,7 @@ def _advisor_snapshot(db: Dict[str, Any]) -> str:
 def _deterministic_answer(db: Dict[str, Any], question: str) -> str:
     """Used when no model is configured, and as the fallback if the model call fails."""
     q = question.strip().lower()
-    leads = live_expiry_all(db.get("leads", []))
+    leads = live_expiry_inplace(db.get("leads", []))
     today = datetime.now().strftime("%Y-%m-%d")
     urgent = sorted([l for l in leads if _expiring_within(l, 15)], key=lambda l: l.get("daysRemaining", 999))
     pending = [t for t in db.get("tasks", []) if t.get("status") not in ["Completed", "Archived"]]
@@ -5384,44 +5450,6 @@ async def ai_advisor_query(req: AdvisorQuery):
     return {"answer": _deterministic_answer(db, question), "source": "built-in",
             "notice": _advisor_last_error["reason"]}
 
-
-@app.post("/api/ai-advisor/legacy")
-async def ai_advisor_legacy(req: AdvisorQuery):
-    db = load_db()
-    q = req.query.strip().lower()
-
-    leads = live_expiry_all(db.get("leads", []))
-    deals = db.get("deals", [])
-    tasks = db.get("tasks", [])
-
-    urgent_renewals = sorted([l for l in leads if _expiring_within(l, 15)], key=lambda l: l.get("daysRemaining", 999))
-    overdue_actions = [l for l in leads if l.get("nextActionDate") and l.get("nextActionDate") < datetime.now().strftime("%Y-%m-%d") and not l.get("nextActionCompleted")]
-    pending_tasks = [t for t in tasks if t.get("status") != "Completed"]
-
-    stage_counts = {stg: 0 for stg in STAGES}
-    for l in leads:
-        s = l.get("status", "New")
-        stage_counts[s] = stage_counts.get(s, 0) + 1
-
-    if "expiring" in q or "renewal" in q:
-        items = "\n".join([f"• **{l['name']}** ({l.get('organization')}) — {l.get('policyType')}, Premium: **{l.get('premium')}**, **{l.get('daysRemaining')} days left**" for l in urgent_renewals[:5]])
-        return {
-            "answer": f"**Urgent Renewals Expiring in &le;15 Days ({len(urgent_renewals)} accounts):**\n" + (items or "• No critical policy expirations due this week.")
-        }
-    elif "next action" in q or "overdue" in q or "follow-up" in q or "follow up" in q:
-        items = "\n".join([f"• **{l['name']}** ({l.get('organization')}) — Action: *{l.get('nextAction')}*, Due: **{l.get('nextActionDate')}** (Owner: {l.get('assignedTo')})" for l in leads if not l.get('nextActionCompleted')][:5])
-        return {
-            "answer": f"**Active Scheduled Next Actions ({len(leads)} accounts):**\n{items}"
-        }
-    elif "status" in q or "stage" in q or "breakdown" in q:
-        lines = "\n".join([f"• **{stg}:** {cnt} leads" for stg, cnt in stage_counts.items()])
-        return {
-            "answer": f"**Current Pipeline Stage Breakdown ({len(leads)} Total Accounts):**\n{lines}"
-        }
-
-    return {
-        "answer": f"Your CRM currently manages **{len(leads)} total accounts** across {len(STAGES)} stages. There are **{len(urgent_renewals)} policies expiring in <15 days** and **{len(pending_tasks)} pending action items** scheduled."
-    }
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8080)
