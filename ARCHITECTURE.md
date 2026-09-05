@@ -67,7 +67,16 @@ Roles:
 | Broker | Read/write assigned operational work | No setup mutation | No admin/recovery access |
 | Read-only/Auditor | Read | No mutation | No audit/backup administration |
 
-The current role policy is path-based. Record-level assignment rules can be added if the client requires brokers to see only their own book; company isolation is already mandatory.
+Visibility is enforced at record level, not only by path. `visible_owners()` resolves the signed-in session to the set of owner names it may read:
+
+| Role | Sees |
+| --- | --- |
+| Administrator | The whole company book |
+| Read-only/Auditor | The whole company book, no mutation |
+| Manager | Themselves plus everyone beneath them in the reporting hierarchy |
+| Broker | Only records assigned to them |
+
+The boundary is applied to lead lists and single-lead fetches, tasks, deals, policies, renewals, customers, the dashboard and the calendar, so a scoped user cannot reach another broker's record by requesting its ID; the response is 404, not a redacted record. The blueprint treats assigned-only visibility as a company policy rather than a constant, so it is stored as `settings.access.assignedOnlyVisibility` and defaults on. Company isolation remains mandatory and independent of this setting.
 
 ## 4. Persistence and relationships
 
@@ -103,6 +112,17 @@ The guarded migration utility:
 - refuses unresolved relationship errors;
 - refuses to overwrite a non-empty tenant without explicit `--replace`;
 - verifies the target after commit.
+
+## 4a. Dashboard composition
+
+The dashboard owns no records. Every number is a filtered view of the records that own the work, recomputed per request and scoped to the caller's visibility.
+
+- `todayCounts` splits active tasks into overdue, due today, completed today and the next seven days. "Due today" means the due date equals today; it previously returned every incomplete task regardless of date.
+- Completion time is recorded on the task as `completedAt`, because "completed today" cannot be derived from a due date, which states when work was meant to happen.
+- Open pipeline value sums premiums of leads that are not Won or Lost, using decimal parsing rather than digit concatenation of a formatted string. Won value is reported separately. `wonThisMonth` counts the stated period only.
+- `workTrend` returns seven daily pairs of scheduled versus completed tasks.
+
+Panel selection and order are per user, stored under `settings.dashboardLayouts` keyed by identity ID, so one broker's arrangement never changes another's. Chart colours come from a validated categorical palette (blue/orange, CVD ΔE 24.7 light and 26.8 dark); reserved status colours mark overdue, due, and completed states and are never reused as series colours.
 
 ## 5. Domain lifecycle
 

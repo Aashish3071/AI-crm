@@ -1731,78 +1731,217 @@ async function handleCreateLeadSubmit(e) {
 // ═══════════════════════════════════════════════════════════════════
 // 7. DASHBOARD, DEALS, CONTACTS & ORGANIZATIONS
 // ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
+// DASHBOARD — the day's work first, configurable per person
+// ═══════════════════════════════════════════════════════════════════
+let dashboardLayout = null;
+
 async function loadDashboard() {
     try {
-        const res = await fetch('/api/dashboard');
-        const data = await res.json();
+        const [data, layout] = await Promise.all([apiJson('/api/dashboard'), apiJson('/api/dashboard/layout')]);
+        dashboardLayout = layout;
+        window.crmDashboard = data;
 
-        document.getElementById('dash-date').textContent = new Date().toLocaleDateString('en-IN', {
-            weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
-        });
+        const hour = new Date().getHours();
+        const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+        const who = (document.getElementById('current-user-name')?.textContent || '').split(' ')[0];
+        document.getElementById('dash-greeting').textContent = who ? `${greeting}, ${who}` : 'Your day';
+        document.getElementById('dash-date').textContent = new Date().toLocaleDateString('en-IN',
+            { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 
-        document.getElementById('kpi-leads').textContent = data.totalLeads;
-        document.getElementById('kpi-deals').textContent = data.openDeals;
-        document.getElementById('kpi-won').textContent = data.wonThisMonth;
-        document.getElementById('kpi-value').textContent = data.pipelineValue;
+        const hidden = new Set(layout.hidden || []);
+        document.getElementById('dashboard-panels').innerHTML =
+            layout.order.filter(id => !hidden.has(id)).map(id => renderDashboardPanel(id, data)).join('')
+            || '<div class="text-xs text-slate-400 text-center py-10">Every panel is hidden. Use Customise to bring some back.</div>';
+        drawWorkTrend(data.workTrend || []);
+    } catch (e) { console.error(e); }
+}
 
-        const pipeEl = document.getElementById('dashboard-pipeline');
-        if (data.pipelineByStage) {
-            const total = Object.values(data.pipelineByStage).reduce((a, b) => a + b, 0) || 1;
-            pipeEl.innerHTML = STAGES.map(stg => {
-                const count = data.pipelineByStage[stg] || 0;
-                const pct = Math.round((count / total) * 100);
-                return `
-                    <div class="space-y-1">
-                        <div class="flex justify-between text-xs text-slate-700">
-                            <span class="font-medium">${stg}</span>
-                            <span class="font-mono text-slate-500">${count} (${pct}%)</span>
-                        </div>
-                        <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                            <div class="bg-slate-900 h-1.5 rounded-full" style="width: ${pct}%"></div>
-                        </div>
+function dashPanel(title, subtitle, body, action = '') {
+    return `<section class="bg-white border border-slateBorder rounded-lg">
+        <div class="flex items-start justify-between gap-3 px-4 py-3 border-b border-slateBorder">
+            <div><h2 class="text-xs font-semibold uppercase tracking-wider text-slate-900">${esc(title)}</h2>
+                 <p class="text-[11px] text-slate-500 mt-0.5">${esc(subtitle)}</p></div>
+            ${action}
+        </div>
+        <div class="p-4">${body}</div>
+    </section>`;
+}
+
+function taskLine(t, tone) {
+    const overdue = tone === 'overdue';
+    return `<button onclick="openLeadDrawer('${t.associatedId || ''}')" class="w-full text-left flex items-center justify-between gap-3 py-2 border-b border-slate-100 last:border-0 hover:bg-slate-50 px-1 -mx-1 rounded">
+        <span class="min-w-0">
+            <span class="block text-xs font-medium text-slate-800 truncate">${esc(t.title || '')}</span>
+            <span class="block text-[11px] text-slate-500 truncate">${esc(t.associatedTitle || '')}${t.assignedTo ? ` · ${esc(t.assignedTo)}` : ''}</span>
+        </span>
+        <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0 ${overdue ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-slate-100 text-slate-600'}">
+            ${overdue ? 'Overdue' : esc(t.dueDate || '')}
+        </span>
+    </button>`;
+}
+
+function renderDashboardPanel(id, d) {
+    const c = d.todayCounts || {};
+    if (id === 'today') {
+        const tiles = [
+            ['Overdue', c.overdue, 'is-critical', "switchView('tasks')"],
+            ['Due today', c.dueToday, 'is-warning', "switchView('tasks')"],
+            ['Completed today', c.completedToday, 'is-good', "switchView('tasks')"],
+            ['Next 7 days', c.next7Days, '', "switchView('calendar')"],
+        ];
+        return dashPanel('Today at a glance', 'Your workload right now',
+            `<div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                ${tiles.map(([label, value, tone, go]) => `
+                    <button onclick="${go}" class="day-tile ${tone}">
+                        <strong>${value ?? 0}</strong><span>${label}</span>
+                    </button>`).join('')}
+            </div>`);
+    }
+    if (id === 'myDay') {
+        const items = d.myDay || [];
+        const today = d.today;
+        return dashPanel('My day', 'Overdue first, then due today',
+            items.length ? items.map(t => taskLine(t, (t.dueDate || '') < today ? 'overdue' : 'today')).join('')
+                         : '<p class="text-xs text-slate-400 py-6 text-center">Nothing outstanding. Everything due today is done.</p>',
+            `<button onclick="switchView('tasks')" class="text-[11px] font-semibold text-slate-600">All tasks</button>`);
+    }
+    if (id === 'renewals') {
+        const items = d.renewalsDueThisWeek || [];
+        return dashPanel('Renewal radar', 'Policies expiring within 15 days',
+            items.length ? items.slice(0, 8).map(l => `
+                <button onclick="openLeadDrawer('${l.id}')" class="w-full text-left flex items-center justify-between gap-3 py-2 border-b border-slate-100 last:border-0 hover:bg-slate-50 px-1 -mx-1 rounded">
+                    <span class="min-w-0"><span class="block text-xs font-medium text-slate-800 truncate">${esc(l.name)}</span>
+                    <span class="block text-[11px] text-slate-500 truncate">${esc(l.organization || '')} · ${esc(l.policyType || '')} · ${esc(l.premium || '')}</span></span>
+                    <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0 bg-rose-50 text-rose-700 border border-rose-200">${esc(formatDaysLeft(l.daysRemaining))}</span>
+                </button>`).join('')
+                : '<p class="text-xs text-slate-400 py-6 text-center">No policy expires in the next 15 days.</p>',
+            `<button onclick="switchView('renewals')" class="text-[11px] font-semibold text-slate-600">Renewals</button>`);
+    }
+    if (id === 'trend') {
+        return dashPanel('Work trend', 'Scheduled versus completed, last 7 days',
+            `<div id="work-trend" class="viz-root"></div>`);
+    }
+    if (id === 'pipeline') {
+        const stages = d.pipelineByStage || {};
+        const max = Math.max(1, ...Object.values(stages));
+        const total = Object.values(stages).reduce((a, b) => a + b, 0);
+        return dashPanel('Pipeline by stage', `${total} accounts · open value ${esc(d.pipelineValue || '')}`,
+            `<div class="space-y-2">${Object.entries(stages).map(([stage, n]) => `
+                <button onclick="filterLeadsByStage('${esc(stage)}')" class="w-full text-left group">
+                    <div class="flex items-center justify-between text-xs mb-1">
+                        <span class="text-slate-700 group-hover:text-slate-900">${esc(stage)}</span>
+                        <span class="num-tabular text-slate-500">${n}</span>
                     </div>
-                `;
-            }).join('');
-        }
-
-        const tasksEl = document.getElementById('dashboard-tasks');
-        if (data.tasksDueToday && data.tasksDueToday.length > 0) {
-            tasksEl.innerHTML = data.tasksDueToday.map(t => `
-                <div class="p-2 rounded bg-slate-50 border border-slateBorder text-xs flex items-center justify-between">
-                    <span class="font-medium text-slate-800 truncate">${esc(t.title)}</span>
-                    <span class="text-[10px] text-slate-500 font-mono">${esc(t.dueDate)}</span>
-                </div>
-            `).join('');
-        } else {
-            tasksEl.innerHTML = '<div class="text-xs text-slate-400 py-3 text-center">No pending tasks for today</div>';
-        }
-
-        const renewalsEl = document.getElementById('dashboard-renewals');
-        if (data.renewalsDueThisWeek && data.renewalsDueThisWeek.length > 0) {
-            renewalsEl.innerHTML = data.renewalsDueThisWeek.map(l => `
-                <div class="p-2 rounded bg-slate-50 border border-slateBorder text-xs flex items-center justify-between">
-                    <div>
-                        <div class="font-semibold text-slate-900">${esc(l.name)} (${esc(l.organization)})</div>
-                        <div class="text-[11px] text-slate-500">${esc(l.policyType)} • ${esc(l.premium)}</div>
-                    </div>
-                    <span class="text-xs font-bold text-rose-600 font-mono">${formatDaysLeft(l.daysRemaining)}</span>
-                </div>
-            `).join('');
-        } else {
-            renewalsEl.innerHTML = '<div class="text-xs text-slate-400 py-3 text-center">No policies expiring in &le;15 days</div>';
-        }
-
-        const activityEl = document.getElementById('dashboard-activity');
-        if (activityEl) {
-            const feed = data.recentActivity || [];
-            activityEl.innerHTML = feed.length ? feed.map(a => `
+                    <div class="h-2 bg-slate-100 rounded overflow-hidden"><div class="h-full rounded" style="width:${Math.round(n / max * 100)}%;background:var(--viz-series-1)"></div></div>
+                </button>`).join('')}</div>`);
+    }
+    if (id === 'upcoming') {
+        const items = d.upcomingTasks || [];
+        return dashPanel('Coming up', 'Scheduled for the next 7 days',
+            items.length ? items.map(t => taskLine(t, 'future')).join('')
+                         : '<p class="text-xs text-slate-400 py-6 text-center">Nothing scheduled in the next week.</p>',
+            `<button onclick="switchView('calendar')" class="text-[11px] font-semibold text-slate-600">Calendar</button>`);
+    }
+    if (id === 'activity') {
+        const feed = d.recentActivity || [];
+        return dashPanel('Recent activity', 'From the audit ledger',
+            feed.length ? feed.map(a => `
                 <div class="flex items-center justify-between gap-3 py-1.5 border-b border-slate-100 last:border-0 text-xs">
                     <span class="text-slate-700 truncate">${esc(a.description)}</span>
-                    <span class="text-[10px] text-slate-400 font-mono whitespace-nowrap">${esc(a.actor || 'System')} • ${esc(a.time || '')}</span>
-                </div>
-            `).join('') : '<div class="text-xs text-slate-400 py-3 text-center">No activity recorded yet</div>';
-        }
-    } catch (e) { console.error(e); }
+                    <span class="text-[10px] text-slate-400 font-mono whitespace-nowrap">${esc(a.actor || '')} · ${esc(a.time || '')}</span>
+                </div>`).join('')
+                : '<p class="text-xs text-slate-400 py-6 text-center">No activity recorded yet.</p>');
+    }
+    return '';
+}
+
+function filterLeadsByStage(stage) {
+    switchView('leads');
+    setTimeout(() => {
+        const select = document.getElementById('leads-status-filter');
+        if (select) { select.value = stage; loadLeads(); }
+    }, 200);
+}
+
+// Grouped bars: two series, one shared count axis. Colours are the validated
+// categorical slots 1 and 2; identity is carried by a legend AND direct labels.
+function drawWorkTrend(trend) {
+    const host = document.getElementById('work-trend');
+    if (!host || !trend.length) return;
+    const max = Math.max(1, ...trend.map(d => Math.max(d.due, d.completed)));
+    const H = 120;
+    host.innerHTML = `
+        <div class="viz-legend">
+            <span><i style="background:var(--viz-series-1)"></i>Scheduled</span>
+            <span><i style="background:var(--viz-series-2)"></i>Completed</span>
+        </div>
+        <div class="viz-bars" role="img" aria-label="Tasks scheduled versus completed over the last seven days">
+            ${trend.map(d => `
+                <div class="viz-day">
+                    <div class="viz-pair" style="height:${H}px">
+                        <div class="viz-bar" style="height:${Math.round(d.due / max * H)}px;background:var(--viz-series-1)" title="${d.due} scheduled on ${d.label}"><span>${d.due || ''}</span></div>
+                        <div class="viz-bar" style="height:${Math.round(d.completed / max * H)}px;background:var(--viz-series-2)" title="${d.completed} completed on ${d.label}"><span>${d.completed || ''}</span></div>
+                    </div>
+                    <span class="viz-day-label">${esc(d.label)}</span>
+                </div>`).join('')}
+        </div>`;
+}
+
+async function openDashboardCustomiser() {
+    const layout = dashboardLayout || await apiJson('/api/dashboard/layout');
+    const hidden = new Set(layout.hidden || []);
+    const form = document.getElementById('insurance-dynamic-form');
+    document.getElementById('insurance-form-title').textContent = 'Customise dashboard';
+    const byId = Object.fromEntries(layout.panels.map(p => [p.id, p]));
+    form.innerHTML = `
+        <p class="text-xs text-slate-500">Choose which panels appear and in what order. This is yours alone — it does not change anyone else's dashboard.</p>
+        <div id="panel-list" class="space-y-2">
+            ${layout.order.map((id, i) => `
+                <div class="panel-row" data-panel="${id}">
+                    <label class="flex items-start gap-2 min-w-0">
+                        <input type="checkbox" ${hidden.has(id) ? '' : 'checked'} class="mt-0.5 rounded">
+                        <span class="min-w-0"><span class="block text-xs font-medium text-slate-800">${esc(byId[id]?.label || id)}</span>
+                        <span class="block text-[11px] text-slate-500">${esc(byId[id]?.description || '')}</span></span>
+                    </label>
+                    <span class="flex gap-1 shrink-0">
+                        <button type="button" onclick="movePanel('${id}',-1)" class="rule-move">↑</button>
+                        <button type="button" onclick="movePanel('${id}',1)" class="rule-move">↓</button>
+                    </span>
+                </div>`).join('')}
+        </div>
+        <div class="pt-3 border-t border-slateBorder flex flex-wrap justify-between gap-2">
+            <button type="button" onclick="resetDashboardLayout()" class="text-xs font-semibold text-slate-600">Reset to default</button>
+            <div class="flex gap-2">
+                <button type="button" onclick="closeInsuranceForm()" class="px-3 py-1.5 border border-slate-300 rounded text-xs">Cancel</button>
+                <button type="submit" class="px-4 py-1.5 bg-slate-900 text-white rounded text-xs font-semibold">Save layout</button>
+            </div>
+        </div>`;
+    form.onsubmit = async e => {
+        e.preventDefault();
+        const rows = [...document.querySelectorAll('#panel-list .panel-row')];
+        await apiJson('/api/dashboard/layout', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order: rows.map(r => r.dataset.panel),
+                                   hidden: rows.filter(r => !r.querySelector('input').checked).map(r => r.dataset.panel) }) });
+        closeInsuranceForm(); showToast('Dashboard updated'); loadDashboard();
+    };
+    document.getElementById('insurance-form-modal').classList.remove('hidden');
+}
+
+function movePanel(id, delta) {
+    const list = document.getElementById('panel-list');
+    const row = list.querySelector(`[data-panel="${id}"]`);
+    const rows = [...list.children];
+    const at = rows.indexOf(row);
+    const to = at + delta;
+    if (to < 0 || to >= rows.length) return;
+    delta < 0 ? list.insertBefore(row, rows[to]) : list.insertBefore(rows[to], row);
+}
+
+async function resetDashboardLayout() {
+    await apiJson('/api/dashboard/layout', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order: dashboardLayout.panels.map(p => p.id), hidden: [] }) });
+    closeInsuranceForm(); showToast('Dashboard reset'); loadDashboard();
 }
 
 async function loadDeals() {

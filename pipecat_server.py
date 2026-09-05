@@ -802,37 +802,113 @@ def get_dashboard():
     deals = scoped(db.get("deals", []), owners)
     tasks = scoped(db.get("tasks", []), owners)
 
+    today = datetime.now().date()
+    today_str = today.strftime("%Y-%m-%d")
+    month_start = today.replace(day=1).strftime("%Y-%m-%d")
+    week_ahead = (today + timedelta(days=7)).strftime("%Y-%m-%d")
+
+    def task_date(task):
+        return task.get("dueDate") or ""
+
+    active_tasks = [t for t in tasks if t.get("status") not in ["Completed", "Archived"]]
+    # M01.2: "due today" means today — not every open task, which is what it used to return.
+    due_today = [t for t in active_tasks if task_date(t) == today_str]
+    overdue = [t for t in active_tasks if task_date(t) and task_date(t) < today_str]
+    upcoming = [t for t in active_tasks if today_str < task_date(t) <= week_ahead]
+    completed_today = [t for t in tasks if t.get("status") == "Completed"
+                       and (t.get("completedAt", "")[:10] or task_date(t)) == today_str]
+
     total_leads = len(leads)
-    open_deals = len([d for d in deals if d.get("status") not in ["Won", "Lost"]])
-    won_count = len([l for l in leads if l.get("status") == "Won"])
-    
-    pipeline_val_sum = 0
-    for l in leads:
-        prem_str = l.get("premium", "0")
-        digits = "".join([c for c in prem_str if c.isdigit()])
-        if digits:
-            pipeline_val_sum += int(digits)
-            
+    open_leads = [l for l in leads if l.get("status") not in ["Won", "Lost"]]
+    open_deals = [d for d in deals if d.get("status") not in ["Won", "Lost"]]
+
+    # M01.3: open pipeline excludes closed business, and keeps decimals rather than
+    # concatenating digits out of a formatted string.
+    pipeline_value = round(sum(money_value(l.get("premium")) for l in open_leads), 2)
+    won_value = round(sum(money_value(l.get("premium")) for l in leads if l.get("status") == "Won"), 2)
+
+    # A date-labelled KPI uses its stated period.
+    won_this_month = [l for l in leads if l.get("status") == "Won"
+                      and (l.get("lastModified", "") or "")[:10] >= month_start]
+
     stage_counts = {stg: 0 for stg in STAGES}
     for l in leads:
-        s = l.get("status", "New")
-        if s in stage_counts:
-            stage_counts[s] += 1
-        else:
-            stage_counts["Contacted"] += 1
+        stage_counts[l.get("status", "New")] = stage_counts.get(l.get("status", "New"), 0) + 1
 
-    renewals = sorted([l for l in leads if _expiring_within(l, 15)], key=lambda l: l.get("daysRemaining", 999))
+    renewals = sorted([l for l in leads if _expiring_within(l, 15)],
+                      key=lambda l: l.get("daysRemaining", 999))
+
+    # Seven-day work trend: what was scheduled versus what actually got finished.
+    trend = []
+    for offset in range(6, -1, -1):
+        day = today - timedelta(days=offset)
+        key = day.strftime("%Y-%m-%d")
+        trend.append({
+            "date": key,
+            "label": day.strftime("%a"),
+            "due": len([t for t in tasks if task_date(t) == key]),
+            "completed": len([t for t in tasks if t.get("status") == "Completed"
+                              and (t.get("completedAt", "")[:10] or task_date(t)) == key]),
+        })
 
     return {
+        "today": today_str,
+        "todayCounts": {"overdue": len(overdue), "dueToday": len(due_today),
+                        "completedToday": len(completed_today), "next7Days": len(upcoming)},
+        "myDay": sorted(overdue + due_today, key=lambda t: (task_date(t), t.get("priority") != "High"))[:12],
+        "upcomingTasks": sorted(upcoming, key=task_date)[:8],
+        "completedTodayList": completed_today[:8],
+        "workTrend": trend,
         "totalLeads": total_leads,
-        "openDeals": open_deals,
-        "wonThisMonth": won_count,
-        "pipelineValue": f"₹ {pipeline_val_sum:,.0f}" if pipeline_val_sum > 0 else "₹ 0",
+        "openLeads": len(open_leads),
+        "openDeals": len(open_deals),
+        "wonThisMonth": len(won_this_month),
+        "pipelineValue": f"₹ {pipeline_value:,.2f}".replace(".00", ""),
+        "pipelineValueRaw": pipeline_value,
+        "wonValueRaw": won_value,
         "pipelineByStage": stage_counts,
-        "tasksDueToday": [t for t in tasks if t.get("status") != "Completed"],
+        "tasksDueToday": due_today,
         "renewalsDueThisWeek": renewals,
         "recentActivity": _recent_activity(db)
     }
+
+DASHBOARD_PANELS = [
+    {"id": "today", "label": "Today at a glance", "description": "Overdue, due today, finished today and the week ahead."},
+    {"id": "myDay", "label": "My day", "description": "The tasks actually needing attention now."},
+    {"id": "renewals", "label": "Renewal radar", "description": "Policies expiring within 15 days."},
+    {"id": "trend", "label": "Work trend", "description": "Scheduled versus completed over the last 7 days."},
+    {"id": "pipeline", "label": "Pipeline by stage", "description": "Where the open book sits."},
+    {"id": "upcoming", "label": "Coming up", "description": "Scheduled for the next 7 days."},
+    {"id": "activity", "label": "Recent activity", "description": "What the team changed, from the audit ledger."},
+]
+DEFAULT_PANEL_ORDER = ["today", "myDay", "renewals", "trend", "pipeline", "upcoming", "activity"]
+
+def _panel_key() -> str:
+    session = crm_security.current_user() or {}
+    return session.get("sub") or "default"
+
+@app.get("/api/dashboard/layout")
+def get_dashboard_layout():
+    """Each person arranges their own dashboard; the catalogue is shared."""
+    db = load_db()
+    saved = ((db.get("settings", {}) or {}).get("dashboardLayouts", {}) or {}).get(_panel_key())
+    order = [p for p in (saved or {}).get("order", DEFAULT_PANEL_ORDER) if p in {x["id"] for x in DASHBOARD_PANELS}]
+    for panel in DEFAULT_PANEL_ORDER:
+        if panel not in order:
+            order.append(panel)
+    hidden = [h for h in (saved or {}).get("hidden", []) if h in order]
+    return {"panels": DASHBOARD_PANELS, "order": order, "hidden": hidden}
+
+@app.put("/api/dashboard/layout")
+def save_dashboard_layout(payload: Dict[str, Any]):
+    db = load_db()
+    valid = {p["id"] for p in DASHBOARD_PANELS}
+    order = [p for p in payload.get("order", DEFAULT_PANEL_ORDER) if p in valid]
+    hidden = [h for h in payload.get("hidden", []) if h in valid]
+    db.setdefault("settings", {}).setdefault("dashboardLayouts", {})[_panel_key()] = {
+        "order": order or DEFAULT_PANEL_ORDER, "hidden": hidden}
+    save_db(db)
+    return get_dashboard_layout()
 
 # ─── Leads CRUD & Stage Transition Engine ───
 @app.get("/api/leads")
@@ -1436,6 +1512,12 @@ def update_task(id: str, updates: Dict[str, Any]):
                 changes["dueDate"] = _parse_flexible_date(changes["dueDate"])
                 if not changes["dueDate"]:
                     raise HTTPException(status_code=422, detail="A valid due date is required")
+            # Record when work actually finished; "completed today" cannot be derived
+            # from the due date, which is when it was meant to happen.
+            if changes.get("status") == "Completed" and task.get("status") != "Completed":
+                changes["completedAt"] = datetime.utcnow().isoformat() + "Z"
+            elif "status" in changes and changes["status"] != "Completed":
+                changes["completedAt"] = ""
             if "title" in changes and (not isinstance(changes["title"], str) or not changes["title"].strip()):
                 raise HTTPException(status_code=422, detail="A task title is required")
             if "status" in changes and changes["status"] not in {"Pending", "In Progress", "Completed", "Archived"}:

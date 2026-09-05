@@ -4,7 +4,7 @@ InsureCRM is a CRM-first operating system for commercial insurance brokers. It m
 
 ## Current release
 
-The commercial readiness standard is now defined in [CRM Blueprint v1](uat/CRM_BLUEPRINT.md), covering 28 modules, 84 acceptance criteria and seven cross-module journeys. Read the [current assessment](uat/CRM_BLUEPRINT_ASSESSMENT.md) before treating the feature list below as verified commercial capability. The expanded acceptance tests expose failures that earlier smoke tests did not cover. This assessment changes test/documentation files only; it does not silently fix or waive the failures.
+The commercial readiness standard is defined in [CRM Blueprint v2](uat/CRM_BLUEPRINT_V2.md), which supersedes [v1](uat/CRM_BLUEPRINT.md) without lowering any criterion in it. v2 adds record-level visibility as a release requirement, an honest-module-boundary standard, and a split dashboard numeric contract; it also records the measured position (43 of 89 acceptance tests passing on 5 September 2026) and the build order derived from it. v1 remains, covering 28 modules, 84 acceptance criteria and seven cross-module journeys. Read the [current assessment](uat/CRM_BLUEPRINT_ASSESSMENT.md) before treating the feature list below as verified commercial capability. The expanded acceptance tests expose failures that earlier smoke tests did not cover. This assessment changes test/documentation files only; it does not silently fix or waive the failures.
 
 Repeat the comparison on disposable data:
 
@@ -17,6 +17,18 @@ The runner refuses a deployed browser target or configured application database,
 Optional real PostgreSQL adapter checks use `CRM_BLUEPRINT_PG_DSN` pointing to a designated disposable database named `blueprint` on localhost. They test competing writes, rollback, company isolation, archive references and scheduler locking; they do not certify combined database/document recovery. Install the declared CRM dependencies before running them. Never supply a live database or real customer records to acceptance tests.
 
 The assessment is snapshot-specific: compare its recorded product hashes with the current files before relying on its results. Product edits after a run require a new assessment.
+
+### Dashboard, visibility and cleanup — 5 September 2026
+
+The dashboard was rebuilt around the day's work. Four status tiles lead: overdue, due today, completed today and the next seven days. "My day" lists what actually needs attention, overdue first. The renewal radar, a seven-day scheduled-versus-completed chart, pipeline by stage, the week ahead and the audit activity feed follow. Every panel can be reordered or hidden per user; the arrangement is stored against the signed-in identity and does not affect anyone else.
+
+Three dashboard calculations were wrong and are corrected: "tasks due today" returned every incomplete task regardless of date; open pipeline value included Won and Lost business and parsed premiums by concatenating digits out of a formatted string; and "won this month" counted all time. Task completion time is now recorded, so "completed today" reflects when work finished rather than when it was due.
+
+Record-level visibility is enforced. Administrators and auditors see the whole company book, a manager sees themselves plus their reports, and everyone else sees only records assigned to them — applied to lead lists, single-lead fetches, tasks, deals, policies, renewals, customers, the dashboard and the calendar. Requesting another broker's record by ID returns 404.
+
+Sign out is a labelled action beside My profile rather than an unlabelled icon. Activity notes can be archived or deleted from always-visible controls, with a shared confirmation dialog that explains which is reversible. Connecting a lead source that is already connected warns before creating a second one.
+
+The abandoned Frappe/Node prototype was removed (`frappe_extension/`, `server.js`, `frappeClient.js`, `callManager.js`, `voiceAgent.js`, `test_engine.js`, `package.json`, `public/`) after confirming nothing in the running application imported it. Spreadsheet import deduplication was O(rows x leads); an index reduced an 800-row import against 3,000 leads from 4,086 ms to 3.8 ms.
 
 ### Workflow cleanup — 5 September 2026
 

@@ -300,66 +300,18 @@
             <!-- ═══════════════════════════════════════════════════════════ -->
             <!-- VIEW: DASHBOARD                                            -->
             <!-- ═══════════════════════════════════════════════════════════ -->
-            <div id="view-dashboard" class="view-panel p-5 space-y-5 max-w-7xl mx-auto">
-                <div class="flex items-center justify-between pb-1 border-b border-slateBorder pb-3">
+            <div id="view-dashboard" class="view-panel p-5 space-y-4 max-w-7xl mx-auto">
+                <div class="flex flex-wrap items-start justify-between gap-3 border-b border-slateBorder pb-3">
                     <div>
-                        <h1 class="text-base font-semibold text-slate-900">Commercial Insurance Operations</h1>
-                        <p class="text-xs text-slate-500">Live operational overview of policy pipeline, next action follow-ups, and renewals.</p>
+                        <h1 class="text-base font-semibold text-slate-900" id="dash-greeting">Your day</h1>
+                        <p class="text-xs text-slate-500">What needs attention now, what is finished, and what is coming.</p>
                     </div>
-                    <span id="dash-date" class="text-xs text-slate-500 font-mono bg-white px-2.5 py-1 rounded border border-slateBorder shadow-xs"></span>
-                </div>
-
-                <!-- KPI Metric Cards -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-                    <div class="bg-white p-3.5 rounded-lg border border-slateBorder shadow-xs space-y-1">
-                        <div class="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Total Active Accounts</div>
-                        <div class="text-2xl font-bold text-slate-900" id="kpi-leads">-</div>
-                        <div class="text-[11px] text-slate-500">Managed in portfolio</div>
-                    </div>
-                    <div class="bg-white p-3.5 rounded-lg border border-slateBorder shadow-xs space-y-1">
-                        <div class="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Deals In Negotiation</div>
-                        <div class="text-2xl font-bold text-slate-900" id="kpi-deals">-</div>
-                        <div class="text-[11px] text-slate-500">Quotes pending decision</div>
-                    </div>
-                    <div class="bg-white p-3.5 rounded-lg border border-slateBorder shadow-xs space-y-1">
-                        <div class="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Won Policies</div>
-                        <div class="text-2xl font-bold text-slate-900 text-emerald-700" id="kpi-won">-</div>
-                        <div class="text-[11px] text-emerald-600 font-medium">Active coverage bound</div>
-                    </div>
-                    <div class="bg-white p-3.5 rounded-lg border border-slateBorder shadow-xs space-y-1">
-                        <div class="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Total Pipeline Value</div>
-                        <div class="text-2xl font-bold text-slate-900 num-tabular" id="kpi-value">-</div>
-                        <div class="text-[11px] text-slate-500">Annual premium sum</div>
+                    <div class="flex items-center gap-2">
+                        <span id="dash-date" class="text-xs text-slate-500 font-mono bg-white px-2.5 py-1 rounded border border-slateBorder"></span>
+                        <button onclick="openDashboardCustomiser()" class="px-2.5 py-1.5 border border-slate-300 rounded bg-white text-xs font-medium hover:bg-slate-50">Customise</button>
                     </div>
                 </div>
-
-                <!-- Pipeline Funnel & Tasks -->
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                    <div class="bg-white p-4 rounded-lg border border-slateBorder shadow-xs space-y-3">
-                        <h3 class="font-semibold text-slate-900 text-xs uppercase tracking-wider border-b border-slateBorder pb-2">Pipeline Stage Distribution</h3>
-                        <div id="dashboard-pipeline" class="space-y-2.5 pt-1"></div>
-                    </div>
-                    <div class="bg-white p-4 rounded-lg border border-slateBorder shadow-xs space-y-3">
-                        <h3 class="font-semibold text-slate-900 text-xs uppercase tracking-wider border-b border-slateBorder pb-2">Action Tasks Due Today</h3>
-                        <div id="dashboard-tasks" class="space-y-2"></div>
-                    </div>
-                    <div class="bg-white p-4 rounded-lg border border-slateBorder shadow-xs space-y-3">
-                        <div class="flex items-center justify-between border-b border-slateBorder pb-2">
-                            <h3 class="font-semibold text-slate-900 text-xs uppercase tracking-wider">Expiring in &le;15 Days</h3>
-                            <span class="text-[10px] bg-rose-50 text-rose-700 font-bold px-1.5 py-0.5 rounded border border-rose-200">Renewal Alert</span>
-                        </div>
-                        <div id="dashboard-renewals" class="space-y-2"></div>
-                    </div>
-                </div>
-
-                <!-- Live audit feed -->
-                <div class="bg-white p-4 rounded-lg border border-slateBorder shadow-xs space-y-3">
-                    <div class="flex items-center justify-between border-b border-slateBorder pb-2">
-                        <h3 class="font-semibold text-slate-900 text-xs uppercase tracking-wider">Recent Activity</h3>
-                        <span class="text-[10px] text-slate-400">From the audit ledger</span>
-                    </div>
-                    <div id="dashboard-activity" class="space-y-1.5"></div>
-                </div>
+                <div id="dashboard-panels" class="space-y-4"></div>
             </div>
 
             <!-- ═══════════════════════════════════════════════════════════ -->

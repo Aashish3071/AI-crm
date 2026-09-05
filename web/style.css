@@ -424,3 +424,36 @@ button.wa-token:hover { background: #0F172A; color: #fff; border-color: #0F172A;
 .confirm-go { padding: 7px 14px; font-size: 12px; font-weight: 600; border-radius: 6px; border: 1px solid #0F172A; background: #0F172A; color: #fff; cursor: pointer; }
 .confirm-go.is-danger { background: #B91C1C; border-color: #B91C1C; }
 .confirm-go.is-danger:hover { background: #991B1B; }
+
+/* ── Dashboard ──────────────────────────────────────────────────────
+   Chart colours are the validated categorical slots 1 and 2 (blue/orange):
+   CVD ΔE 24.7 light / 26.8 dark, normal-vision ΔE 33.6 / 31.8 — all six checks pass.
+   Status tones are the reserved status palette, never reused as a series. */
+.viz-root { --viz-series-1: #2a78d6; --viz-series-2: #eb6834; }
+@media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root { --viz-series-1: #3987e5; --viz-series-2: #d95926; }
+}
+:root[data-theme="dark"] .viz-root { --viz-series-1: #3987e5; --viz-series-2: #d95926; }
+#view-dashboard { --viz-series-1: #2a78d6; }
+
+.day-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 12px 14px; border: 1px solid #E2E8F0; border-radius: 8px; background: #fff; cursor: pointer; text-align: left; transition: .15s ease; }
+.day-tile:hover { border-color: #94A3B8; }
+.day-tile strong { font-size: 24px; font-weight: 600; color: #0F172A; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.day-tile span { font-size: 11px; color: #64748B; }
+.day-tile.is-critical { border-left: 3px solid #d03b3b; }
+.day-tile.is-critical strong { color: #d03b3b; }
+.day-tile.is-warning { border-left: 3px solid #fab219; }
+.day-tile.is-good { border-left: 3px solid #0ca30c; }
+.day-tile.is-good strong { color: #0ca30c; }
+
+.viz-legend { display: flex; gap: 14px; margin-bottom: 10px; font-size: 11px; color: #475569; }
+.viz-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.viz-legend i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+.viz-bars { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
+.viz-day { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 0; }
+.viz-pair { display: flex; align-items: flex-end; gap: 2px; }
+.viz-bar { width: 14px; min-height: 2px; border-radius: 4px 4px 0 0; position: relative; }
+.viz-bar span { position: absolute; top: -15px; left: 50%; transform: translateX(-50%); font-size: 9.5px; color: #52514e; font-variant-numeric: tabular-nums; }
+.viz-day-label { font-size: 10px; color: #94A3B8; }
+
+.panel-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; border: 1px solid #E2E8F0; border-radius: 6px; padding: 8px 10px; background: #fff; }
