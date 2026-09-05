@@ -114,6 +114,15 @@ async function logout() {
     location.reload();
 }
 
+function confirmLogout() {
+    if (confirm('Sign out of InsureCRM?')) logout();
+}
+
+function switchSettingsTo(tab) {
+    openSettingsModal();
+    switchSettingTab(tab);
+}
+
 async function refreshNotificationBadge() {
     try {
         const unread = await apiJson('/api/notifications?unreadOnly=true');
@@ -1302,9 +1311,8 @@ function renderNotesGrid(notes) {
                     <span class="font-medium text-slate-600">${esc(n.author || 'Sarah Connor')}</span>
                     <div class="flex items-center gap-2">
                         <span>${timeAgo(n.createdAt)}</span>
-                        <button onclick="event.stopPropagation(); deleteNoteAction('${n.id}')" class="text-slate-300 hover:text-rose-600 p-0.5 opacity-0 group-hover:opacity-100 transition-opacity" title="Delete Note">
-                            ✕
-                        </button>
+                        <button onclick="event.stopPropagation(); archiveNoteAction('${n.id}')" class="note-action" title="Archive this note — it stays on the record's history">Archive</button>
+                        <button onclick="event.stopPropagation(); deleteNoteAction('${n.id}')" class="note-action is-delete" title="Delete this note permanently">Delete</button>
                     </div>
                 </div>
             </div>
@@ -1397,13 +1405,62 @@ async function handleNoteSubmit(e) {
     } catch (err) { showToast(err.message || 'Could not save note.'); }
 }
 
+// Archive keeps the record as evidence; delete removes it. The dialog says which is which,
+// because on a client's account these are very different decisions.
+async function archiveNoteAction(id) {
+    const ok = await confirmDestructive({
+        title: 'Archive this note?',
+        body: 'It disappears from the Activity Notes list but stays attached to the record for audit. You can restore it later.',
+        confirmLabel: 'Archive note', tone: 'neutral'
+    });
+    if (!ok) return;
+    try {
+        await apiJson(`/api/notes/${id}/archive`, { method: 'POST' });
+        showToast('Note archived.');
+        loadNotes();
+    } catch (e) { showToast(e.message || 'Could not archive note.'); }
+}
+
 async function deleteNoteAction(id) {
-    if (!confirm('Delete this note?')) return;
+    const ok = await confirmDestructive({
+        title: 'Delete this note permanently?',
+        body: 'This cannot be undone. If you only want it out of the way, archive it instead — that keeps it on the record.',
+        confirmLabel: 'Delete permanently', tone: 'danger'
+    });
+    if (!ok) return;
     try {
         await apiJson(`/api/notes/${id}`, { method: 'DELETE' });
         showToast('Note deleted.');
         loadNotes();
     } catch (e) { showToast(e.message || 'Could not delete note.'); }
+}
+
+// One dialog for every destructive action, so the wording and the stakes are consistent.
+function confirmDestructive({ title, body, confirmLabel = 'Confirm', tone = 'danger' }) {
+    return new Promise(resolve => {
+        const existing = document.getElementById('confirm-overlay');
+        if (existing) existing.remove();
+        const overlay = document.createElement('div');
+        overlay.id = 'confirm-overlay';
+        overlay.className = 'confirm-overlay';
+        overlay.innerHTML = `
+            <div class="confirm-box" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title">
+                <h3 id="confirm-title">${esc(title)}</h3>
+                <p>${esc(body)}</p>
+                <div class="confirm-actions">
+                    <button type="button" class="confirm-cancel">Cancel</button>
+                    <button type="button" class="confirm-go ${tone === 'danger' ? 'is-danger' : ''}">${esc(confirmLabel)}</button>
+                </div>
+            </div>`;
+        const close = value => { overlay.remove(); document.removeEventListener('keydown', onKey); resolve(value); };
+        const onKey = e => { if (e.key === 'Escape') close(false); };
+        overlay.querySelector('.confirm-cancel').onclick = () => close(false);
+        overlay.querySelector('.confirm-go').onclick = () => close(true);
+        overlay.onclick = e => { if (e.target === overlay) close(false); };
+        document.addEventListener('keydown', onKey);
+        document.body.appendChild(overlay);
+        overlay.querySelector('.confirm-go').focus();
+    });
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -2879,6 +2936,18 @@ function chooseProvider(provider) {
         e.preventDefault();
         const values = Object.fromEntries(new FormData(form).entries());
         const credentials = {};
+        // Guard the case from the screenshot: two identical Google Ads connections, made by
+        // reopening the picker instead of going back. Two callback URLs to maintain and
+        // enquiries split across both is almost never what someone means to do.
+        const duplicate = (window.crmChannels || []).find(c => c.provider === provider);
+        if (duplicate) {
+            const proceed = await confirmDestructive({
+                title: `${spec.label} is already connected`,
+                body: `“${duplicate.name}” is already set up. Add a second one only if you genuinely run separate ad accounts — otherwise go back and finish setting up the existing connection.`,
+                confirmLabel: 'Add a second one anyway', tone: 'neutral'
+            });
+            if (!proceed) { closeInsuranceForm(); loadChannels(); return; }
+        }
         try {
             const created = await apiJson('/api/channels', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },

@@ -1,0 +1,23 @@
+{
+  "companies": [
+    {
+      "id": "CO_0dbb3fc46684",
+      "name": "Test Brokerage",
+      "status": "Active",
+      "createdAt": 1788543535
+    }
+  ],
+  "users": [
+    {
+      "id": "USR_96a6f640b9dd",
+      "companyId": "CO_0dbb3fc46684",
+      "name": "Advisor Test",
+      "email": "advisor.test@insurecrm.in",
+      "role": "Administrator",
+      "status": "Active",
+      "passwordHash": "pbkdf2_sha256$310000$oCW21xTU2WXs_zTRWZqwaA$-lJ0HdSx8LuZneZzDnDY6zFIKP-LWHGg7eAiWkQYSbo",
+      "createdAt": 1788543535,
+      "passwordChangedAt": 1788543535
+    }
+  ]
+}

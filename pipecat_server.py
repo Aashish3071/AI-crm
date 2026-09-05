@@ -797,9 +797,10 @@ def global_search(q: str = Query(..., min_length=2), limit: int = Query(20, ge=1
 @app.get("/api/dashboard")
 def get_dashboard():
     db = load_db()
-    leads = live_expiry_inplace(db.get("leads", []))
-    deals = db.get("deals", [])
-    tasks = db.get("tasks", [])
+    owners = visible_owners(db)
+    leads = scoped(live_expiry_inplace(db.get("leads", [])), owners)
+    deals = scoped(db.get("deals", []), owners)
+    tasks = scoped(db.get("tasks", []), owners)
 
     total_leads = len(leads)
     open_deals = len([d for d in deals if d.get("status") not in ["Won", "Lost"]])
@@ -839,7 +840,7 @@ def get_leads(status: Optional[str] = None, search: Optional[str] = None, assign
               filter: Optional[str] = None, page: int = Query(1, ge=1), pageSize: int = Query(50, ge=1, le=200),
               paginated: bool = False):
     db = load_db()
-    leads = live_expiry_inplace(db.get("leads", []))
+    leads = scoped(live_expiry_inplace(db.get("leads", [])), visible_owners(db))
     if status:
         leads = [l for l in leads if l.get("status") == status]
     if assignedTo:
@@ -874,6 +875,7 @@ def get_single_lead(id: str):
     lead = next((l for l in db.get("leads", []) if l["id"] == id), None)
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
+    require_visible(lead, visible_owners(db), "Lead")
     notes = [n for n in db.get("notes", []) if n.get("associatedId") == id or n.get("leadId") == id]
     tasks = [t for t in db.get("tasks", []) if t.get("associatedId") == id]
     return {"lead": live_expiry(lead), "notes": notes, "tasks": tasks}
@@ -1214,7 +1216,7 @@ def delete_lead(id: str):
 @app.get("/api/deals")
 def get_deals(status: Optional[str] = None, search: Optional[str] = None):
     db = load_db()
-    deals = db.get("deals", [])
+    deals = scoped(db.get("deals", []), visible_owners(db))
     if status:
         deals = [d for d in deals if d.get("status") == status]
     if search:
@@ -1266,9 +1268,11 @@ def update_organization(id: str, updates: Dict[str, Any]):
 
 # ─── Polymorphic Notes CRUD ───
 @app.get("/api/notes")
-def get_notes(associatedId: Optional[str] = None):
+def get_notes(associatedId: Optional[str] = None, includeArchived: bool = False):
     db = load_db()
     notes = db.get("notes", [])
+    if not includeArchived:
+        notes = [n for n in notes if not n.get("archived")]
     if associatedId:
         notes = [n for n in notes if n.get("associatedId") == associatedId or n.get("leadId") == associatedId]
     return notes
@@ -1303,6 +1307,27 @@ def create_note(n: NoteModel):
     audit(db, "Note Created", "Note", item["id"], {"associatedId":item.get("associatedId"), "title":item.get("title")}, item.get("author","System"))
     save_db(db)
     return item
+
+@app.post("/api/notes/{id}/archive")
+def archive_note(id: str):
+    """Archiving keeps the note as evidence; deleting removes it. Both are audited."""
+    db = load_db()
+    note = _find_record(db.get("notes", []), id, "Note")
+    note["archived"] = True
+    note["archivedAt"] = datetime.utcnow().isoformat() + "Z"
+    audit(db, "Note Archived", "Note", id, {"title": note.get("title")})
+    save_db(db)
+    return note
+
+@app.post("/api/notes/{id}/restore")
+def restore_note(id: str):
+    db = load_db()
+    note = _find_record(db.get("notes", []), id, "Note")
+    note.pop("archived", None)
+    note.pop("archivedAt", None)
+    audit(db, "Note Restored", "Note", id, {"title": note.get("title")})
+    save_db(db)
+    return note
 
 @app.delete("/api/notes/{id}")
 def delete_note(id: str):
@@ -1362,7 +1387,7 @@ def _sync_calendar_event_from_task(db: Dict[str, Any], task: Dict[str, Any]):
 @app.get("/api/tasks")
 def get_tasks():
     db = load_db()
-    return db.get("tasks", [])
+    return scoped(db.get("tasks", []), visible_owners(db))
 
 class TaskModel(BaseModel):
     title: str
@@ -1610,7 +1635,8 @@ def convert_lead(id: str, payload: LeadConversionPayload):
 
 @app.get("/api/customers")
 def get_customers(search: Optional[str] = None):
-    items = load_db().get("customers", [])
+    _db = load_db()
+    items = scoped(_db.get("customers", []), visible_owners(_db))
     if search:
         q = search.lower()
         items = [c for c in items if q in c.get("name", "").lower() or q in c.get("organization", "").lower()]
@@ -1874,7 +1900,8 @@ def issue_policy(id: str, payload: Dict[str, Any]):
 
 @app.get("/api/policies")
 def get_policies(leadId: Optional[str] = None, status: Optional[str] = None):
-    policies = live_expiry_inplace(load_db().get("policies", []))
+    _db = load_db()
+    policies = scoped(live_expiry_inplace(_db.get("policies", [])), visible_owners(_db))
     if leadId:
         policies = [p for p in policies if p.get("leadId") == leadId]
     if status:
@@ -1981,7 +2008,8 @@ def get_endorsements(policyId: Optional[str] = None):
 
 @app.get("/api/renewals")
 def get_renewals(stage: Optional[str] = None):
-    renewals = load_db().get("renewals", [])
+    _db = load_db()
+    renewals = scoped(_db.get("renewals", []), visible_owners(_db))
     return [r for r in renewals if not stage or r.get("stage") == stage]
 
 @app.post("/api/renewals")
@@ -4146,6 +4174,66 @@ def rollback_import(import_id: str):
     save_db(db)
     return {"archivedCount": len(removed), "retained": kept}
 
+# ─── Who may see which records ──────────────────────────────────────
+# Roles already decide who may change things. This decides who may SEE things.
+# Administrators see the whole book. Managers see themselves plus everyone reporting to
+# them. Everyone else sees only what is assigned to them. The blueprint treats
+# assigned-only visibility as a company policy, so it is a setting rather than a constant.
+
+def _visibility_policy(db: Dict[str, Any]) -> bool:
+    access = (db.get("settings", {}) or {}).get("access", {}) or {}
+    return bool(access.get("assignedOnlyVisibility", True))
+
+def _team_of(db: Dict[str, Any], user_name: str) -> set:
+    """A manager's own name plus everyone beneath them in the reporting tree."""
+    users = db.get("users", [])
+    by_manager: Dict[str, List[Dict[str, Any]]] = {}
+    for user in users:
+        by_manager.setdefault(user.get("reportsTo") or "", []).append(user)
+    start = next((u for u in users if u.get("name") == user_name), None)
+    if not start:
+        return {user_name}
+    names, queue, guard = {user_name}, [start.get("id")], 0
+    while queue and guard < 500:
+        guard += 1
+        current = queue.pop()
+        for report in by_manager.get(current, []):
+            if report.get("name") not in names:
+                names.add(report.get("name"))
+                queue.append(report.get("id"))
+    return names
+
+def visible_owners(db: Dict[str, Any]) -> Optional[set]:
+    """None means 'everything'. Otherwise the set of owner names this user may see."""
+    if AUTH_DISABLED:
+        return None
+    session = crm_security.current_user()
+    if not session:
+        return None
+    role = crm_security.normalized_role(session.get("role", ""))
+    if role in {"admin", "readonly"}:          # auditors read the book without changing it
+        return None
+    if not _visibility_policy(db):
+        return None
+    name = session.get("name", "")
+    return _team_of(db, name) if role == "manager" else {name}
+
+def _owned_by(record: Dict[str, Any], owners: Optional[set]) -> bool:
+    if owners is None:
+        return True
+    return record.get("assignedTo") in owners
+
+def scoped(records: List[Dict[str, Any]], owners: Optional[set]) -> List[Dict[str, Any]]:
+    if owners is None:
+        return records
+    return [r for r in records if isinstance(r, dict) and _owned_by(r, owners)]
+
+def require_visible(record: Dict[str, Any], owners: Optional[set], label: str = "Record"):
+    """Direct record access must respect the same boundary as the lists."""
+    if not _owned_by(record, owners):
+        raise HTTPException(status_code=404, detail=f"{label} not found")
+    return record
+
 # ─── Assignment rules ───────────────────────────────────────────────
 # An admin decides who new enquiries go to. A rule is: "when a lead looks like THIS,
 # give it to one of THESE people, chosen THIS way". Rules are tried in order and the
@@ -4688,10 +4776,13 @@ def get_calendar(start: Optional[str] = None, end: Optional[str] = None,
                  assignedTo: Optional[str] = None, types: Optional[str] = None):
     """Everything dated in the CRM, in one feed."""
     db = load_db()
+    owners = visible_owners(db)
     wanted = {t.strip() for t in (types or "").split(",") if t.strip()}
     entries: List[Dict[str, Any]] = []
 
     def add(entry):
+        if owners is not None and entry.get("assignedTo") not in owners:
+            return
         if wanted and entry["type"] not in wanted:
             return
         if assignedTo and entry.get("assignedTo") != assignedTo:
