@@ -13,7 +13,30 @@ let savedLeadFilters = [];
 let activeTaskTab = 'all';
 let editingLeadId = null;
 
-const STAGES = ["New", "Contacted", "Risk / Underwriting", "Quotation Sent", "Won", "Lost"];
+// The lead vocabulary is served by /api/lead-options so screens never keep a copy that
+// drifts from the server. These values only cover the first paint.
+let STAGES = ["New", "Assigned", "Contacted", "Interested", "Quote Sent", "Follow-up", "Documents Pending",
+    "Policy Sold", "Not Interested", "Call Later", "Wrong Number", "Unreachable", "Lost"];
+let leadOptions = { statuses: STAGES, noNextAction: ['Lost', 'Not Interested', 'Policy Sold', 'Wrong Number'],
+    reasonRequired: ['Lost', 'Not Interested'], products: ['Car Insurance', 'Health Insurance'], sources: [],
+    closeReasons: [], fuelTypes: [], ncbLevels: [], healthPlanTypes: [], memberRelations: [] };
+
+async function loadLeadOptions() {
+    try { leadOptions = await apiJson('/api/lead-options'); STAGES = leadOptions.statuses; }
+    catch (e) { /* keep the first-paint values */ }
+    const filter = document.getElementById('leads-status-filter');
+    if (filter) {
+        const chosen = filter.value;
+        filter.innerHTML = '<option value="">All statuses</option>' + STAGES.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+        filter.value = STAGES.includes(chosen) ? chosen : '';
+    }
+    return leadOptions;
+}
+
+// Mirrors is_open_lead() on the server: finished enquiries and wrong numbers are not open work.
+const isOpenLead = lead => !leadOptions.noNextAction.includes(lead.status);
+const needsNextAction = status => !leadOptions.noNextAction.includes(status);
+const needsReason = status => leadOptions.reasonRequired.includes(status);
 
 // The broker roster comes from the users table, so adding or renaming a team member
 // flows through every owner dropdown instead of needing a code change.
@@ -29,7 +52,7 @@ async function loadBrokerRoster() {
     document.querySelectorAll('[data-roster]').forEach(select => {
         const keepAll = select.getAttribute('data-roster') === 'with-all';
         const current = select.value;
-        select.innerHTML = (keepAll ? '<option value="">All Brokers</option>' : '')
+        select.innerHTML = (keepAll ? '<option value="">All telecallers</option>' : '')
             + brokerRoster.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
         if (current && brokerRoster.includes(current)) select.value = current;
     });
@@ -37,6 +60,12 @@ async function loadBrokerRoster() {
 
 function ownerFieldOptions() {
     return brokerRoster.length ? `select:${brokerRoster.join('|')}` : 'text';
+}
+
+// "23 Sept 2026", in the viewer's own time zone.
+function formatShortDate(value) {
+    const d = new Date(value);
+    return isNaN(d) ? String(value || '') : d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 function formatDaysLeft(days) {
@@ -59,7 +88,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function startApplication() {
     if (applicationStarted) return;
     applicationStarted = true;
-    await loadBrokerRoster();
+    await Promise.all([loadBrokerRoster(), loadLeadOptions()]);
+    applyRoleVisibility();
     switchView('dashboard');
     refreshNotificationBadge();
     refreshDemoCleanupLink();
@@ -73,7 +103,7 @@ function setSignedInUser(user) {
     if (!user) return;
     const initials = String(user.name || 'U').split(/\s+/).map(x => x[0]).join('').slice(0, 2).toUpperCase();
     const set = (id, value) => { const element = document.getElementById(id); if (element) element.textContent = value; };
-    set('current-user-initials', initials); set('current-user-name', user.name); set('current-user-role', user.role);
+    set('current-user-initials', initials); set('current-user-name', user.name); set('current-user-role', roleLabel(user));
 }
 
 async function ensureAuthenticated() {
@@ -152,23 +182,23 @@ async function refreshNotificationBadge() {
 // quotation → issued policy → renewal. Each step names the screen it happens on.
 const ONBOARDING_STEPS = [
     {
-        view: 'leads', screen: 'Leads & Accounts', heading: 'Capture the enquiry',
+        view: 'leads', screen: 'Leads', heading: 'Capture the enquiry',
         summary: 'Every enquiry starts here — typed in directly, or imported in bulk from your existing spreadsheet.',
         points: [
-            'New Lead records the client, organization, policy category and renewal date',
-            'Import from spreadsheet brings your whole book across, skipping or updating duplicates',
-            'The organization and contact records are created for you automatically'
+            'New Lead records the customer, their mobile, car or health product and current policy expiry',
+            'Import from spreadsheet brings your whole list across, skipping or updating duplicates',
+            'Car and health details are optional — capture what the customer tells you, when they tell you'
         ],
         note: 'A lead with no renewal date stays out of the renewal radar until you set one.',
         hint: 'Start with New Lead in the top right, or Import to bring across an existing book.'
     },
     {
-        view: 'leads', screen: 'Leads & Accounts', heading: 'Move the stage, schedule the next action',
+        view: 'leads', screen: 'Leads', heading: 'Move the stage, schedule the next action',
         summary: 'Click any stage pill to advance the lead. The CRM will not let you leave without deciding what happens next.',
         points: [
-            'Six stages: New → Contacted → Risk / Underwriting → Quotation Sent → Won or Lost',
-            'Every transition needs a next action and a due date — this is what stops leads going quiet',
-            'Marking a lead Lost requires a reason, so you can review why business is being lost'
+            'Thirteen statuses follow a telecalling day: New → Contacted → Interested → Quote Sent → Documents Pending → Policy Sold',
+            'While a lead is being worked it needs a next action and a date — this is what stops leads going quiet',
+            'Not Interested and Lost need a reason, so you can see why business is being lost'
         ],
         note: 'Each transition writes a timestamped memo to the account timeline and raises the matching task.',
         hint: 'Try it: click a coloured stage pill on any row in the leads table.'
@@ -372,7 +402,7 @@ function switchView(viewName) {
 
     const labels = {
         'dashboard': 'Dashboard',
-        'leads': 'Leads & Accounts',
+        'leads': 'Leads',
         'deals': 'Pipeline Deals',
         'policies': 'Policies',
         'renewals': 'Renewals',
@@ -381,6 +411,10 @@ function switchView(viewName) {
         'organizations': 'Organizations',
         'notes': 'Activity Notes',
         'tasks': 'Action Tasks',
+        'follow-ups': 'Follow-ups',
+        'automation': 'Automation',
+        'performance': 'Performance',
+        'reports': 'Reports',
         'notifications': 'Notification Inbox',
         'channels': 'Lead Sources',
         'calendar': 'Calendar'
@@ -428,6 +462,10 @@ function switchView(viewName) {
         case 'organizations': loadOrganizations(); break;
         case 'notes': loadNotes(); break;
         case 'tasks': loadTasks(); break;
+        case 'follow-ups': loadFollowUps(); break;
+        case 'automation': loadAutomation(); break;
+        case 'performance': loadPerformance(); break;
+        case 'reports': loadReports(); break;
         case 'notifications': loadNotifications(); break;
         case 'channels': loadChannels(); break;
         case 'calendar': loadCalendar(); break;
@@ -444,6 +482,8 @@ function configureInsuranceWorkspace(mode){
     document.getElementById('policy-register-section').classList.toggle('hidden',!policies);
     document.getElementById('communication-section').classList.toggle('hidden',!policies);
     document.getElementById('renewal-pipeline-section').classList.toggle('hidden',policies);
+    document.getElementById('renewal-dashboard-section').classList.toggle('hidden',policies);
+    document.getElementById('insurance-kpis').classList.toggle('hidden',!policies);
     document.getElementById('quotation-section').classList.toggle('hidden',policies);
     document.getElementById('generate-renewals-button').classList.toggle('hidden',policies);
     document.getElementById('policy-service-section').classList.toggle('hidden',!policies);
@@ -481,6 +521,7 @@ async function loadInsuranceOperations() {
         renderCommunications(communications);
         renderQuotationComparison(quotations, renewals);
         renderServiceRequests(services);
+        if (currentView === 'renewals') await loadRenewalDashboard();
     } catch (e) {
         showToast(e.message);
     }
@@ -489,24 +530,297 @@ async function loadInsuranceOperations() {
 function renderQuotationComparison(quotes, renewals) {
     const root = document.getElementById('quotation-comparison');
     if (!root) return;
-    const lowest = quotes.length ? Math.min(...quotes.map(q=>Number(q.premium||0))) : 0;
+    const lowest = quotes.length ? Math.min(...quotes.map(q => Number(q.premium || 0))) : 0;
+    const deals = window.crmDeals || [];
     root.innerHTML = quotes.length ? quotes.map(q => {
-        const renewal = renewals.find(r => r.id === q.renewalId) || {};
-        const selected = renewal.selectedQuotationId === q.id;
-        return `<div class="border ${selected ? 'border-emerald-500 ring-1 ring-emerald-200' : 'border-slate-200'} rounded-lg p-3">
-            <div class="flex justify-between gap-2"><div><div class="font-semibold">${esc(q.insurer)}</div><div class="text-[11px] text-slate-500">${esc(renewal.customerName || q.renewalId)}</div></div><div class="font-mono font-semibold">₹${Number(q.premium || 0).toLocaleString('en-IN')}</div></div>
+        let parentLabel = 'Unlinked Quotation';
+        let contextType = 'renewal';
+        let contextId = q.renewalId || '';
+        let selected = false;
+        let approvalEvents = 0;
+
+        if (q.renewalId) {
+            const renewal = renewals.find(r => r.id === q.renewalId) || {};
+            parentLabel = `Renewal: ${renewal.customerName || q.renewalId}`;
+            selected = renewal.selectedQuotationId === q.id;
+            approvalEvents = renewal.approvalHistory?.length || 0;
+            contextType = 'renewal';
+            contextId = q.renewalId;
+        } else if (q.dealId) {
+            const deal = deals.find(d => d.id === q.dealId) || {};
+            parentLabel = `Deal: ${deal.dealName || deal.title || q.dealId}`;
+            selected = deal.selectedQuotationId === q.id;
+            contextType = 'deal';
+            contextId = q.dealId;
+        } else if (q.leadId) {
+            parentLabel = `Lead: ${q.leadId}`;
+            contextType = 'lead';
+            contextId = q.leadId;
+        }
+
+        return `<div class="border ${selected ? 'border-emerald-500 ring-1 ring-emerald-200' : 'border-slate-200'} rounded-lg p-3 bg-white">
+            <div class="flex justify-between gap-2"><div><div class="font-semibold text-slate-900">${esc(q.insurer)}</div><div class="text-[11px] text-slate-500">${esc(parentLabel)}</div></div><div class="font-mono font-semibold text-slate-900">₹${Number(q.premium || 0).toLocaleString('en-IN')}</div></div>
             <div class="text-[10px] mt-2 ${Number(q.premium||0)===lowest?'text-emerald-700 font-semibold':'text-slate-500'}">${Number(q.premium||0)===lowest?'Lowest premium':`₹${(Number(q.premium||0)-lowest).toLocaleString('en-IN')} above lowest`}</div>
             <div class="text-[11px] text-slate-600 mt-2">Sum insured: ₹${Number(q.sumInsured || 0).toLocaleString('en-IN')} · Deductible: ₹${Number(q.deductible || 0).toLocaleString('en-IN')}</div>
             <div class="text-[11px] text-slate-500 mt-1">${esc(q.coverageSummary || 'No coverage summary')}</div>
-            ${renewal.approvalHistory?.length?`<div class="text-[10px] text-slate-400 mt-2">${renewal.approvalHistory.length} approval event(s) recorded</div>`:''}
-            <button onclick="selectQuotation('${q.renewalId}','${q.id}')" class="mt-3 w-full py-1.5 rounded text-xs font-semibold ${selected ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-900 text-white'}">${selected ? 'Selected' : 'Select quotation'}</button>
+            ${approvalEvents ? `<div class="text-[10px] text-slate-400 mt-2">${approvalEvents} approval event(s) recorded</div>` : ''}
+            <div class="mt-3 flex gap-2">
+                <button onclick="selectQuotationUnified('${contextType}','${contextId}','${q.id}')" class="flex-1 py-1.5 rounded text-xs font-semibold ${selected ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-900 text-white'}">${selected ? 'Selected' : 'Select quotation'}</button>
+                ${contextId ? `<button onclick="openSideBySideQuoteComparison('${contextType}','${contextId}')" class="px-2.5 py-1.5 border border-slate-300 rounded text-xs font-semibold text-slate-700 hover:bg-slate-50" title="Compare side-by-side">Matrix</button>` : ''}
+            </div>
         </div>`;
     }).join('') : '<div class="text-xs text-slate-400">No quotations recorded yet.</div>';
 }
 
+const renderQuoteComparison = renderQuotationComparison;
+const compareQuotes = (...args) => openSideBySideQuoteComparison(...args);
+const quotationComparison = (...args) => openSideBySideQuoteComparison(...args);
+
 async function selectQuotation(renewalId, quotationId) {
-    try { await apiJson(`/api/renewals/${renewalId}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({selectedQuotationId:quotationId, stage:'Quotation Sent'})}); showToast('Quotation selected'); await loadInsuranceOperations(); }
-    catch (e) { showToast(e.message); }
+    return selectQuotationUnified('renewal', renewalId, quotationId);
+}
+
+async function selectQuotationUnified(contextType, contextId, quoteId) {
+    try {
+        if (contextType === 'renewal' && contextId) {
+            await apiJson(`/api/renewals/${contextId}`, {
+                method: 'PUT',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({selectedQuotationId: quoteId, stage: 'Quotation Sent'})
+            });
+            showToast('Renewal quotation selected');
+            await loadInsuranceOperations();
+        } else if (contextType === 'deal' && contextId) {
+            const quotes = await apiJson('/api/quotations').catch(() => []);
+            const quote = quotes.find(q => q.id === quoteId);
+            await apiJson(`/api/deals/${contextId}`, {
+                method: 'PUT',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({
+                    selectedQuotationId: quoteId,
+                    stage: 'Quotation Sent',
+                    annualRevenue: quote?.premium || 0
+                })
+            });
+            showToast('Deal quotation selected');
+            await loadDeals();
+            if (['policies','renewals'].includes(currentView)) await loadInsuranceOperations();
+        } else if (contextType === 'lead' && contextId) {
+            // The customer chose this quote. A quote they accept has necessarily been sent to them.
+            const quote = (await apiJson(`/api/quotations?leadId=${encodeURIComponent(contextId)}`)).find(q => q.id === quoteId);
+            if (quote?.status === 'Draft') await setQuoteStatus(quoteId, 'Sent', true);
+            await setQuoteStatus(quoteId, 'Accepted', true);
+            showToast('Quotation accepted — collect the documents next');
+            openLeadDrawer(contextId);
+        } else {
+            showToast('Cannot select quotation: unlinked context');
+        }
+        closeQuoteComparisonModal();
+    } catch (e) {
+        showToast(e.message);
+    }
+}
+
+async function openSideBySideQuoteComparison(contextType, contextId) {
+    const [allQuotes, renewals, deals] = await Promise.all([
+        apiJson('/api/quotations').catch(() => []),
+        cachedRenewals.length ? Promise.resolve(cachedRenewals) : apiJson('/api/renewals').catch(() => []),
+        window.crmDeals?.length ? Promise.resolve(window.crmDeals) : apiJson('/api/deals').catch(() => [])
+    ]);
+
+    let title = 'Comparative Quotation Analysis';
+    let filteredQuotes = [];
+    let selectedQuoteId = null;
+
+    if (contextType === 'renewal') {
+        const r = renewals.find(x => x.id === contextId);
+        title = `Quotation Comparison — ${r?.customerName || 'Renewal'} (${r?.policyNumber || contextId})`;
+        filteredQuotes = allQuotes.filter(q => q.renewalId === contextId);
+        selectedQuoteId = r?.selectedQuotationId;
+    } else if (contextType === 'deal') {
+        const d = deals.find(x => x.id === contextId);
+        title = `Quotation Comparison — Deal: ${d?.dealName || d?.title || contextId}`;
+        filteredQuotes = allQuotes.filter(q => q.dealId === contextId);
+        selectedQuoteId = d?.selectedQuotationId;
+    } else if (contextType === 'lead') {
+        const lead = (await apiJson(`/api/leads/${contextId}`)).lead;
+        title = `Quotation comparison — ${lead?.name || 'Lead'}`;
+        filteredQuotes = allQuotes.filter(q => q.leadId === contextId && q.status !== 'Rejected');
+        selectedQuoteId = filteredQuotes.find(q => q.status === 'Accepted')?.id;
+    } else {
+        filteredQuotes = allQuotes;
+    }
+
+    const modal = document.getElementById('quote-comparison-modal');
+    if (!modal) return;
+    document.getElementById('quote-modal-title').textContent = title;
+    document.getElementById('quote-modal-subtitle').textContent = `${filteredQuotes.length} competing quote(s) received`;
+
+    const body = document.getElementById('quote-modal-body');
+    if (!filteredQuotes.length) {
+        body.innerHTML = `
+            <div class="py-12 text-center">
+                <p class="text-xs text-slate-500">No quotes recorded for this record yet.</p>
+                <button onclick="closeQuoteComparisonModal(); openQuotationModalPrompt('${contextType}', '${contextId}')" class="mt-3 px-3 py-1.5 bg-slate-900 text-white rounded text-xs font-semibold hover:bg-black">+ Add Quote</button>
+            </div>
+        `;
+        modal.classList.remove('hidden');
+        return;
+    }
+
+    const lowest = Math.min(...filteredQuotes.map(q => Number(q.premium || 0)));
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    body.innerHTML = `
+        <div class="overflow-x-auto">
+            <table class="w-full border-collapse text-left text-xs corp-table">
+                <thead>
+                    <tr class="bg-slate-50 border-b border-slateBorder">
+                        <th class="p-3 font-semibold text-slate-700 w-44">Comparison Feature</th>
+                        ${filteredQuotes.map(q => `
+                            <th class="p-3 font-semibold text-slate-900 border-l border-slateBorder min-w-[200px]">
+                                <div class="flex items-center justify-between">
+                                    <span>${esc(q.insurer)}</span>
+                                    ${q.id === selectedQuoteId ? '<span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">Selected</span>' : ''}
+                                </div>
+                            </th>
+                        `).join('')}
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    <tr>
+                        <td class="p-3 font-medium text-slate-600 bg-slate-50/50">Net Premium</td>
+                        ${filteredQuotes.map(q => {
+                            const prem = Number(q.premium || 0);
+                            const isLowest = prem === lowest;
+                            return `
+                                <td class="p-3 border-l border-slateBorder ${isLowest ? 'bg-emerald-50/30' : ''}">
+                                    <div class="font-mono font-semibold text-sm ${isLowest ? 'text-emerald-800' : 'text-slate-900'}">₹${prem.toLocaleString('en-IN')}</div>
+                                    <div class="text-[10px] ${isLowest ? 'text-emerald-700 font-bold' : 'text-slate-400'}">${isLowest ? '★ Lowest Premium' : `+₹${(prem - lowest).toLocaleString('en-IN')}`}</div>
+                                </td>
+                            `;
+                        }).join('')}
+                    </tr>
+                    <tr>
+                        <td class="p-3 font-medium text-slate-600 bg-slate-50/50">Sum Insured</td>
+                        ${filteredQuotes.map(q => `
+                            <td class="p-3 border-l border-slateBorder font-mono">₹${Number(q.sumInsured || 0).toLocaleString('en-IN')}</td>
+                        `).join('')}
+                    </tr>
+                    <tr>
+                        <td class="p-3 font-medium text-slate-600 bg-slate-50/50">Deductible</td>
+                        ${filteredQuotes.map(q => `
+                            <td class="p-3 border-l border-slateBorder font-mono">₹${Number(q.deductible || 0).toLocaleString('en-IN')}</td>
+                        `).join('')}
+                    </tr>
+                    <tr>
+                        <td class="p-3 font-medium text-slate-600 bg-slate-50/50">Valid Until</td>
+                        ${filteredQuotes.map(q => {
+                            const isExpired = q.validityDate && q.validityDate < todayStr;
+                            return `
+                                <td class="p-3 border-l border-slateBorder">
+                                    <span class="font-mono ${isExpired ? 'text-rose-600 font-bold' : 'text-slate-700'}">${esc(q.validityDate || 'Not specified')}</span>
+                                    ${isExpired ? '<span class="ml-1.5 px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 text-[10px]">Expired</span>' : ''}
+                                </td>
+                            `;
+                        }).join('')}
+                    </tr>
+                    <tr>
+                        <td class="p-3 font-medium text-slate-600 bg-slate-50/50">Coverage Terms</td>
+                        ${filteredQuotes.map(q => `
+                            <td class="p-3 border-l border-slateBorder text-slate-600 leading-relaxed">${esc(q.coverageSummary || 'Standard coverage terms')}</td>
+                        `).join('')}
+                    </tr>
+                    <tr class="bg-slate-50/50">
+                        <td class="p-3 font-medium text-slate-600">Decision</td>
+                        ${filteredQuotes.map(q => {
+                            const isSelected = q.id === selectedQuoteId;
+                            const isExpired = q.validityDate && q.validityDate < todayStr;
+                            return `
+                                <td class="p-3 border-l border-slateBorder">
+                                    ${isSelected ? `
+                                        <button disabled class="w-full py-1.5 px-3 rounded text-xs font-semibold bg-emerald-100 text-emerald-800">Current Choice</button>
+                                    ` : `
+                                        <button onclick="selectQuotationUnified('${contextType}','${contextId}','${q.id}')" ${isExpired ? 'disabled title="Cannot select expired quotation"' : ''} class="w-full py-1.5 px-3 rounded text-xs font-semibold ${isExpired ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-slate-900 hover:bg-black text-white'}">
+                                            ${isExpired ? 'Expired' : 'Select Quote'}
+                                        </button>
+                                    `}
+                                </td>
+                            `;
+                        }).join('')}
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    `;
+    modal.classList.remove('hidden');
+}
+
+function closeQuoteComparisonModal() {
+    document.getElementById('quote-comparison-modal')?.classList.add('hidden');
+}
+
+function openQuotationModalPrompt(targetType = null, targetId = null) {
+    const deals = window.crmDeals || [];
+    const renewals = cachedRenewals || [];
+
+    const targetPairs = [
+        'none::-- Select Associated Opportunity / Renewal --',
+        ...renewals.map(r => `renewal_${r.id}::Renewal: ${r.customerName} (${r.policyNumber || r.id})`),
+        ...deals.map(d => `deal_${d.id}::Deal: ${d.dealName || d.title} (${d.organization || d.id})`)
+    ].join('|');
+
+    let initialTarget = 'none';
+    if (targetType === 'renewal' && targetId) initialTarget = `renewal_${targetId}`;
+    if (targetType === 'deal' && targetId) initialTarget = `deal_${targetId}`;
+
+    openInsuranceForm('Add Insurer Quotation', [
+        ['target', 'Associated Renewal or Deal', 'selectpairs:' + targetPairs, true],
+        ['insurer', 'Insurer Name', 'text', true],
+        ['premium', 'Quoted Net Premium (₹)', 'number', true],
+        ['sumInsured', 'Sum Insured (₹)', 'number', false],
+        ['deductible', 'Deductible (₹)', 'number', false],
+        ['validityDate', 'Quotation Validity Expiry', 'date', false],
+        ['coverageSummary', 'Coverage & Terms Summary', 'textarea', false]
+    ], async values => {
+        const payload = {
+            insurer: values.insurer,
+            premium: Number(values.premium || 0),
+            sumInsured: Number(values.sumInsured || 0),
+            deductible: Number(values.deductible || 0),
+            validityDate: values.validityDate || null,
+            coverageSummary: values.coverageSummary || '',
+            status: 'Draft'
+        };
+
+        if (values.target?.startsWith('renewal_')) {
+            payload.renewalId = values.target.replace('renewal_', '');
+        } else if (values.target?.startsWith('deal_')) {
+            payload.dealId = values.target.replace('deal_', '');
+        }
+
+        await apiJson('/api/quotations', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+
+        if (payload.renewalId) {
+            await apiJson(`/api/renewals/${payload.renewalId}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({stage: 'Quotation Requested'})
+            }).catch(() => {});
+        }
+
+        showToast('Quotation recorded');
+        if (['policies','renewals'].includes(currentView)) await loadInsuranceOperations();
+        if (currentView === 'deals') await loadDeals();
+    }, {target: initialTarget});
+}
+
+function addDealQuotation(dealId) {
+    openQuotationModalPrompt('deal', dealId);
 }
 
 function renderInsuranceKpis(report, policies, communications) {
@@ -528,16 +842,41 @@ function renderPolicies(items) {
     </tr>`).join('') : '<tr><td colspan="5" class="text-center py-10 text-slate-400">No policies yet. Import existing lead policies or create one.</td></tr>';
 }
 
+// Slide 24: due this month and next, renewed, lost, renewal rate, and each telecaller's
+// renewed against pending. Slide 23's reminder ladder shows how many sit at each stage.
+async function loadRenewalDashboard() {
+    const input = document.getElementById('renewal-dashboard-month');
+    const root = document.getElementById('renewal-dashboard-body');
+    if (!input || !root) return;
+    try {
+        const d = await apiJson(`/api/renewals/dashboard${input.value ? `?month=${encodeURIComponent(input.value)}` : ''}`);
+        input.value = d.month;
+        const tile = (label, value, note = '') => `<div class="border border-slateBorder rounded-lg p-3"><div class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">${label}</div><div class="text-xl font-semibold mt-1 num-tabular">${value}</div>${note ? `<div class="text-[11px] text-slate-500 mt-0.5">${note}</div>` : ''}</div>`;
+        const rate = d.renewalRate === null ? '—' : `${d.renewalRate}%`;
+        root.innerHTML = `
+            <div class="grid grid-cols-2 md:grid-cols-6 gap-3">
+                ${tile('Due this month', d.dueThisMonth)}${tile('Due next month', d.dueNextMonth)}${tile('Renewed', d.renewed, d.premiumRenewed ? `₹${Number(d.premiumRenewed).toLocaleString('en-IN')}` : '')}
+                ${tile('Pending', d.pending)}${tile('Lost', d.lost)}${tile('Renewal rate', rate, d.dueThisMonth ? `${d.renewed} of ${d.dueThisMonth}` : 'Nothing due this month')}
+            </div>
+            <div class="grid md:grid-cols-2 gap-4">
+                <div><h3 class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-2">Open renewals by reminder stage</h3>
+                    <div class="flex flex-wrap gap-2">${d.ladder.map(s => `<span class="px-2 py-1 rounded border text-[11px] ${s.stage.startsWith('Expired') && s.count ? 'border-red-200 bg-red-50 text-red-700' : 'border-slate-200 bg-slate-50'}">${esc(s.stage)} <strong class="num-tabular">${s.count}</strong></span>`).join('')}</div></div>
+                <div><h3 class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-2">By telecaller — ${esc(d.month)}</h3>
+                    ${d.byEmployee.length ? `<table class="w-full text-left corp-table"><thead><tr><th>Telecaller</th><th>Renewed</th><th>Pending</th><th>Lost</th></tr></thead><tbody>${d.byEmployee.map(r => `<tr><td>${esc(r.person)}</td><td class="num-tabular">${r.renewed}</td><td class="num-tabular">${r.pending}</td><td class="num-tabular">${r.lost}</td></tr>`).join('')}</tbody></table>` : '<p class="text-xs text-slate-400">No renewals fall due this month.</p>'}</div>
+            </div>`;
+    } catch (e) { root.innerHTML = `<p class="text-xs text-red-600">${esc(e.message)}</p>`; }
+}
+
 function renderRenewals(items) {
     const body = document.getElementById('renewals-table-body');
     const stages = ['Upcoming', 'Due Soon', 'Contacted', 'Quotation Requested', 'Quotation Sent', 'Negotiation', 'Renewed', 'Lost', 'Lapsed'];
     body.innerHTML = items.length ? items.map(r => `<tr>
         <td><div class="font-medium">${esc(r.customerName)}</div><div class="text-[11px] text-slate-500">${esc(r.policyNumber || 'Policy')}</div></td>
-        <td class="font-mono text-xs">${esc(r.expiryDate || '—')}</td><td>${esc(r.assignedTo)}</td>
+        <td><div class="font-mono text-xs">${esc(r.expiryDate || '—')}</div>${r.ladderStage ? `<div class="text-[10px] mt-0.5 ${r.daysToExpiry < 0 ? 'text-red-700 font-semibold' : r.daysToExpiry <= 7 ? 'text-amber-700 font-semibold' : 'text-slate-500'}">${esc(r.ladderStage)}</div>` : ''}</td><td>${esc(r.assignedTo || 'Unassigned')}</td>
         <td><div>${esc(r.nextAction)}</div><div class="text-[11px] text-slate-500">${esc(r.nextActionDate || 'No date')}</div></td>
         <td class="font-mono">₹${Number(r.targetPremium || 0).toLocaleString('en-IN')}</td>
         <td><select class="corp-input py-1 text-[11px]" onchange="changeRenewalStage('${r.id}', this.value)">${stages.map(s => `<option ${s === r.stage ? 'selected' : ''}>${s}</option>`).join('')}</select></td>
-        <td><div class="flex gap-2"><button onclick="addQuotation('${r.id}')" class="text-[11px] font-semibold text-slate-700 hover:text-black">Add quote</button><button onclick="openCalendarEventForm('Renewal','${r.id}')" class="text-[11px] font-semibold">Schedule</button>${r.selectedQuotationId && r.stage !== 'Renewed' ? `<button onclick="completeRenewal('${r.id}')" class="text-[11px] font-semibold text-emerald-700">Complete</button>` : ''}</div></td>
+        <td><div class="flex gap-2"><button onclick="addQuotation('${r.id}')" class="text-[11px] font-semibold text-slate-700 hover:text-black">Add quote</button><button onclick="openSideBySideQuoteComparison('renewal','${r.id}')" class="text-[11px] font-semibold text-indigo-700 hover:text-indigo-900">Compare</button><button onclick="openCalendarEventForm('Renewal','${r.id}')" class="text-[11px] font-semibold">Schedule</button>${r.selectedQuotationId && r.stage !== 'Renewed' ? `<button onclick="completeRenewal('${r.id}')" class="text-[11px] font-semibold text-emerald-700">Complete</button>` : ''}</div></td>
     </tr>`).join('') : '<tr><td colspan="7" class="text-center py-10 text-slate-400">No renewals generated yet.</td></tr>';
 }
 
@@ -758,7 +1097,7 @@ async function loadLeads() {
 
         const first = result.total ? ((result.page - 1) * result.pageSize) + 1 : 0;
         const last = Math.min(result.total, result.page * result.pageSize);
-        document.getElementById('leads-count-info').textContent = `Displaying ${first}–${last} of ${result.total} commercial accounts`;
+        document.getElementById('leads-count-info').textContent = `Displaying ${first}–${last} of ${result.total} leads`;
         document.getElementById('lead-page-label').textContent = `Page ${result.page} of ${result.totalPages}`;
         document.getElementById('lead-page-prev').disabled = result.page <= 1;
         document.getElementById('lead-page-next').disabled = result.page >= result.totalPages;
@@ -840,13 +1179,11 @@ function renderLeadsTable(leads) {
                         </div>
                         <div>
                             <div class="font-semibold text-slate-900 group-hover:text-black transition-colors">${esc(l.name)}</div>
-                            <div class="text-[11px] text-slate-500 font-medium">${esc(l.policyType)}</div>
+                            <div class="text-[11px] text-slate-500 font-medium">${esc(productLine(l))}</div>
                         </div>
                     </div>
                 </td>
-                <td class="px-4 py-2.5 border-r border-slateBorder text-slate-800 font-medium">
-                    ${esc(l.organization || 'Individual')}
-                </td>
+                <td class="px-4 py-2.5 border-r border-slateBorder">${priorityBadge(l)}</td>
                 <td class="px-4 py-2.5 border-r border-slateBorder" onclick="event.stopPropagation()">
                     <button onclick="openStageTransitionModal('${l.id}', '${l.status}')" class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition-all ${stagePillClass(l.status)}" title="Click to transition stage">
                         <span>${esc(l.status)}</span>
@@ -855,19 +1192,20 @@ function renderLeadsTable(leads) {
                 </td>
                 <td class="px-4 py-2.5 border-r border-slateBorder">
                     <div class="flex items-center justify-between gap-2">
-                        <span class="text-slate-800 font-medium truncate max-w-[230px]" title="${esc(l.nextAction)}">${esc(l.nextAction || 'Follow-up discussion')}</span>
-                        <span class="text-[10px] px-1.5 py-0.2 rounded font-mono font-medium flex-shrink-0 ${isOverdue ? 'bg-rose-50 text-rose-700 border border-rose-200 font-bold' : (isDueToday ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-slate-100 text-slate-600')}">
+                        <span class="text-slate-800 font-medium truncate max-w-[230px]" title="${esc(l.nextAction)}">${esc(l.nextAction || (needsNextAction(l.status) ? 'No next action set' : '—'))}</span>
+                        ${l.nextActionDate ? `<span class="text-[10px] px-1.5 py-0.2 rounded font-mono font-medium flex-shrink-0 ${isOverdue ? 'bg-rose-50 text-rose-700 border border-rose-200 font-bold' : (isDueToday ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-slate-100 text-slate-600')}">
                             ${formatDueBadge(l.nextActionDate, l.daysRemaining)}
-                        </span>
+                        </span>` : ''}
                     </div>
                 </td>
                 <td class="px-4 py-2.5 border-r border-slateBorder font-mono font-semibold text-slate-900 num-tabular">
-                    ${esc(l.premium)}
+                    ${esc(l.premium || '—')}
                 </td>
                 <td class="px-4 py-2.5 border-r border-slateBorder text-slate-700 font-medium">
-                    ${esc(l.assignedTo || 'Sarah Connor')}
+                    ${esc(l.assignedTo || 'Unassigned')}
                 </td>
-                <td class="px-2 py-2.5 text-center" onclick="event.stopPropagation()">
+                <td class="px-2 py-2.5 text-center whitespace-nowrap" onclick="event.stopPropagation()">
+                    ${needsNextAction(l.status) ? callButton(l.id, '') : ''}
                     ${!l.convertedPolicyId ? `<button onclick="convertLeadToPolicy('${l.id}')" class="p-1 text-slate-400 hover:text-emerald-700 rounded" title="Convert to policy">
                         <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M20 13c0 5-3.5 7.5-7.7 9C7.5 20.5 4 18 4 13V6l8-3 8 3z"/><path d="M9 12l2 2 4-4"/></svg>
                     </button>` : ''}
@@ -947,7 +1285,7 @@ function renderLeadsKanban(leads) {
     boardEl.innerHTML = STAGES.map(stg => {
         const stageLeads = (leads || []).filter(l => (l.status || 'New').toLowerCase() === stg.toLowerCase());
         return `
-            <div class="w-72 kanban-col flex flex-col max-h-full flex-shrink-0">
+            <div class="w-64 kanban-col flex flex-col max-h-full flex-shrink-0">
                 <div class="p-3 border-b border-slateBorder flex items-center justify-between bg-white rounded-t-lg">
                     <div class="flex items-center gap-2">
                         <span class="font-semibold text-slate-900 text-xs">${stg}</span>
@@ -961,18 +1299,19 @@ function renderLeadsKanban(leads) {
                         <div draggable="true" ondragstart="event.dataTransfer.setData('text/plain', '${l.id}')" onclick="openLeadDrawer('${l.id}')" class="kanban-card p-3 cursor-pointer space-y-2">
                             <div>
                                 <div class="font-semibold text-slate-900 text-xs truncate">${esc(l.name)}</div>
-                                <div class="text-[11px] text-slate-500 font-medium truncate">${esc(l.organization || 'Individual')}</div>
+                                <div class="text-[11px] text-slate-500 font-medium truncate">${esc(productLine(l))}</div>
                             </div>
 
-                            <div class="p-1.5 rounded bg-slate-50 border border-slate-100 text-[11px] space-y-0.5">
+                            ${l.nextAction ? `<div class="p-1.5 rounded bg-slate-50 border border-slate-100 text-[11px] space-y-0.5">
                                 <div class="text-[10px] text-slate-400 uppercase font-medium">Next Action</div>
-                                <div class="text-slate-800 font-medium truncate">${esc(l.nextAction || 'Follow-up discussion')}</div>
-                                <div class="text-[10px] text-slate-500 font-mono">${esc(l.nextActionDate || 'Pending date')}</div>
-                            </div>
+                                <div class="text-slate-800 font-medium truncate">${esc(l.nextAction)}</div>
+                                <div class="text-[10px] text-slate-500 font-mono">${esc(l.nextActionDate || '')}</div>
+                            </div>` : ''}
 
-                            <div class="flex items-center justify-between pt-1 text-[11px]">
-                                <span class="font-mono font-bold text-slate-900 num-tabular">${esc(l.premium)}</span>
-                                <span class="text-[10px] text-slate-400">${esc(l.assignedTo)}</span>
+                            <div class="flex items-center justify-between gap-2 pt-1 text-[11px]">
+                                ${priorityBadge(l)}
+                                <span class="font-mono font-bold text-slate-900 num-tabular">${esc(l.premium || '')}</span>
+                                <span class="text-[10px] text-slate-400 truncate">${esc(l.assignedTo || 'Unassigned')}</span>
                             </div>
                         </div>
                     `).join('')}
@@ -1030,100 +1369,118 @@ function resetLeadsFilters() {
 // ═══════════════════════════════════════════════════════════════════
 // 2. STAGE TRANSITION & NEXT ACTION DISCIPLINE MODAL
 // ═══════════════════════════════════════════════════════════════════
-function openStageTransitionModal(leadId, targetStage) {
-    const lead = cachedLeads.find(l => l.id === leadId);
-    if (!lead) return;
-
+async function openStageTransitionModal(leadId, targetStage, { fresh = false } = {}) {
+    let lead = fresh ? null : cachedLeads.find(l => l.id === leadId);
+    if (!lead) { try { lead = (await apiJson(`/api/leads/${leadId}`)).lead; } catch (e) { return; } }
+    await loadLeadOptions();
+    const target = targetStage || lead.status;
     document.getElementById('stage-modal-lead-id').value = lead.id;
-    document.getElementById('stage-modal-lead-name').textContent = `${lead.name} (${lead.organization})`;
+    document.getElementById('stage-modal-lead-name').textContent = [lead.name, lead.product].filter(Boolean).join(' · ');
     document.getElementById('stage-modal-old-stage').textContent = lead.status;
-    document.getElementById('stage-modal-new-stage').value = targetStage || lead.status;
-
-    const nextActionSelect = document.getElementById('stage-modal-next-action-select');
-    const customInput = document.getElementById('stage-modal-custom-action');
-    customInput.classList.add('hidden');
-
-    const stageDefaults = {
-        'Contacted': 'Collect Fleet RC Books & NCB Proof',
-        'Risk / Underwriting': 'Dispatch Surveyor for On-site Inspection',
-        'Quotation Sent': 'Deliver Comparative Quotation to Client',
-        'Won': 'Collect Payment & Issue Policy Schedule',
-        'Lost': 'Lost to Competitor'
-    };
-
-    if (stageDefaults[targetStage]) {
-        nextActionSelect.value = stageDefaults[targetStage];
-    } else {
-        nextActionSelect.value = 'custom';
-        customInput.classList.remove('hidden');
-        customInput.value = lead.nextAction || '';
-    }
-
-    const d = new Date();
-    d.setDate(d.getDate() + 2);
-    document.getElementById('stage-modal-action-date').value = d.toISOString().split('T')[0];
+    document.getElementById('stage-modal-new-stage').innerHTML = optionsHtml(STAGES, target);
+    document.getElementById('next-action-suggestions').innerHTML = NEXT_ACTIONS.map(a => `<option value="${esc(a)}"></option>`).join('');
+    document.getElementById('close-reason-suggestions').innerHTML = (leadOptions.closeReasons || []).map(r => `<option value="${esc(r)}"></option>`).join('');
+    const keepCurrent = target === lead.status && lead.nextAction && !lead.nextActionCompleted;
+    document.getElementById('stage-modal-custom-action').value = keepCurrent ? lead.nextAction : (STATUS_NEXT_ACTION[target] || '');
+    document.getElementById('stage-modal-action-date').value = keepCurrent && lead.nextActionDate ? lead.nextActionDate : isoDay(1);
+    document.getElementById('stage-modal-action-time').value = keepCurrent ? (lead.nextActionTime || '') : '';
+    document.getElementById('stage-modal-lost-reason').value = '';
     document.getElementById('stage-modal-note').value = '';
-
-    const lostContainer = document.getElementById('stage-modal-lost-container');
-    if (targetStage === 'Lost') lostContainer.classList.remove('hidden');
-    else lostContainer.classList.add('hidden');
-
+    updateStageFields(target);
     document.getElementById('stage-transition-modal').classList.remove('hidden');
+}
+
+// A finished lead has nothing to schedule; closing one needs a reason.
+function updateStageFields(status) {
+    const open = needsNextAction(status);
+    document.getElementById('stage-modal-next-container').classList.toggle('hidden', !open);
+    document.getElementById('stage-modal-custom-action').required = open;
+    document.getElementById('stage-modal-action-date').required = open;
+    document.getElementById('stage-modal-lost-container').classList.toggle('hidden', !needsReason(status));
+    document.getElementById('stage-modal-lost-reason').required = needsReason(status);
+    // Replace our own suggestion as the status changes, but never something the telecaller typed.
+    const action = document.getElementById('stage-modal-custom-action');
+    const suggested = Object.values(STATUS_NEXT_ACTION);
+    if (open && (!action.value || suggested.includes(action.value))) action.value = STATUS_NEXT_ACTION[status] || action.value;
 }
 
 function closeStageTransitionModal() {
     document.getElementById('stage-transition-modal').classList.add('hidden');
 }
 
-function handleNextActionSelectChange(val) {
-    const custom = document.getElementById('stage-modal-custom-action');
-    if (val === 'custom') {
-        custom.classList.remove('hidden');
-        custom.focus();
-    } else {
-        custom.classList.add('hidden');
-    }
-}
-
 async function handleStageTransitionSubmit(e) {
     e.preventDefault();
     const leadId = document.getElementById('stage-modal-lead-id').value;
-    const newStage = document.getElementById('stage-modal-new-stage').value;
-    const selectAction = document.getElementById('stage-modal-next-action-select').value;
-    const customAction = document.getElementById('stage-modal-custom-action').value.trim();
-    const nextAction = (selectAction === 'custom' ? customAction : selectAction) || 'Follow-up discussion';
-    const nextActionDate = document.getElementById('stage-modal-action-date').value;
-    const stageNote = document.getElementById('stage-modal-note').value.trim();
-    const lostReason = newStage === 'Lost' ? document.getElementById('stage-modal-lost-reason').value : '';
-
+    const status = document.getElementById('stage-modal-new-stage').value;
+    const body = { status, stageNote: document.getElementById('stage-modal-note').value.trim() };
+    if (needsNextAction(status)) {
+        body.nextAction = document.getElementById('stage-modal-custom-action').value.trim();
+        body.nextActionDate = document.getElementById('stage-modal-action-date').value;
+        body.nextActionTime = document.getElementById('stage-modal-action-time').value;
+    }
+    if (needsReason(status)) body.lostReason = document.getElementById('stage-modal-lost-reason').value.trim();
     try {
-        await apiJson(`/api/leads/${leadId}/stage`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                status: newStage,
-                nextAction,
-                nextActionDate,
-                stageNote,
-                lostReason,
-                author: signedInUser?.name || 'System'
-            })
-        });
-
+        await apiJson(`/api/leads/${leadId}/stage`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         closeStageTransitionModal();
-        showToast(`Stage updated to "${newStage}". Next action scheduled.`);
-        loadLeads();
-        if (document.getElementById('detail-drawer')?.classList.contains('translate-x-0')) {
-            openLeadDrawer(leadId);
-        }
+        showToast(needsNextAction(status) ? `Now ${status} — next: ${body.nextAction}` : `Marked ${status}`);
+        if (currentView === 'follow-ups') loadFollowUps(); else loadLeads();
+        if (document.getElementById('detail-drawer')?.classList.contains('translate-x-0')) openLeadDrawer(leadId);
     } catch (err) {
-        showToast(err.message || 'Could not update the stage.');
+        showToast(err.message || 'Could not update the status.');
     }
 }
 
 // ═══════════════════════════════════════════════════════════════════
 // 3. 360° LEAD DETAIL DRAWER
 // ═══════════════════════════════════════════════════════════════════
+function nextActionCard(l) {
+    const open = needsNextAction(l.status);
+    if (!open) return `<div class="p-3 rounded-lg border border-slate-200 bg-slate-50/70 text-xs text-slate-600">
+        ${esc(l.status)} — nothing further is scheduled.${l.lostReason && needsReason(l.status) ? ` Reason: ${esc(l.lostReason)}` : ''}</div>`;
+    // A finished follow-up with nothing after it is exactly how customers get forgotten.
+    if (!l.nextAction || l.nextActionCompleted) return `
+        <div class="p-3 rounded-lg border border-amber-300 bg-amber-50 space-y-2 text-xs">
+            <div class="font-semibold text-amber-900">No next action scheduled</div>
+            <p class="text-amber-800">${l.nextAction ? `“${esc(l.nextAction)}” is done.` : ''} Decide what happens next so this customer isn't forgotten.</p>
+            <button onclick="openStageTransitionModal('${l.id}', '${esc(l.status)}', { fresh: true })" class="px-3 py-1.5 bg-slate-900 text-white rounded text-xs font-semibold">Schedule next action</button>
+        </div>`;
+    const today = localCalendarDate();
+    const late = l.nextActionDate && l.nextActionDate < today;
+    return `
+        <div class="p-3 rounded-lg border ${late ? 'border-rose-300 bg-rose-50/60' : 'border-slate-300 bg-slate-50/70'} space-y-2">
+            <div class="flex items-center justify-between">
+                <span class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Next action</span>
+                <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white border ${late ? 'border-rose-300 text-rose-700' : 'border-slate-200 text-slate-800'} font-bold">
+                    ${late ? 'Overdue · ' : ''}${esc(l.nextActionDate)}${l.nextActionTime ? ` ${esc(l.nextActionTime)}` : ''}
+                </span>
+            </div>
+            <div class="font-semibold text-slate-900 text-xs">${esc(l.nextAction)}</div>
+            <div class="flex items-center justify-between pt-1 border-t border-slate-200 text-[11px]">
+                <span class="text-slate-500">Telecaller: <strong>${esc(l.assignedTo || 'Unassigned')}</strong></span>
+                <button onclick="openStageTransitionModal('${l.id}', '${esc(l.status)}', { fresh: true })" class="text-black font-semibold hover:underline">Reschedule / update →</button>
+            </div>
+        </div>`;
+}
+
+function detailCell(label, value, mono = false) {
+    return `<div><span class="text-slate-400 block text-[10px]">${label}</span><span class="text-slate-800 ${mono ? 'font-mono' : 'font-medium'} break-words">${value ? esc(String(value)) : '<span class="text-slate-300">—</span>'}</span></div>`;
+}
+
+function vehicleSummary(v) {
+    if (!v || !Object.values(v).some(x => x !== '' && x !== null && x !== undefined)) return '';
+    const car = [v.make, v.model, v.variant].filter(Boolean).join(' ');
+    const parts = [v.registrationNumber, car, v.manufactureYear, v.fuelType, v.ncbPercent !== undefined && v.ncbPercent !== null ? `${v.ncbPercent}% NCB` : '',
+        v.idv ? `IDV ₹${Number(v.idv).toLocaleString('en-IN')}` : '', v.previousClaims === true ? 'claimed last year' : ''].filter(Boolean);
+    return `<div class="pt-2 border-t border-slate-100"><span class="text-slate-400 block text-[10px]">Car</span><span class="text-slate-800 font-medium">${esc(parts.join(' · '))}</span></div>`;
+}
+
+function healthSummary(h) {
+    if (!h || !(h.members?.length || h.planType || h.sumInsured || h.preExistingConditions)) return '';
+    const members = (h.members || []).map(m => `${m.relation} ${m.age}`).join(', ');
+    const parts = [h.planType, members, h.sumInsured ? `cover ₹${Number(h.sumInsured).toLocaleString('en-IN')}` : '', h.preExistingConditions].filter(Boolean);
+    return `<div class="pt-2 border-t border-slate-100"><span class="text-slate-400 block text-[10px]">Health</span><span class="text-slate-800 font-medium">${esc(parts.join(' · '))}</span></div>`;
+}
+
 async function openLeadDrawer(leadId) {
     try {
         const res = await fetch(`/api/leads/${leadId}`);
@@ -1131,81 +1488,52 @@ async function openLeadDrawer(leadId) {
         const data = await res.json();
         const l = data.lead;
         const notes = data.notes || [];
+        const docStatus = data.documentStatus || { required: [], missing: [] };
         const documents = await apiJson(`/api/documents?associatedId=${encodeURIComponent(leadId)}`);
+        await loadLeadOptions();
 
         document.getElementById('drawer-title').textContent = l.name;
-        document.getElementById('drawer-org').textContent = `${l.organization || 'Corporate Account'} • ${l.territory || 'India'}`;
+        document.getElementById('drawer-org').textContent = [productLine(l), l.source && l.source !== 'Not recorded' ? `via ${l.source}` : ''].filter(Boolean).join(' • ');
 
         const content = document.getElementById('drawer-content');
         content.innerHTML = `
-            <div class="flex justify-end gap-2"><button onclick="openCalendarEventForm('Lead','${l.id}')" class="px-3 py-1.5 border border-slate-300 rounded text-xs font-semibold">Schedule activity</button><button onclick="openEditLead('${l.id}')" class="px-3 py-1.5 bg-slate-900 text-white rounded text-xs font-semibold">Edit lead details</button></div>
+            <div class="flex flex-wrap justify-end gap-2">${needsNextAction(l.status) || l.status === 'Policy Sold' ? callButton(l.id, 'Call now') : ''}<button onclick="openCalendarEventForm('Lead','${l.id}')" class="px-3 py-1.5 border border-slate-300 rounded text-xs font-semibold">Schedule activity</button><button onclick="openEditLead('${l.id}')" class="px-3 py-1.5 bg-slate-900 text-white rounded text-xs font-semibold">Edit lead details</button></div>
             <!-- Stage Chevron Progression -->
             <div class="space-y-1.5 pb-3 border-b border-slateBorder">
-                <div class="text-[10px] uppercase font-semibold text-slate-500">Pipeline Stage</div>
-                <div class="grid grid-cols-6 gap-1">
-                    ${STAGES.map(stg => {
-                        const isCurrent = l.status === stg;
-                        return `
-                            <button onclick="openStageTransitionModal('${l.id}', '${stg}')" class="stage-step ${isCurrent ? 'active' : ''} text-[10px] py-1">
-                                ${stg.split(' ')[0]}
-                            </button>
-                        `;
-                    }).join('')}
-                </div>
-            </div>
-
-            <div class="border border-slateBorder rounded-lg p-3 bg-white space-y-2">
-                <div class="flex justify-between"><span class="text-[11px] font-bold uppercase tracking-wider">Documents (${documents.filter(d=>d.status==='Active').length})</span></div>
-                <div class="flex flex-wrap gap-2"><select id="lead-document-category" class="corp-input flex-1"><option>KYC</option><option>Proposal Form</option><option>Quote</option><option>Policy Schedule</option><option>Claims History</option><option>Other</option></select><input id="lead-document-file" type="file" class="corp-input flex-[2]" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx,.csv,.txt"><button onclick="uploadLeadDocument('${l.id}')" class="px-3 bg-slate-900 text-white rounded text-xs font-semibold">Upload</button></div>
-                <div class="space-y-1">${documents.filter(d=>d.status==='Active').map(d=>`<div class="text-xs flex justify-between border-t pt-1"><a class="font-medium underline" href="/api/documents/${d.id}/content" target="_blank">${esc(d.originalName)}</a><span class="text-slate-400">${esc(d.category)} · v${d.version}</span></div>`).join('')||'<p class="text-xs text-slate-400">No documents uploaded.</p>'}</div>
-            </div>
-
-            <!-- Prominent Next Action Card -->
-            <div class="p-3 rounded-lg border border-slate-300 bg-slate-50/70 space-y-2">
                 <div class="flex items-center justify-between">
-                    <span class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Scheduled Next Action</span>
-                    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white border border-slate-200 font-bold ${l.daysRemaining <= 10 ? 'text-rose-600' : 'text-slate-800'}">
-                        Due: ${esc(l.nextActionDate)}
-                    </span>
+                    <div class="text-[10px] uppercase font-semibold text-slate-500">Status</div>
+                    ${priorityBadge(l)}
                 </div>
-                <div class="font-semibold text-slate-900 text-xs">${esc(l.nextAction)}</div>
-                <div class="flex items-center justify-between pt-1 border-t border-slate-200 text-[11px]">
-                    <span class="text-slate-500">Assigned: <strong>${esc(l.assignedTo)}</strong></span>
-                    <button onclick="openStageTransitionModal('${l.id}', '${l.status}')" class="text-black font-semibold hover:underline">
-                        Reschedule / Update →
-                    </button>
+                <div class="flex flex-wrap gap-1">
+                    ${STAGES.map(stg => `<button onclick="openStageTransitionModal('${l.id}', '${esc(stg)}')" class="stage-step ${l.status === stg ? 'active' : ''} text-[10px] py-1 px-2">${esc(stg)}</button>`).join('')}
                 </div>
             </div>
 
-            <!-- Commercial Policy Schedule -->
+            ${await callHistoryCard(l.id)}
+
+            ${await quotationsCard(l)}
+
+            ${documentsCard(l, documents, docStatus)}
+
+            <!-- Next action: what happens next with this customer -->
+            ${nextActionCard(l)}
+
+            <!-- What the customer has told us -->
             <div class="border border-slateBorder rounded-lg p-3 bg-white space-y-2 text-xs">
-                <div class="text-[11px] font-bold text-slate-800 uppercase tracking-wider">Commercial Policy Schedule</div>
+                <div class="text-[11px] font-bold text-slate-800 uppercase tracking-wider">Customer & cover</div>
                 <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <span class="text-slate-400 block text-[10px]">Contact Mobile</span>
-                        <span class="font-mono text-slate-800 font-medium">${esc(l.mobile)}</span>
-                    </div>
-                    <div>
-                        <span class="text-slate-400 block text-[10px]">Contact Email</span>
-                        <span class="font-mono text-slate-800 truncate block">${esc(l.email || '-')}</span>
-                    </div>
-                    <div>
-                        <span class="text-slate-400 block text-[10px]">Policy Category</span>
-                        <span class="text-slate-900 font-medium">${esc(l.policyType)}</span>
-                    </div>
-                    <div>
-                        <span class="text-slate-400 block text-[10px]">Annual Premium</span>
-                        <span class="text-slate-900 font-bold font-mono num-tabular">${esc(l.premium)}</span>
-                    </div>
-                    <div>
-                        <span class="text-slate-400 block text-[10px]">Expiry / Renewal Due</span>
-                        <span class="text-slate-800 font-mono">${l.expiryDate ? `${esc(l.expiryDate)} (${formatDaysLeft(l.daysRemaining)})` : 'Not set'}</span>
-                    </div>
-                    <div>
-                        <span class="text-slate-400 block text-[10px]">Policy Number</span>
-                        <span class="text-slate-800 font-mono">${esc(l.policyNumber || '-')}</span>
-                    </div>
+                    ${detailCell('Mobile', l.mobile, true)}
+                    ${detailCell('Email', l.email, true)}
+                    ${detailCell('Product', l.product || l.policyType)}
+                    ${detailCell('City', l.city)}
+                    ${detailCell('Current premium', l.premium, true)}
+                    ${detailCell('Current policy expires', l.expiryDate ? `${l.expiryDate} (${formatDaysLeft(l.daysRemaining)})` : '')}
+                    ${detailCell('Current insurer', l.existingPolicy?.insurer)}
+                    ${detailCell('Lead source', l.sourceDetail ? `${l.source} (${l.sourceDetail})` : l.source)}
+                    ${detailCell('Enquiry received', l.leadDate ? formatShortDate(l.leadDate) : (l.leadDateUnknown ? 'Not recorded' : ''))}
+                    ${detailCell('Policy number', l.policyNumber, true)}
                 </div>
+                ${vehicleSummary(l.vehicleDetails)}${healthSummary(l.healthDetails)}
             </div>
 
             ${Object.keys(l.customFields || {}).length ? `
@@ -1264,6 +1592,74 @@ async function openLeadDrawer(leadId) {
     }
 }
 
+// ── Documents (slide 21): what the product needs, what has arrived, what is verified ──
+const DOC_STATE = {
+    missing: ['Missing', 'bg-rose-50 text-rose-700 border-rose-200'],
+    pending: ['Awaiting check', 'bg-amber-50 text-amber-800 border-amber-200'],
+    verified: ['Verified', 'bg-emerald-50 text-emerald-800 border-emerald-200'],
+    rejected: ['Rejected', 'bg-rose-50 text-rose-700 border-rose-200'],
+};
+const docStateBadge = state => { const [label, cls] = DOC_STATE[state] || DOC_STATE.pending;
+    return `<span class="inline-block px-1.5 py-0.5 rounded border text-[10px] font-semibold ${cls}">${label}</span>`; };
+
+function documentsCard(l, documents, status) {
+    const active = documents.filter(d => d.status === 'Active');
+    const checklist = status.required.length ? `
+        <div class="space-y-1">
+            <div class="text-[10px] text-slate-400 uppercase font-medium">Needed for ${esc(status.product)}</div>
+            ${status.required.map(r => `<div class="flex items-center justify-between gap-2 text-xs">
+                <span class="font-medium text-slate-800">${esc(r.type)}</span>
+                <span class="flex items-center gap-1.5">${r.note ? `<span class="text-[10px] text-rose-600 truncate max-w-[160px]" title="${esc(r.note)}">${esc(r.note)}</span>` : ''}${docStateBadge(r.state)}</span>
+            </div>`).join('')}
+            ${status.missing.length ? `<button type="button" onclick="requestMissingDocuments('${l.id}')" class="mt-1 w-full px-3 py-1.5 border border-slate-300 rounded text-xs font-semibold hover:border-slate-500">Ask for ${esc(status.missing.join(', '))} on WhatsApp or email</button>`
+                : `<p class="text-[11px] text-emerald-700 font-medium">Everything needed has arrived.</p>`}
+        </div>` : `<p class="text-[11px] text-slate-400">${l.product ? `No documents are required for ${esc(l.product)}.` : 'Choose a product to see which documents are needed.'}</p>`;
+    const types = leadOptions.documentTypes?.length ? leadOptions.documentTypes : ['Other'];
+    const firstMissing = status.missing[0] || types[0];
+    return `
+        <div class="border border-slateBorder rounded-lg p-3 bg-white space-y-2.5">
+            <div class="text-[11px] font-bold uppercase tracking-wider">Documents (${active.length})</div>
+            ${checklist}
+            <div class="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
+                <select id="lead-document-category" class="corp-input flex-1 min-w-[8rem]" aria-label="Document type">${optionsHtml(types, firstMissing)}</select>
+                <input id="lead-document-file" type="file" class="corp-input flex-[2] min-w-[10rem]" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx,.csv,.txt" aria-label="Document file">
+                <button onclick="uploadLeadDocument('${l.id}')" class="px-3 bg-slate-900 text-white rounded text-xs font-semibold">Upload</button>
+            </div>
+            <div class="space-y-1">${active.map(d => `
+                <div class="text-xs flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-1.5">
+                    <a class="font-medium underline truncate max-w-[45%]" href="/api/documents/${d.id}/content" target="_blank" rel="noopener">${esc(d.originalName)}</a>
+                    <span class="flex items-center gap-1.5 text-slate-400">${esc(d.category)} · v${d.version} ${docStateBadge((d.verification || 'Pending').toLowerCase())}
+                        ${canAssignLeads() && (d.verification || 'Pending') === 'Pending' ? `<button type="button" onclick="verifyDocument('${d.id}','Verified','${l.id}')" class="fu-btn">Verify</button><button type="button" onclick="verifyDocument('${d.id}','Rejected','${l.id}')" class="fu-btn">Reject</button>` : ''}
+                    </span>
+                </div>`).join('') || '<p class="text-xs text-slate-400">No documents uploaded.</p>'}</div>
+        </div>`;
+}
+
+async function verifyDocument(id, verification, leadId) {
+    let note = '';
+    if (verification === 'Rejected') {
+        note = prompt('Why is this document being rejected? The customer will need to know what to send instead.') || '';
+        if (!note.trim()) return;
+    }
+    try {
+        await apiJson(`/api/documents/${id}/verification`, { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ verification, note }) });
+        showToast(verification === 'Verified' ? 'Document verified' : 'Document rejected');
+        openLeadDrawer(leadId);
+    } catch (e) { showToast(e.message); }
+}
+
+// Slide 19: request pending documents from the customer, naming exactly what is missing.
+async function requestMissingDocuments(leadId) {
+    const data = await apiJson(`/api/leads/${leadId}`);
+    const l = data.lead, missing = data.documentStatus?.missing || [];
+    if (!missing.length) return showToast('Nothing is missing');
+    const first = (l.firstName || l.name || '').split(' ')[0];
+    const draft = `Hello ${first}, to complete your ${l.product || 'insurance'} we still need: ${missing.join(', ')}. `
+        + `You can reply to this message with a photo or PDF of each. Thank you.`;
+    openSendMessage(leadId, draft);
+}
+
 async function uploadLeadDocument(leadId){
     const input=document.getElementById('lead-document-file'); const file=input?.files?.[0]; if(!file)return showToast('Choose a document first');
     try{await apiJson(`/api/documents?associatedId=${encodeURIComponent(leadId)}&associatedType=Lead&category=${encodeURIComponent(document.getElementById('lead-document-category').value)}&filename=${encodeURIComponent(file.name)}`,{method:'POST',headers:{'Content-Type':file.type||'application/octet-stream'},body:file});showToast('Document uploaded');await openLeadDrawer(leadId)}catch(e){showToast(e.message)}
@@ -1319,7 +1715,7 @@ function renderNotesGrid(notes) {
 
                 <!-- Footer with Author, Date and Action -->
                 <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-                    <span class="font-medium text-slate-600">${esc(n.author || 'Sarah Connor')}</span>
+                    <span class="font-medium text-slate-600">${esc(n.author || 'Unknown')}</span>
                     <div class="flex items-center gap-2">
                         <span>${timeAgo(n.createdAt)}</span>
                         <button onclick="event.stopPropagation(); archiveNoteAction('${n.id}')" class="note-action" title="Archive this note — it stays on the record's history">Archive</button>
@@ -1592,6 +1988,1043 @@ async function toggleTaskStatus(id, isDone) {
     } catch (e) { showToast(e.message || 'Could not update task.'); loadTasks(); }
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// FOLLOW-UPS — slide 17: counters and the calling order
+// ═══════════════════════════════════════════════════════════════════
+let followUpData = null;
+let followUpTab = 'dueToday';
+
+async function loadFollowUps() {
+    try {
+        followUpData = await apiJson('/api/follow-ups');
+    } catch (e) { showToast(e.message || 'Could not load follow-ups'); return; }
+    const m = followUpData.metrics;
+    const basis = m.onTimeBasis;
+    // Status is carried by the rail and the wording, not by colour alone.
+    const tiles = [
+        ['Due today', m.dueToday, 'Still to do today', m.dueToday ? 'is-warning' : '', 'dueToday'],
+        ['Overdue', m.overdue, 'Past their due time', m.overdue ? 'is-critical' : '', 'overdue'],
+        ['Upcoming', m.upcoming, 'Scheduled after today', '', 'upcoming'],
+        ['On-time rate', m.onTimeRate === null ? '—' : `${m.onTimeRate}%`,
+            m.onTimeRate === null ? `Nothing fell due in the last ${basis.days} days`
+                : `${basis.onTime} of ${basis.cameDue} on time · last ${basis.days} days`, m.onTimeRate >= 90 ? 'is-good' : '', ''],
+    ];
+    document.getElementById('fu-metrics').innerHTML = tiles.map(([label, value, note, tone, tab]) => `
+        <${tab ? `button type="button" onclick="setFollowUpTab('${tab}')"` : 'div'} class="day-tile ${tone}">
+            <strong>${esc(String(value))}</strong>
+            <span class="font-medium text-slate-700">${esc(label)}</span>
+            <span>${esc(note)}</span>
+        </${tab ? 'button' : 'div'}>`).join('');
+    ['overdue', 'dueToday', 'upcoming', 'doneToday'].forEach(key => {
+        const el = document.querySelector(`[data-fu-count="${key}"]`);
+        if (el) el.textContent = (followUpData[key] || []).length;
+    });
+    document.getElementById('fu-timezone').textContent = `Times shown in ${followUpData.timezone}`;
+    // Open on the first list with something in it, rather than an empty "due today".
+    if (!(followUpData[followUpTab] || []).length) {
+        followUpTab = ['dueToday', 'overdue', 'upcoming'].find(k => followUpData[k].length) || followUpTab;
+    }
+    renderFollowUps();
+}
+
+function setFollowUpTab(tab) { followUpTab = tab; renderFollowUps(); }
+
+function relativeTime(iso) {
+    const then = new Date(iso); if (isNaN(then)) return '';
+    const minutes = Math.round((Date.now() - then) / 60000);
+    if (minutes < 60) return `${Math.max(minutes, 1)} min ago`;
+    if (minutes < 1440) return `${Math.round(minutes / 60)} h ago`;
+    return `${Math.round(minutes / 1440)} d ago`;
+}
+
+function followUpWhen(r) {
+    const today = localCalendarDate();
+    const day = r.dueDate === today ? 'Today' : r.dueDate === isoDay(1) ? 'Tomorrow' : formatShortDate(r.dueDate);
+    return `${day}${r.dueTime ? ` · ${r.dueTime}` : ''}`;
+}
+
+function renderFollowUps() {
+    document.querySelectorAll('[data-fu-tab]').forEach(b => {
+        const on = b.dataset.fuTab === followUpTab;
+        b.classList.toggle('is-active', on); b.setAttribute('aria-selected', on);
+    });
+    const rows = (followUpData?.[followUpTab]) || [];
+    const empty = { overdue: 'Nothing overdue. Every follow-up is on track.', dueToday: 'Nothing left for today.',
+        upcoming: 'Nothing scheduled after today yet.', doneToday: 'Nothing finished yet today.' }[followUpTab];
+    const list = document.getElementById('fu-list');
+    if (!rows.length) { list.innerHTML = `<p class="p-6 text-center text-xs text-slate-400">${empty}</p>`; return; }
+    const done = followUpTab === 'doneToday', late = followUpTab === 'overdue';
+    list.innerHTML = rows.map(r => `
+        <div class="fu-row">
+            <div class="fu-when ${late ? 'text-rose-700' : 'text-slate-700'}">
+                <span class="font-mono font-semibold">${esc(done ? `Done ${relativeTime(r.completedAt)}` : followUpWhen(r))}</span>
+            </div>
+            <div class="min-w-0">
+                <button type="button" onclick="${r.associatedType === 'Lead' ? `openLeadDrawer('${r.associatedId}')` : `openFollowUpRecord('${r.associatedType}','${r.associatedId}')`}"
+                    class="font-semibold text-slate-900 hover:underline text-left truncate block max-w-full">${esc(r.customerName || 'General task')}</button>
+                <span class="block text-[11px] text-slate-500 truncate">${esc([r.product, r.leadStatus].filter(Boolean).join(' · '))}</span>
+            </div>
+            <div>${r.leadPriority ? priorityBadge(r) : ''}</div>
+            <div class="min-w-0">
+                <span class="block text-slate-800 font-medium truncate">${esc(r.title)}</span>
+                <span class="block text-[11px] text-slate-400 truncate">${r.lastInteraction ? `Last: ${esc(r.lastInteraction.what)} · ${relativeTime(r.lastInteraction.at)}` : 'No contact recorded yet'}</span>
+            </div>
+            <div class="text-[11px] text-slate-600 truncate">${esc(r.assignedTo || 'Unassigned')}</div>
+            <div class="fu-actions">
+                ${r.associatedType === 'Lead' && r.mobile ? callButton(r.associatedId) : r.mobile ? `<a href="tel:${esc(r.mobile.replace(/\s+/g, ''))}" class="fu-btn">Call</a>` : ''}
+                ${done ? '' : `<button type="button" onclick="completeFollowUp('${r.id}')" class="fu-btn is-primary">Done</button>
+                <button type="button" onclick="rescheduleFollowUp('${r.id}')" class="fu-btn">Reschedule</button>`}
+            </div>
+        </div>`).join('');
+}
+
+function findFollowUp(id) {
+    return ['overdue', 'dueToday', 'upcoming'].flatMap(k => followUpData?.[k] || []).find(r => r.id === id);
+}
+
+// Finishing a lead's follow-up asks what happens next, so the lead is never left without one.
+async function completeFollowUp(id) {
+    const row = findFollowUp(id);
+    try {
+        await apiJson(`/api/tasks/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'Completed' }) });
+        showToast('Follow-up done');
+        await loadFollowUps();
+        if (row?.associatedType === 'Lead' && row.leadStatus && needsNextAction(row.leadStatus)) {
+            const next = ['New', 'Assigned'].includes(row.leadStatus) ? 'Contacted' : row.leadStatus;
+            openStageTransitionModal(row.associatedId, next, { fresh: true });
+        }
+    } catch (e) { showToast(e.message || 'Could not update the follow-up'); }
+}
+
+function rescheduleFollowUp(id) {
+    const row = findFollowUp(id); if (!row) return;
+    if (row.associatedType === 'Lead' && row.leadStatus) { openStageTransitionModal(row.associatedId, row.leadStatus, { fresh: true }); return; }
+    openInsuranceForm('Reschedule follow-up', [['dueDate', 'Due', 'date', true], ['dueTime', 'Time', 'time', false]], async v => {
+        await apiJson(`/api/tasks/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(v) });
+        await loadFollowUps();
+    }, { dueDate: row.dueDate, dueTime: row.dueTime || '' });
+}
+
+function openFollowUpRecord(type, id) {
+    // The 360° panel lives on the Customers screen, so go there first.
+    if (type === 'Customer') { switchView('customers'); setTimeout(() => openCustomer360(id), 120); }
+    else if (type === 'Policy' || type === 'Renewal') switchView(type === 'Policy' ? 'policies' : 'renewals');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ROLE-AWARE SCREENS — elements marked data-requires only show to those allowed
+// ═══════════════════════════════════════════════════════════════════
+function roleKey() {
+    if (!signedInUser) return 'admin';                        // local mode without sign-in
+    const r = String(signedInUser.role || '').toLowerCase();
+    if (['admin', 'administrator', 'system administrator', 'owner', 'owner / admin'].includes(r)) return 'admin';
+    if (['manager', 'team manager', 'sales manager'].includes(r)) return 'manager';
+    if (['readonly', 'read-only', 'read-only auditor', 'auditor', 'viewer'].includes(r)) return 'readonly';
+    return 'telecaller';
+}
+
+function applyRoleVisibility() {
+    const role = roleKey();
+    document.querySelectorAll('[data-requires]').forEach(el => {
+        const need = el.dataset.requires;
+        const allowed = need === 'admin' ? role === 'admin' : need === 'manage' ? ['admin', 'manager'].includes(role) : true;
+        el.classList.toggle('hidden', !allowed);
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// AUTOMATION — slide 33: when something happens, if it matches, then act
+// ═══════════════════════════════════════════════════════════════════
+let automationData = null, automationOptions = null, automationTab = 'rules', ruleDraft = null;
+
+async function loadAutomation() {
+    try {
+        [automationData, automationOptions] = await Promise.all([apiJson('/api/automations'), apiJson('/api/automations/options')]);
+    } catch (e) { showToast(e.message || 'Could not load automations'); return; }
+    document.getElementById('auto-paused').checked = automationData.paused;
+    document.getElementById('auto-paused-banner').classList.toggle('hidden', !automationData.paused);
+    applyRoleVisibility();
+    setAutomationTab(automationTab);
+}
+
+function setAutomationTab(tab) {
+    automationTab = tab;
+    document.querySelectorAll('[data-auto-tab]').forEach(b => { const on = b.dataset.autoTab === tab; b.classList.toggle('is-active', on); b.setAttribute('aria-selected', on); });
+    document.getElementById('auto-rules-pane').classList.toggle('hidden', tab !== 'rules');
+    document.getElementById('auto-activity-pane').classList.toggle('hidden', tab !== 'activity');
+    if (tab === 'rules') { renderRecipes(); renderAutomationRules(); } else loadAutomationRuns();
+}
+
+const quote = t => `“${esc(t)}”`;
+function describeAction(a) {
+    const p = a.params || {};
+    switch (a.type) {
+        case 'assign': { const how = (automationOptions.methods.find(m => m.method === p.method) || {}).label || '';
+            return `assign it to <b>${esc((p.assignees || []).join(' or '))}</b>${how ? ` (${esc(how.toLowerCase())})` : ''}`; }
+        case 'create_task': return `create a follow-up ${quote(p.title)} due ${Number(p.dueInDays) ? `in ${p.dueInDays} day${p.dueInDays == 1 ? '' : 's'}` : 'the same day'}`;
+        case 'notify': return `notify <b>${esc({ assignee: 'the telecaller', manager: 'their manager', owner: 'the owner' }[p.to] || p.to)}</b>: ${quote(p.message)}`;
+        case 'send_message': { const t = (automationOptions.whatsappTemplates || []).find(x => x.id === p.whatsappTemplateId);
+            return `send the customer ${esc(p.channel === 'Email' ? 'an email' : 'a WhatsApp')}: ${t ? `template ${quote(t.name)}` : quote(p.text)}`; }
+        case 'set_status': return `set the status to <b>${esc(p.status)}</b>`;
+        case 'set_priority': return `set calling priority to <b>${esc(p.priority)}</b>`;
+        case 'add_note': return `add a note ${quote(p.text)}`;
+        case 'create_renewal': return 'open a renewal record';
+        default: return esc(a.type);
+    }
+}
+
+function describeRule(rule) {
+    const t = rule.trigger || {}, spec = automationOptions.triggers[t.type] || { label: t.type };
+    let when = esc(spec.label.charAt(0).toLowerCase() + spec.label.slice(1));
+    if (t.params?.to) when += ` ${t.type === 'call.logged' ? 'with outcome' : 'to'} <b>${esc(t.params.to)}</b>`;
+    if (t.params?.days !== undefined) when += ` (<b>${esc(t.params.days)}</b> ${esc((spec.params || [])[0]?.label || 'days')})`;
+    const fields = automationOptions.fields[spec.record] || [];
+    const ops = Object.fromEntries(automationOptions.operators.map(o => [o.op, o.label]));
+    const ifs = (rule.conditions || []).map(c => `<b>${esc((fields.find(f => f.field === c.field) || {}).label || c.field)}</b> ${esc(ops[c.operator] || c.operator)}${c.operator === 'is_empty' ? '' : ` <b>${esc(c.value)}</b>`}`);
+    return `<span class="auto-sentence"><b>When</b> ${when}${ifs.length ? ` · <b>if</b> ${ifs.join(' and ')}` : ''} · <b>then</b> ${(rule.actions || []).map(describeAction).join(', then ')}.</span>`;
+}
+
+function renderRecipes() {
+    const admin = roleKey() === 'admin';
+    document.getElementById('auto-recipes').innerHTML = automationData.recipes.map(r => {
+        const rule = automationData.rules.find(x => x.id === r.ruleId);
+        const [label, cls] = r.builtIn ? ['Built in', 'built'] : r.comingWith ? ['Coming later', 'later'] : rule ? (rule.enabled ? ['On', 'on'] : ['Off', 'off']) : ['Not added', 'off'];
+        const body = r.builtIn || r.comingWith || (rule ? describeRule(rule) : esc(r.name));
+        const button = r.builtIn || r.comingWith ? '' : rule ? `<button type="button" class="fu-btn" onclick="openRuleBuilder('${rule.id}')">${admin ? 'Edit' : 'View'}</button>`
+            : admin ? `<button type="button" class="fu-btn is-primary" onclick="addRecipe('${r.key}')">Turn on</button>` : '';
+        return `<div class="auto-card ${rule?.enabled ? '' : 'is-off'}"><div class="min-w-0 space-y-1">
+                <div class="flex flex-wrap items-center gap-2"><span class="font-semibold text-slate-900">${esc(r.row)}</span><span class="auto-pill ${cls}">${label}</span></div>
+                <div class="text-[11px] text-slate-500">${body}</div></div>${button}</div>`;
+    }).join('');
+}
+
+function renderAutomationRules() {
+    const admin = roleKey() === 'admin';
+    const rules = automationData.rules;
+    document.getElementById('auto-rules').innerHTML = rules.length ? rules.map((r, i) => `
+        <div class="auto-card ${r.enabled ? '' : 'is-off'}">
+            <div class="min-w-0 space-y-1">
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="font-mono text-[10px] text-slate-400">${i + 1}</span>
+                    <span class="font-semibold text-slate-900">${esc(r.name)}</span>
+                    <span class="auto-pill ${r.enabled ? 'on' : 'off'}">${r.enabled ? 'On' : 'Off'}</span>
+                </div>
+                <div>${describeRule(r)}</div>
+                <div class="text-[11px] text-slate-400">${r.runCount ? `Ran ${r.runCount} time${r.runCount === 1 ? '' : 's'} · last ${relativeTime(r.lastRunAt)}` : 'Has not run yet'}${(r.limits?.daysOfWeek || []).length ? ` · only on ${esc(r.limits.daysOfWeek.join(', '))}` : ''}</div>
+            </div>
+            <div class="flex flex-wrap gap-1.5 shrink-0">
+                ${admin ? `<label class="auto-switch"><input type="checkbox" ${r.enabled ? 'checked' : ''} onchange="toggleAutomation('${r.id}', this.checked)"><span>On</span></label>
+                <button type="button" class="fu-btn" onclick="moveAutomation('${r.id}','up')" aria-label="Try earlier" ${i === 0 ? 'disabled' : ''}>↑</button>
+                <button type="button" class="fu-btn" onclick="moveAutomation('${r.id}','down')" aria-label="Try later" ${i === rules.length - 1 ? 'disabled' : ''}>↓</button>` : ''}
+                <button type="button" class="fu-btn" onclick="openRuleBuilder('${r.id}')">${admin ? 'Edit' : 'View'}</button>
+                ${admin ? `<button type="button" class="fu-btn" onclick="deleteAutomation('${r.id}')">Delete</button>` : ''}
+            </div>
+        </div>`).join('') : '<p class="text-xs text-slate-400 p-4 bg-white border border-slateBorder rounded-lg">No rules yet. Turn on one from the client’s plan above, or write your own with New rule.</p>';
+}
+
+async function automationCall(path, method, body) {
+    try { await apiJson(path, { method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) }); await loadAutomation(); return true; }
+    catch (e) { showToast(e.message); return false; }
+}
+const toggleAutomation = (id, enabled) => automationCall(`/api/automations/${id}`, 'PUT', { enabled }).then(ok => ok && showToast(enabled ? 'Rule switched on' : 'Rule switched off'));
+const moveAutomation = (id, direction) => automationCall(`/api/automations/${id}/move`, 'POST', { direction });
+const setAutomationPaused = paused => automationCall('/api/automations/pause', 'PUT', { paused }).then(ok => ok && showToast(paused ? 'Every automation is paused' : 'Automations resumed'));
+async function addRecipe(key) { if (await automationCall(`/api/automations/recipes/${key}`, 'POST', {})) showToast('Rule switched on'); }
+async function deleteAutomation(id) {
+    const rule = automationData.rules.find(r => r.id === id);
+    if (!await confirmDestructive({ title: `Delete “${rule?.name}”?`, body: 'The rule stops running and is removed. Its past activity stays in the log.', confirmLabel: 'Delete rule', tone: 'danger' })) return;
+    if (await automationCall(`/api/automations/${id}`, 'DELETE')) showToast('Rule deleted');
+}
+
+async function loadAutomationRuns() {
+    const runs = await apiJson('/api/automations/runs?limit=200');
+    const results = { done: 'Done', partial: 'Partly done', blocked: 'Blocked', skipped: 'Skipped', failed: 'Failed' };
+    document.getElementById('auto-runs').innerHTML = runs.length ? runs.map(r => `
+        <tr><td class="whitespace-nowrap text-[11px] text-slate-500">${esc(formatShortDate(r.at))} ${esc(new Date(r.at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }))}</td>
+            <td class="text-xs font-medium">${esc(r.ruleName || '—')}</td>
+            <td class="text-xs">${esc(r.recordName || r.recordId)}</td>
+            <td><span class="auto-pill ${r.status}">${results[r.status] || esc(r.status)}</span></td>
+            <td class="text-[11px] text-slate-600">${r.reason ? esc(r.reason) : (r.actions || []).map(a => `${esc(a.detail || a.type)}${a.result === 'done' ? '' : ` — <em>${esc(a.result)}</em>`}`).join('<br>')}</td></tr>`).join('')
+        : '<tr><td colspan="5" class="text-center text-xs text-slate-400 py-6">No automation has run yet.</td></tr>';
+}
+
+// ── The rule builder ──
+function blankRule() {
+    return { name: '', enabled: false, trigger: { type: 'lead.status_changed', params: {} }, conditions: [],
+        actions: [{ type: 'create_task', params: { title: '', dueInDays: 0 } }], limits: { daysOfWeek: [], maxPerHour: automationOptions.defaultMaxPerHour } };
+}
+
+async function openRuleBuilder(id = '') {
+    if (!automationOptions) automationOptions = await apiJson('/api/automations/options');
+    const existing = id ? automationData.rules.find(r => r.id === id) : null;
+    ruleDraft = JSON.parse(JSON.stringify(existing || blankRule()));
+    ruleDraft.id = existing?.id || '';
+    document.getElementById('insurance-form-title').textContent = existing ? (roleKey() === 'admin' ? 'Edit rule' : 'Rule') : 'New rule';
+    renderRuleBuilder();
+    document.getElementById('insurance-form-modal').classList.remove('hidden');
+}
+
+const selectHtml = (bind, pairs, value) => `<select data-bind="${bind}" class="corp-input">${pairs.map(([v, l]) => `<option value="${esc(String(v))}" ${String(v) === String(value ?? '') ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
+const inputHtml = (bind, value, attrs = '') => `<input data-bind="${bind}" value="${esc(String(value ?? ''))}" class="corp-input" ${attrs}>`;
+
+function actionEditor(a, i) {
+    const p = a.params || {}, b = k => `actions.${i}.params.${k}`, o = automationOptions;
+    const label = (text, control, wide = false) => `<label class="block text-[11px] font-medium text-slate-600 ${wide ? 'sm:col-span-2' : ''}">${text}${control}</label>`;
+    switch (a.type) {
+        case 'assign': return `${label('Choose between', `<div class="flex flex-wrap gap-1.5 mt-1">${o.people.map(n => `<span class="auto-chip ${(p.assignees || []).includes(n) ? 'is-on' : ''}" onclick="toggleDraftList('${b('assignees')}','${esc(n)}')">${esc(n)}</span>`).join('')}</div>`, true)}
+            ${label('How', selectHtml(b('method'), o.methods.map(m => [m.method, m.label]), p.method || 'least_busy'))}`;
+        case 'create_task': return `${label('Follow-up', inputHtml(b('title'), p.title, 'placeholder="e.g. Send quotation to {{name}}"'), true)}
+            ${label('Due in days (0 = same day)', inputHtml(b('dueInDays'), p.dueInDays ?? 0, 'type="number" min="0" max="365"'))}
+            ${label('Time', inputHtml(b('dueTime'), p.dueTime, 'type="time"'))}`;
+        case 'notify': return `${label('Who', selectHtml(b('to'), [['assignee', 'The telecaller'], ['manager', 'Their manager'], ['owner', 'The owner']], p.to || 'assignee'))}
+            ${label('Message', inputHtml(b('message'), p.message, 'placeholder="e.g. {{name}} needs a call today"'), true)}`;
+        case 'send_message': return `${label('By', selectHtml(b('channel'), [['WhatsApp', 'WhatsApp'], ['Email', 'Email']], p.channel || 'WhatsApp'))}
+            ${label('Approved WhatsApp template', selectHtml(b('whatsappTemplateId'), [['', 'None — write the text'], ...(o.whatsappTemplates || []).map(t => [t.id, t.name])], p.whatsappTemplateId))}
+            ${label('Message', `<textarea data-bind="${b('text')}" rows="2" class="corp-input">${esc(p.text || '')}</textarea>`, true)}
+            <p class="text-[11px] text-slate-500 sm:col-span-2">Only sent to customers who haven't opted out. Outside WhatsApp's 24-hour window only an approved template can go, and nothing is sent during quiet hours — it waits for the morning.</p>`;
+        case 'set_status': return `${label('Status', selectHtml(b('status'), o.statuses.map(x => [x, x]), p.status || o.statuses[0]))}
+            ${label('Then', inputHtml(b('nextAction'), p.nextAction, 'placeholder="Next action, e.g. Call back"'))}
+            ${label('Due in days', inputHtml(b('dueInDays'), p.dueInDays ?? 0, 'type="number" min="0"'))}
+            ${label('Reason (when closing)', inputHtml(b('reason'), p.reason))}`;
+        case 'set_priority': return label('Priority', selectHtml(b('priority'), [['HOT', 'HOT'], ['WARM', 'WARM'], ['COLD', 'COLD']], p.priority || 'HOT'));
+        case 'add_note': return label('Note', inputHtml(b('text'), p.text), true);
+        case 'create_renewal': return '<p class="text-[11px] text-slate-500 sm:col-span-2">Opens a renewal for the policy, owned by its telecaller, unless one is already open.</p>';
+        default: return '';
+    }
+}
+
+function renderRuleBuilder() {
+    const o = automationOptions, d = ruleDraft, admin = roleKey() === 'admin';
+    const spec = o.triggers[d.trigger.type], record = spec.record;
+    const fields = (o.fields[record] || []).filter(f => !f.legacy || d.conditions.some(c => c.field === f.field));
+    const triggerPairs = Object.entries(o.triggers).map(([k, v]) => [k, `${v.kind === 'time' ? 'Every day: ' : ''}${v.label}`]);
+    const actionPairs = Object.entries(o.actions).filter(([, v]) => v.records.includes(record)).map(([k, v]) => [k, v.label]);
+    const params = (spec.params || []).map(p => p.type === 'status' || p.type === 'outcome'
+        ? `<label class="block text-[11px] font-medium text-slate-600">${esc(p.label)} ${selectHtml(`trigger.params.${p.name}`,
+            [['', p.type === 'status' ? 'any status' : 'any outcome'], ...(p.type === 'status' ? o.statuses : o.outcomes).map(x => [x, x])], d.trigger.params?.[p.name])}</label>`
+        : `<label class="block text-[11px] font-medium text-slate-600">${esc(p.label)} ${inputHtml(`trigger.params.${p.name}`, d.trigger.params?.[p.name] ?? p.default ?? '', p.type === 'int' ? 'type="number" min="0" max="365"' : '')}</label>`).join('');
+    const form = document.getElementById('insurance-dynamic-form');
+    form.innerHTML = `
+        <fieldset ${admin ? '' : 'disabled'} class="space-y-3">
+        <label class="block text-xs font-medium text-slate-700">Name ${inputHtml('name', d.name, 'placeholder="e.g. Quote interested customers the same day" required')}</label>
+        <div class="auto-block"><h4>When</h4>
+            ${selectHtml('trigger.type', triggerPairs, d.trigger.type)}
+            ${params ? `<div class="grid grid-cols-2 gap-2">${params}</div>` : ''}</div>
+        <div class="auto-block"><h4>If <span class="normal-case font-normal tracking-normal">— every condition must match; none means always</span></h4>
+            ${d.conditions.map((c, i) => `<div class="auto-row">
+                ${selectHtml(`conditions.${i}.field`, fields.map(f => [f.field, f.label]), c.field)}
+                ${selectHtml(`conditions.${i}.operator`, o.operators.map(x => [x.op, x.label]), c.operator)}
+                ${c.operator === 'is_empty' ? '<span></span>' : inputHtml(`conditions.${i}.value`, c.value)}
+                <button type="button" class="fu-btn" onclick="removeDraftItem('conditions', ${i})" aria-label="Remove condition">✕</button></div>`).join('')}
+            <button type="button" class="fu-btn justify-self-start" onclick="addDraftCondition()">+ Add condition</button></div>
+        <div class="auto-block"><h4>Then</h4>
+            ${d.actions.map((a, i) => `<div class="auto-action">
+                <div class="flex gap-2">${selectHtml(`actions.${i}.type`, actionPairs, a.type)}<button type="button" class="fu-btn" onclick="removeDraftItem('actions', ${i})" aria-label="Remove action">✕</button></div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">${actionEditor(a, i)}</div></div>`).join('')}
+            <button type="button" class="fu-btn justify-self-start" onclick="addDraftAction()">+ Add action</button>
+            <p class="text-[11px] text-slate-400">Placeholders: ${o.tokens.map(t => `<code class="msg-token">{{${t}}}</code>`).join(' ')}</p></div>
+        <div class="auto-block"><h4>Limits</h4>
+            <div class="flex flex-wrap gap-1.5">${o.weekdays.map(day => `<span class="auto-chip ${(d.limits?.daysOfWeek || []).includes(day) ? 'is-on' : ''}" onclick="toggleDraftList('limits.daysOfWeek','${day}')">${day.slice(0, 3)}</span>`).join('')}
+                <span class="text-[11px] text-slate-400 self-center">${(d.limits?.daysOfWeek || []).length ? '' : 'every day'}</span></div>
+            <label class="block text-[11px] font-medium text-slate-600">At most this many runs an hour ${inputHtml('limits.maxPerHour', d.limits?.maxPerHour ?? o.defaultMaxPerHour, 'type="number" min="1" max="5000"')}</label></div>
+        </fieldset>
+        <div id="rule-preview" class="text-[11px] text-slate-600"></div>
+        <div class="pt-3 border-t border-slateBorder flex flex-wrap justify-end gap-2">
+            <button type="button" onclick="closeInsuranceForm()" class="px-3 py-1.5 border border-slate-300 rounded text-xs">${admin ? 'Cancel' : 'Close'}</button>
+            ${admin ? `<button type="button" onclick="previewRule()" class="px-3 py-1.5 border border-slate-300 rounded text-xs font-semibold">Try it on recent records</button>
+            <button type="submit" class="px-4 py-1.5 bg-slate-900 text-white rounded text-xs font-semibold">Save rule</button>` : ''}
+        </div>`;
+    // Structural choices re-render the builder so the right fields appear.
+    form.querySelectorAll('[data-bind="trigger.type"], [data-bind$=".type"], [data-bind$=".operator"]').forEach(el => el.addEventListener('change', () => { collectRuleDraft(); renderRuleBuilder(); }));
+    form.onsubmit = saveRuleDraft;
+}
+
+function setByPath(obj, path, value) {
+    const keys = path.split('.'); let cur = obj;
+    keys.slice(0, -1).forEach((k, i) => { if (cur[k] === undefined) cur[k] = /^\d+$/.test(keys[i + 1]) ? [] : {}; cur = cur[k]; });
+    cur[keys[keys.length - 1]] = value;
+}
+function getByPath(obj, path) { return path.split('.').reduce((cur, k) => cur?.[k], obj); }
+
+function collectRuleDraft() {
+    const previousTrigger = ruleDraft.trigger.type;
+    document.querySelectorAll('#insurance-dynamic-form [data-bind]').forEach(el => {
+        let value = el.value;
+        if (el.type === 'number') value = value === '' ? '' : Number(value);
+        setByPath(ruleDraft, el.dataset.bind, value);
+    });
+    if (ruleDraft.trigger.type !== previousTrigger) {
+        // A different record type: keep only what still makes sense.
+        const record = automationOptions.triggers[ruleDraft.trigger.type].record;
+        const fields = new Set((automationOptions.fields[record] || []).map(f => f.field));
+        ruleDraft.trigger.params = {};
+        ruleDraft.conditions = ruleDraft.conditions.filter(c => fields.has(c.field));
+        ruleDraft.actions = ruleDraft.actions.filter(a => automationOptions.actions[a.type].records.includes(record));
+        if (!ruleDraft.actions.length) ruleDraft.actions = [{ type: 'notify', params: { to: 'assignee', message: '' } }];
+    }
+    ruleDraft.actions.forEach(a => { a.params = a.params || {}; });
+}
+
+function toggleDraftList(path, value) {
+    collectRuleDraft();
+    const list = getByPath(ruleDraft, path) || [];
+    setByPath(ruleDraft, path, list.includes(value) ? list.filter(v => v !== value) : [...list, value]);
+    renderRuleBuilder();
+}
+function addDraftCondition() {
+    collectRuleDraft();
+    const record = automationOptions.triggers[ruleDraft.trigger.type].record;
+    ruleDraft.conditions.push({ field: automationOptions.fields[record][0].field, operator: 'is', value: '' });
+    renderRuleBuilder();
+}
+function addDraftAction() {
+    collectRuleDraft();
+    const record = automationOptions.triggers[ruleDraft.trigger.type].record;
+    const first = Object.entries(automationOptions.actions).find(([k, v]) => v.records.includes(record) && k !== 'assign');
+    ruleDraft.actions.push({ type: first[0], params: {} });
+    renderRuleBuilder();
+}
+function removeDraftItem(list, index) { collectRuleDraft(); ruleDraft[list].splice(index, 1); renderRuleBuilder(); }
+
+function draftPayload() {
+    collectRuleDraft();
+    const { id, runCount, lastRunAt, createdAt, createdBy, updatedAt, order, window: _w, matchCount, lastMatchedAt, recipe, ...body } = ruleDraft;
+    return body;
+}
+
+async function previewRule() {
+    const box = document.getElementById('rule-preview');
+    try {
+        const r = await apiJson('/api/automations/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(draftPayload()) });
+        box.innerHTML = `Checked the ${r.checked} most recent records: <b>${r.matched}</b> would match${r.examples.length ? ` — ${r.examples.map(e => esc(e.name)).join(', ')}` : ''}. Nothing was changed.`;
+    } catch (e) { box.innerHTML = `<span class="text-rose-700">${esc(e.message)}</span>`; }
+}
+
+async function saveRuleDraft(event) {
+    event.preventDefault();
+    const body = draftPayload(), id = ruleDraft.id;
+    try {
+        await apiJson(id ? `/api/automations/${id}` : '/api/automations', { method: id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        closeInsuranceForm();
+        showToast(id ? 'Rule saved' : 'Rule saved — it is off until you switch it on');
+        await loadAutomation();
+    } catch (e) { document.getElementById('rule-preview').innerHTML = `<span class="text-rose-700">${esc(e.message)}</span>`; }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CALLING — slides 15–16: click to call, the customer on screen, an outcome that decides what's next
+// ═══════════════════════════════════════════════════════════════════
+let activeCall = null, callTimer = null, callOptions = null;
+const PHONE_SVG = '<svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg>';
+const callButton = (leadId, label = 'Call') => `<button type="button" class="btn-call" onclick="event.stopPropagation(); startCall('${leadId}')" title="Call and record the outcome">${PHONE_SVG}${label}</button>`;
+const formatDuration = sec => sec === null || sec === undefined ? '—' : `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+
+async function startCall(leadId) {
+    try {
+        if (!callOptions) callOptions = await apiJson('/api/calls/options');
+        const data = await apiJson('/api/calls/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ leadId }) });
+        openCallScreen(data, Date.now());
+        if (data.dial) { const a = document.createElement('a'); a.href = data.dial; a.click(); }   // the phone dials
+    } catch (e) { showToast(e.message || 'Could not start the call'); }
+}
+
+// An unfinished call can have its outcome recorded later, from the lead's call history.
+async function resumeCall(callId, leadId) {
+    if (!callOptions) callOptions = await apiJson('/api/calls/options');
+    const [lead, calls] = await Promise.all([apiJson(`/api/leads/${leadId}`), apiJson(`/api/calls?leadId=${encodeURIComponent(leadId)}`)]);
+    const call = calls.find(c => c.id === callId);
+    openCallScreen({ call, lead: lead.lead, documentStatus: lead.documentStatus, previousCalls: calls.filter(c => c.id !== callId), dial: '' },
+        new Date(call.startedAt).getTime());
+    showCallOutcomes();
+}
+
+function openCallScreen(data, startedAt) {
+    const l = data.lead;
+    activeCall = { id: data.call.id, leadId: l.id, name: l.name, done: false };
+    document.getElementById('call-title').textContent = `Calling ${l.name}`;
+    document.getElementById('call-subtitle').textContent = [l.mobile, l.product, l.status].filter(Boolean).join(' · ');
+    document.getElementById('call-instructions').textContent = data.instructions || 'Call in progress.';
+    const link = document.getElementById('call-dial-link');
+    link.href = data.dial || `tel:${(l.mobile || '').replace(/\s+/g, '')}`;
+    link.innerHTML = `${PHONE_SVG} Dial ${esc(l.mobile || '')} again`;
+    document.getElementById('call-notes').value = '';
+    renderCallCustomer(data);
+    backToCall();
+    clearInterval(callTimer);
+    const tick = () => { document.getElementById('call-timer').textContent = formatDuration(Math.max(0, Math.round((Date.now() - startedAt) / 1000))); };
+    tick(); callTimer = setInterval(tick, 1000);
+    document.getElementById('call-modal').classList.remove('hidden');
+    document.getElementById('call-notes').focus();
+}
+
+function renderCallCustomer(data) {
+    const l = data.lead, docs = data.documentStatus || { missing: [] };
+    const row = (k, v) => v ? `<dt>${k}</dt><dd>${esc(String(v))}</dd>` : '';
+    document.getElementById('call-customer').innerHTML = `
+        <div class="flex flex-wrap items-center gap-2">${priorityBadge(l)}<span class="auto-pill off">${esc(l.status)}</span>
+            ${l.nextAction ? `<span class="text-slate-500">Planned: <b class="text-slate-800">${esc(l.nextAction)}</b></span>` : ''}</div>
+        <dl class="call-kv">
+            ${row('Mobile', l.mobile)}${row('Product', l.product || l.policyType)}${row('City', l.city)}
+            ${row('Current insurer', l.existingPolicy?.insurer)}${row('Policy expires', l.expiryDate ? `${l.expiryDate} (${formatDaysLeft(l.daysRemaining)})` : '')}
+            ${row('Current premium', l.premium)}${row('Source', l.source)}${row('Email', l.email)}
+            ${docs.missing.length ? row('Documents missing', docs.missing.join(', ')) : ''}
+        </dl>
+        ${vehicleSummary(l.vehicleDetails)}${healthSummary(l.healthDetails)}
+        <div>
+            <div class="text-[10px] uppercase font-bold tracking-wider text-slate-500 mb-1">Earlier calls</div>
+            ${(data.previousCalls || []).map(c => `<div class="border-t border-slate-100 py-1.5">
+                <div class="flex justify-between gap-2"><b class="text-slate-800">${esc(c.outcome || c.status)}</b>
+                <span class="text-slate-400 font-mono">${esc(formatShortDate(c.startedAt || c.createdAt))} · ${formatDuration(c.durationSeconds)}</span></div>
+                ${c.notes ? `<p class="text-slate-500 mt-0.5">${esc(c.notes)}</p>` : ''}</div>`).join('') || '<p class="text-slate-400">First call to this customer.</p>'}
+        </div>`;
+}
+
+function backToCall() {
+    document.getElementById('call-dialling').classList.remove('hidden');
+    document.getElementById('call-outcome-form').classList.add('hidden');
+}
+
+function showCallOutcomes() {
+    const groups = [['Spoke to the customer', true], ['Did not reach them', false]];
+    document.getElementById('call-outcomes').innerHTML = groups.map(([title, connected]) => `
+        <div class="call-group">${title}</div>
+        ${callOptions.outcomes.filter(o => o.connected === connected).map(o => `
+            <label class="call-outcome"><input type="radio" name="call-outcome" value="${esc(o.value)}" required onchange="renderOutcomeFields(this.value)">
+                <span><b>${esc(o.label)}</b></span></label>`).join('')}`).join('');
+    document.getElementById('call-outcome-fields').innerHTML = '';
+    document.getElementById('call-outcome-error').textContent = '';
+    document.getElementById('call-dialling').classList.add('hidden');
+    document.getElementById('call-outcome-form').classList.remove('hidden');
+}
+
+// Each outcome asks only for what it needs.
+function renderOutcomeFields(outcome) {
+    const f = (id, label, type = 'text', attrs = '', wide = false) =>
+        `<label class="block font-medium text-slate-700 ${wide ? 'col-span-2' : ''}">${label}<input id="${id}" type="${type}" class="corp-input mt-1" ${attrs}></label>`;
+    const nextYear = (() => { const d = new Date(); d.setFullYear(d.getFullYear() + 1); d.setDate(d.getDate() - 1); return localCalendarDate(d); })();
+    const fields = {
+        'Call Back': f('co-date', 'Call back on *', 'date', `required value="${isoDay(1)}"`) + f('co-time', 'At', 'time'),
+        'Not Interested': f('co-reason', 'Why? *', 'text', 'required list="close-reason-suggestions"', true),
+        'Already Insured': f('co-expiry', 'Their current policy expires *', 'date', 'required', true),
+        'Policy Sold': f('co-insurer', 'Insurer *', 'text', 'required') + f('co-premium', 'Premium (₹) *', 'number', 'required min="1" step="1"')
+            + f('co-start', 'Policy starts', 'date', `value="${isoDay(0)}"`) + f('co-end', 'Policy expires *', 'date', `required value="${nextYear}"`),
+        'Busy / Switched Off': '<p class="col-span-2 text-slate-500">A retry is scheduled for tomorrow.</p>',
+        'Wrong Number': '<p class="col-span-2 text-slate-500">The lead is flagged for a manager to check the number.</p>',
+        'Interested': '<p class="col-span-2 text-slate-500">A quotation follow-up is set for today.</p>',
+        'Documents Pending': '<p class="col-span-2 text-slate-500">A document collection follow-up is set for tomorrow.</p>',
+    };
+    document.getElementById('call-outcome-fields').innerHTML = fields[outcome] || '';
+    const reasons = document.getElementById('close-reason-suggestions');
+    if (reasons && !reasons.children.length) reasons.innerHTML = (callOptions.closeReasons || []).map(r => `<option value="${esc(r)}"></option>`).join('');
+}
+
+async function submitCallOutcome(event) {
+    event.preventDefault();
+    const outcome = document.querySelector('input[name="call-outcome"]:checked')?.value;
+    const val = id => document.getElementById(id)?.value?.trim() || '';
+    const body = { outcome, notes: val('call-notes'), followUpDate: val('co-date'), followUpTime: val('co-time'),
+        reason: val('co-reason'), currentExpiryDate: val('co-expiry') };
+    if (outcome === 'Policy Sold') body.policy = { insurer: val('co-insurer'), premium: Number(val('co-premium')), startDate: val('co-start'), expiryDate: val('co-end') };
+    try {
+        const r = await apiJson(`/api/calls/${activeCall.id}/complete`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        activeCall.done = true;
+        closeCallScreen();
+        showToast(r.summary);
+        refreshAfterCall();
+    } catch (e) { document.getElementById('call-outcome-error').textContent = e.message; }
+}
+
+function closeCallScreen() {
+    if (activeCall && !activeCall.done && !document.getElementById('call-modal').classList.contains('hidden')) {
+        if (!confirm('The outcome is not recorded yet. You can record it later from the lead’s call history. Close anyway?')) return;
+    }
+    clearInterval(callTimer);
+    document.getElementById('call-modal').classList.add('hidden');
+    const leadId = activeCall?.leadId; activeCall = null;
+    refreshAfterCall(leadId);
+}
+
+function refreshAfterCall(leadId) {
+    if (currentView === 'follow-ups') loadFollowUps();
+    else if (currentView === 'leads') loadLeads();
+    const drawer = document.getElementById('detail-drawer');
+    if (leadId && drawer && !drawer.classList.contains('translate-x-full')) openLeadDrawer(leadId);
+}
+
+async function callHistoryCard(leadId) {
+    const calls = await apiJson(`/api/calls?leadId=${encodeURIComponent(leadId)}`).catch(() => []);
+    return `<div class="border border-slateBorder rounded-lg p-3 bg-white space-y-1.5 text-xs">
+        <div class="flex items-center justify-between"><span class="text-[11px] font-bold uppercase tracking-wider">Calls (${calls.length})</span>${callButton(leadId)}</div>
+        ${calls.map(c => `<div class="border-t border-slate-100 pt-1.5 flex flex-wrap justify-between gap-2">
+            <span><b>${esc(c.status === 'In progress' ? 'Outcome not recorded' : c.outcome)}</b> <span class="text-slate-400">· ${esc(c.assignedTo || '')}</span></span>
+            <span class="text-slate-400 font-mono">${esc(formatShortDate(c.startedAt))} · ${formatDuration(c.durationSeconds)}</span>
+            ${c.status === 'In progress' ? `<button type="button" class="fu-btn" onclick="resumeCall('${c.id}','${leadId}')">Record outcome</button>` : ''}
+            ${c.notes ? `<p class="w-full text-slate-500">${esc(c.notes)}</p>` : ''}</div>`).join('') || '<p class="text-slate-400">No calls yet.</p>'}
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ROLE DASHBOARDS — slide 14 for a telecaller, slides 34 and 47 for the owner
+// ═══════════════════════════════════════════════════════════════════
+const inr = n => n === null || n === undefined ? '—' : `₹${Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+const pct = n => n === null || n === undefined ? '—' : `${Number(n).toLocaleString('en-IN', { maximumFractionDigits: 1 })}%`;
+const num = n => n === null || n === undefined ? '—' : Number(n).toLocaleString('en-IN');
+
+async function renderRoleDashboard() {
+    const root = document.getElementById('dashboard-role');
+    if (!root) return;
+    try {
+        root.innerHTML = roleKey() === 'telecaller' ? telecallerBoard(await apiJson('/api/dashboard/telecaller'))
+            : ['admin', 'manager'].includes(roleKey()) ? ownerBoard(await apiJson('/api/dashboard/owner')) : '';
+    } catch (e) { root.innerHTML = `<p class="text-xs text-rose-700">${esc(e.message || 'Could not load your figures')}</p>`; }
+}
+
+function telecallerBoard(d) {
+    const t = d.tiles;
+    const tiles = [["Today's leads", t.todaysLeads, 'To work today'], ['Calls done', t.callsDone, 'Today'], ['Connected', t.connected, 'Reached the customer'],
+        ['Follow-ups due', t.followUpsDue, t.overdue ? `${t.overdue} overdue` : 'Today and earlier', t.overdue ? 'is-critical' : t.followUpsDue ? 'is-warning' : ''],
+        ['Interested', t.interested, 'Today'], ['Quotes sent', t.quotesSent, 'Today'], ['Policies sold', t.policiesSold, 'Today', t.policiesSold ? 'is-good' : ''],
+        ['Target achieved', pct(t.targetAchieved), t.targetAchieved === null ? 'No target set this month' : 'This month', t.targetAchieved >= 100 ? 'is-good' : '']];
+    const a = d.availability || { available: true };
+    return `
+        <p class="text-xs flex flex-wrap items-center gap-2">${a.available
+            ? `<span class="text-emerald-700 font-semibold">Receiving new leads</span><button type="button" class="fu-btn" onclick="setAvailability(false)">I'm away</button>`
+            : `<span class="text-amber-700 font-semibold">Away — no new leads${a.note ? ` (${esc(a.note)})` : ''}</span><button type="button" class="fu-btn" onclick="setAvailability(true)">I'm back</button>`}</p>
+        <section class="grid grid-cols-2 sm:grid-cols-4 gap-3">${tiles.map(([label, value, note, tone]) =>
+            `<div class="day-tile ${tone || ''}" style="cursor:default"><strong>${esc(String(value))}</strong><span class="font-medium text-slate-700">${esc(label)}</span><span>${esc(note)}</span></div>`).join('')}</section>
+        ${d.incentive?.hasPlan ? `<p class="text-xs text-slate-600">This month so far: <b>${num(d.month.policiesSold)}</b> polic${d.month.policiesSold === 1 ? 'y' : 'ies'}, <b>${inr(d.month.premium)}</b> premium · incentive estimate <b>${inr(d.incentive.estimate)}</b>
+            <span class="text-slate-400">(${esc(d.incentive.lines.filter(l => l.amount).map(l => `${l.rule} ${inr(l.amount)}`).join(' · ') || 'nothing earned yet')})</span></p>` : ''}
+        <section class="band">
+            <h3>Today's priority leads</h3>
+            ${d.priorityLeads.length ? `<div class="overflow-x-auto"><table class="w-full text-left perf-table min-w-[640px]"><thead><tr><th>Customer</th><th>Product</th><th>Priority</th><th>Status</th><th>Next action</th><th></th></tr></thead><tbody>
+            ${d.priorityLeads.map(l => `<tr><td><button class="font-semibold hover:underline" onclick="openLeadDrawer('${l.id}')">${esc(l.name)}</button></td>
+                <td>${esc(l.product || '—')}</td><td>${priorityBadge(l)}</td><td><span class="inline-block px-2 py-0.5 rounded text-[11px] ${stagePillClass(l.status)}">${esc(l.status)}</span></td>
+                <td>${esc(l.nextAction || '—')}${l.nextActionDate ? `<span class="perf-sub">${esc(l.nextActionDate)}${l.nextActionTime ? ' ' + esc(l.nextActionTime) : ''}</span>` : ''}</td>
+                <td class="text-right">${callButton(l.id)}</td></tr>`).join('')}</tbody></table></div>`
+            : '<p class="text-xs text-slate-400">No open leads assigned to you.</p>'}
+        </section>`;
+}
+
+// Slide 12: someone away receives no new leads until they are back.
+async function setAvailability(available, userId) {
+    let note = '';
+    if (!available) { note = prompt('Reason (optional) — for example "On leave until Monday"') ?? null; if (note === null) return; }
+    try {
+        await apiJson('/api/availability', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ available, note, ...(userId ? { userId } : {}) }) });
+        showToast(available ? 'Receiving new leads again' : 'Marked away — no new leads until back');
+        renderRoleDashboard();
+    } catch (e) { showToast(e.message); }
+}
+
+function ownerBoard(d) {
+    const b = d.bands, c = d.control, team = d.team;
+    const band = (title, items) => `<div class="band"><h3>${title}</h3><div class="band-grid">${items.map(([label, value]) => `<div><strong>${esc(String(value))}</strong><span>${esc(label)}</span></div>`).join('')}</div></div>`;
+    return `
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-3">
+            ${band('Today', [['New leads', num(b.today.newLeads)], ['Calls', num(b.today.calls)], ['Connected', num(b.today.connected)],
+                ['Follow-ups due', num(b.today.followUpsOpen)], ['Policies', num(b.today.policiesSold)], ['Premium', inr(b.today.premium)]])}
+            ${band('This week', [['New leads', num(b.week.newLeads)], ['Policies', num(b.week.policiesSold)], ['Premium', inr(b.week.premium)], ['Conversion', pct(b.week.conversionRate)]])}
+            ${band('This month', [['Policies', num(b.month.policiesSold)], ['Premium', inr(b.month.premium)],
+                ['Commission', d.commissionAvailable ? inr(b.month.commission) : roleKey() === 'admin' ? 'No rates set' : 'Owner only'], ['Renewals', num(b.month.renewalsClosed)]])}
+        </section>
+        <section class="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-3">
+            <div class="band space-y-2 text-xs">
+                <h3>Team this month</h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <div><span class="perf-sub">Best performer</span><b>${esc(team.best || '—')}</b></div>
+                    <div><span class="perf-sub">Needs support</span><b>${esc(team.needsSupport || '—')}</b></div>
+                    <div><span class="perf-sub">Target achieved</span><b>${team.targetAchieved === null ? 'No targets set' : pct(team.targetAchieved)}</b></div>
+                    <div><span class="perf-sub">Online now</span><b>${c.employeesOnline.length} of ${c.teamSize}</b>${c.employeesOnline.length ? `<span class="perf-sub">${esc(c.employeesOnline.join(', '))}</span>` : ''}</div>
+                </div>
+                <div class="border-t border-slate-100 pt-2"><span class="perf-sub">Away — receiving no new leads</span>
+                    ${c.away.length ? c.away.map(p => `<span class="inline-flex items-center gap-1 mr-2">${esc(p.person)}${p.note ? ` <span class="text-slate-400">(${esc(p.note)})</span>` : ''}<button type="button" class="fu-btn" onclick="setAvailability(true,'${p.userId}')">Back</button></span>`).join('') : '<b>Nobody</b>'}
+                    ${c.availablePeople.length ? `<select class="corp-input py-0.5 text-[11px] ml-1" aria-label="Mark someone away" onchange="if(this.value)setAvailability(false,this.value)"><option value="">Mark someone away…</option>${c.availablePeople.map(p => `<option value="${esc(p.userId)}">${esc(p.person)}</option>`).join('')}</select>` : ''}
+                </div>
+            </div>
+            <div class="band text-xs">
+                <h3>Needs attention today</h3>
+                <div class="band-grid">
+                    <button class="text-left" onclick="switchView('follow-ups')"><strong>${num(c.overdueFollowUps)}</strong><span>Follow-ups overdue</span></button>
+                    <div><strong>${num(c.missedCallsToday)}</strong><span>Calls not connected</span></div>
+                    <button class="text-left" onclick="switchView('renewals')"><strong>${num(c.renewalOpportunities)}</strong><span>Policies expiring in 30 days</span></button>
+                    <button class="text-left" onclick="switchView('notifications')"><strong>${num(c.importantAlerts)}</strong><span>Unread urgent alerts</span></button>
+                </div>
+            </div>
+        </section>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PERFORMANCE — slide 26 (the team) and slide 29 (targets)
+// ═══════════════════════════════════════════════════════════════════
+let performanceTab = 'team', performancePeriod = 'month', targetsData = null;
+
+function loadPerformance() { setPerformanceTab(performanceTab); }
+
+function setPerformanceTab(tab) {
+    performanceTab = tab;
+    document.querySelectorAll('[data-perf-tab]').forEach(b => { const on = b.dataset.perfTab === tab; b.classList.toggle('is-active', on); b.setAttribute('aria-selected', on); });
+    ['team', 'targets', 'leaderboard', 'incentives', 'commission'].forEach(p =>
+        document.getElementById(`perf-${p}-pane`).classList.toggle('hidden', tab !== p));
+    applyRoleVisibility();
+    if (tab === 'team') setPerformancePeriod(performancePeriod);
+    else if (tab === 'targets') loadTargets();
+    else if (tab === 'leaderboard') loadLeaderboard();
+    else if (tab === 'incentives') loadIncentives();
+    else loadCommission();
+}
+
+function setPerformancePeriod(period) {
+    performancePeriod = period;
+    document.querySelectorAll('[data-period]').forEach(b => b.classList.toggle('is-active', b.dataset.period === period));
+    const custom = document.getElementById('perf-custom');
+    custom.classList.toggle('hidden', period !== 'custom'); custom.classList.toggle('flex', period === 'custom');
+    if (period === 'custom') {
+        if (!document.getElementById('perf-start').value) { document.getElementById('perf-start').value = isoDay(-30); document.getElementById('perf-end').value = isoDay(0); }
+    }
+    loadPerformanceTeam();
+}
+
+async function loadPerformanceTeam() {
+    const params = new URLSearchParams({ period: performancePeriod });
+    if (performancePeriod === 'custom') { params.set('start', document.getElementById('perf-start').value); params.set('end', document.getElementById('perf-end').value); }
+    let d;
+    try { d = await apiJson(`/api/performance?${params}`); } catch (e) { return showToast(e.message); }
+    const p = d.period;
+    document.getElementById('perf-period-label').textContent = p.start === p.end ? formatShortDate(p.start) : `${formatShortDate(p.start)} – ${formatShortDate(p.end)}`;
+    const cols = [['New leads', r => num(r.newLeads)], ['Calls', r => num(r.calls)], ['Connected', r => `${num(r.connected)}<span class="perf-sub">${pct(r.connectRate)}</span>`],
+        ['Not connected', r => num(r.notConnected)], ['Avg call', r => r.avgCallSeconds === null ? '—' : formatDuration(r.avgCallSeconds)],
+        ['Quotes', r => num(r.quotesSent)], ['Policies', r => num(r.policiesSold)], ['Premium', r => inr(r.premium)], ['Conversion', r => pct(r.conversionRate)],
+        ['Follow-ups', r => `${num(r.followUpsDone)} / ${num(r.followUpsDue)}<span class="perf-sub">${pct(r.onTimeRate)} on time</span>`],
+        ['Renewals', r => num(r.renewalsClosed)], ['Documents', r => num(r.documentsCollected)]];
+    document.getElementById('perf-team-head').innerHTML = `<tr><th>Telecaller</th>${cols.map(([h]) => `<th class="num">${h}</th>`).join('')}</tr>`;
+    document.getElementById('perf-team-body').innerHTML = d.rows.length ? d.rows.map(r => `<tr><td class="font-semibold">${esc(r.person)}</td>${cols.map(([, f]) => `<td class="num">${f(r)}</td>`).join('')}</tr>`).join('')
+        : `<tr><td colspan="${cols.length + 1}" class="text-center text-slate-400 py-6">No telecallers yet. Add them under Settings → Users.</td></tr>`;
+    document.getElementById('perf-team-foot').innerHTML = d.rows.length > 1 ? `<tr><td>Team</td>${cols.map(([, f]) => `<td class="num">${f(d.totals)}</td>`).join('')}</tr>` : '';
+}
+
+async function loadTargets() {
+    const input = document.getElementById('targets-month');
+    if (!input.value) input.value = localCalendarDate().slice(0, 7);
+    try { targetsData = await apiJson(`/api/targets?month=${input.value}`); } catch (e) { return showToast(e.message); }
+    const d = targetsData, measures = Object.entries(d.measures), canEdit = ['admin', 'manager'].includes(roleKey());
+    document.getElementById('targets-headline').innerHTML = measures.map(([k, l]) => `<option value="${k}" ${k === d.headline ? 'selected' : ''}>${esc(l)}</option>`).join('');
+    const cell = (key, t, a, percent) => {
+        const value = key === 'premium' ? inr(a) : num(a);
+        const bar = percent === undefined ? '' : `<div class="bar ${percent >= 100 ? 'is-done' : ''}" title="${pct(percent)}"><i style="width:${Math.min(100, percent)}%"></i></div>`;
+        return `<td>${canEdit ? `<input class="target-input" type="number" min="0" data-target="${key}" value="${t ?? ''}" placeholder="—" aria-label="${esc(d.measures[key])} target">` : `<b>${t ?? '—'}</b>`}
+            <span class="perf-sub">${value} so far${percent === undefined ? '' : ` · ${pct(percent)}`}</span>${bar}</td>`;
+    };
+    document.getElementById('targets-head').innerHTML = `<tr><th>Telecaller</th>${measures.map(([, l]) => `<th>${esc(l)}</th>`).join('')}<th>Headline</th>${canEdit ? '<th></th>' : ''}</tr>`;
+    document.getElementById('targets-body').innerHTML = d.rows.map(r => `<tr data-person="${esc(r.person)}"><td class="font-semibold">${esc(r.person)}</td>
+        ${measures.map(([k]) => cell(k, r.targets[k], r.actual[k], r.achievement.measures[k]?.percent)).join('')}
+        <td class="num font-semibold">${pct(r.achievement.percent)}</td>
+        ${canEdit ? `<td><button class="fu-btn" onclick="saveTargetRow(this)">Save</button></td>` : ''}</tr>`).join('')
+        || `<tr><td colspan="${measures.length + 3}" class="text-center text-slate-400 py-6">No telecallers yet.</td></tr>`;
+    const team = d.team.achievement;
+    document.getElementById('targets-team').innerHTML = `Team, ${esc(d.month)} to ${esc(formatShortDate(d.through))}: <b>${team.percent === null ? 'no targets set yet' : pct(team.percent) + ' of target'}</b>`;
+}
+
+async function saveTargetRow(button) {
+    const row = button.closest('tr'), body = { month: targetsData.month, person: row.dataset.person };
+    row.querySelectorAll('[data-target]').forEach(i => { body[i.dataset.target] = i.value === '' ? 0 : Number(i.value); });
+    try { await apiJson('/api/targets', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); showToast(`Targets saved for ${body.person}`); loadTargets(); }
+    catch (e) { showToast(e.message); }
+}
+
+async function setTargetHeadline(headline) {
+    try { await apiJson('/api/targets/headline', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ headline }) }); loadTargets(); }
+    catch (e) { showToast(e.message); }
+}
+
+async function copyLastMonthTargets() {
+    const to = document.getElementById('targets-month').value;
+    const d = new Date(`${to}-01T00:00:00`); d.setMonth(d.getMonth() - 1);
+    const from = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    try { const r = await apiJson('/api/targets/copy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ from, to }) });
+        showToast(r.copied ? `Copied ${r.copied} telecaller${r.copied === 1 ? '' : 's'}' targets from ${from}` : `Nothing to copy — no new targets in ${from}`); loadTargets(); }
+    catch (e) { showToast(e.message); }
+}
+
+// ── Leaderboard and Employee of the Month (slides 28 and 30) ──
+let leaderboardData = null;
+async function loadLeaderboard() {
+    try { leaderboardData = await apiJson(`/api/leaderboard?period=${performancePeriod === 'custom' ? 'month' : performancePeriod}`); }
+    catch (e) { return showToast(e.message); }
+    const d = leaderboardData, e = d.employeeOfMonth, admin = roleKey() === 'admin';
+    const periods = ['today', 'week', 'month'].map(p => `<button class="fu-tab ${d.period.name === p ? 'is-active' : ''}" onclick="performancePeriod='${p}'; loadLeaderboard()">${{ today: 'Today', week: 'This week', month: 'This month' }[p]}</button>`).join('');
+    const awardValue = (k, v) => v === null ? '' : k === 'highestPremium' ? inr(v) : ['highestConversion', 'bestFollowUp'].includes(k) ? pct(v) : num(v);
+    document.getElementById('perf-leaderboard-pane').innerHTML = `
+        <div class="flex flex-wrap items-center gap-1.5 text-xs">${periods}<span class="ml-auto text-[11px] text-slate-400">${esc(formatShortDate(d.period.start))} – ${esc(formatShortDate(d.period.end))}</span></div>
+        <div class="grid grid-cols-2 lg:grid-cols-5 gap-2">${Object.entries(d.awards).map(([k, a]) => `
+            <div class="band"><h3>${esc(a.label)}</h3><b class="text-sm">${a.winners.length ? esc(a.winners.join(' & ')) : '—'}</b>
+                <span class="perf-sub">${a.winners.length ? awardValue(k, a.value) : esc(a.note || '')}</span></div>`).join('')}</div>
+        <div class="bg-white border border-slateBorder rounded-lg overflow-x-auto"><table class="w-full text-left perf-table min-w-[760px]">
+            <thead><tr><th>#</th><th>Telecaller</th><th class="num">Calls</th><th class="num">Connected</th><th class="num">Quotes</th><th class="num">Policies</th><th class="num">Premium</th><th class="num">Conversion</th><th class="num">On time</th></tr></thead>
+            <tbody>${d.ranking.map((r, i) => `<tr><td class="font-mono text-slate-400">${i + 1}</td><td class="font-semibold">${esc(r.person)}</td><td class="num">${num(r.calls)}</td>
+                <td class="num">${num(r.connected)}<span class="perf-sub">${pct(r.connectRate)}</span></td><td class="num">${num(r.quotesSent)}</td><td class="num">${num(r.policiesSold)}</td>
+                <td class="num">${inr(r.premium)}</td><td class="num">${pct(r.conversionRate)}</td><td class="num">${pct(r.onTimeRate)}</td></tr>`).join('')
+                || '<tr><td colspan="9" class="text-center text-slate-400 py-6">No telecallers yet.</td></tr>'}</tbody></table></div>
+        <section class="band space-y-3">
+            <div class="flex flex-wrap items-start justify-between gap-2">
+                <div><h3>Employee of the Month — ${esc(d.period.start.slice(0, 7))}</h3>
+                    <p class="text-xs">${e.announced ? `Announced: <b>${esc(e.announced.person)}</b> by ${esc(e.announced.announcedBy)}` : e.winner ? `Leading: <b>${esc(e.winner)}</b>` : e.tied.length > 1 ? `Tied: <b>${esc(e.tied.join(' & '))}</b>` : 'Nobody has scored yet.'}</p></div>
+                ${admin && e.winner && !e.announced ? `<button class="fu-btn is-primary" onclick="announceEmployeeOfMonth('${esc(e.winner)}')">Announce ${esc(e.winner)}</button>` : ''}
+            </div>
+            <div class="overflow-x-auto"><table class="w-full text-left perf-table min-w-[560px]"><thead><tr><th>Telecaller</th>${Object.keys(e.weightsUsed).map(k => `<th class="num">${esc(e.labels[k])}<span class="perf-sub">${e.weightsUsed[k]} pts</span></th>`).join('')}<th class="num">Score</th></tr></thead>
+                <tbody>${e.ranking.map(r => `<tr><td class="font-semibold">${esc(r.person)}</td>${Object.keys(e.weightsUsed).map(k => `<td class="num">${r.parts[k]}</td>`).join('')}<td class="num font-semibold">${r.score}</td></tr>`).join('')}</tbody></table></div>
+            <p class="text-[11px] text-slate-500">Each measure is scaled against the best in the team, so the leader on a measure earns its full points.${e.leftOut.length ? ` ${esc(e.leftOut.map(k => e.labels[k]).join(', '))} is left out until calls are reviewed for quality, and the other weights are scaled up to fill its share.` : ''}</p>
+            ${admin ? `<details><summary class="text-xs font-semibold cursor-pointer">Change the weights</summary>
+                <div class="flex flex-wrap gap-2 mt-2">${Object.entries(e.labels).map(([k, l]) => `<label class="text-xs">${esc(l)} <input class="target-input" type="number" min="0" data-weight="${k}" value="${e.weights[k] ?? 0}"></label>`).join('')}
+                <button class="fu-btn" onclick="saveRecognitionWeights()">Save weights</button></div></details>` : ''}
+        </section>`;
+}
+async function announceEmployeeOfMonth(person) {
+    try { await apiJson(`/api/recognition/${leaderboardData.period.start.slice(0, 7)}/announce`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ person }) });
+        showToast(`${person} is Employee of the Month`); loadLeaderboard(); } catch (e) { showToast(e.message); }
+}
+async function saveRecognitionWeights() {
+    const weights = {}; document.querySelectorAll('[data-weight]').forEach(i => { weights[i.dataset.weight] = Number(i.value || 0); });
+    try { await apiJson('/api/recognition/weights', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ weights }) }); showToast('Weights saved'); loadLeaderboard(); }
+    catch (e) { showToast(e.message); }
+}
+
+// ── Incentives (slide 29) ──
+let incentiveData = null, incentiveDraft = null;
+async function loadIncentives(month) {
+    const m = month || incentiveData?.month || localCalendarDate().slice(0, 7);
+    try { incentiveData = await apiJson(`/api/incentives?month=${m}`); } catch (e) { return showToast(e.message); }
+    incentiveDraft = JSON.parse(JSON.stringify(incentiveData.rules));
+    renderIncentives();
+}
+function renderIncentives() {
+    const d = incentiveData, admin = roleKey() === 'admin', past = d.month < localCalendarDate().slice(0, 7);
+    document.getElementById('perf-incentives-pane').innerHTML = `
+        <div class="flex flex-wrap items-center gap-2 text-xs">
+            <label class="flex items-center gap-1.5">Month <input type="month" class="corp-input w-auto py-0.5" value="${d.month}" onchange="loadIncentives(this.value)"></label>
+            <span class="auto-pill ${d.status === 'Approved' ? 'on' : 'later'}">${d.status === 'Approved' ? 'Approved' : 'Estimate — changes as sales happen'}</span>
+            ${d.status === 'Approved' ? `<span class="text-slate-500">by ${esc(d.approvedBy)} on ${esc(formatShortDate(d.approvedAt))}</span>` : ''}
+            ${admin && past && d.status !== 'Approved' ? `<button class="fu-btn is-primary ml-auto" onclick="approveIncentives()">Approve ${esc(d.month)} for payroll</button>` : ''}
+        </div>
+        <div class="bg-white border border-slateBorder rounded-lg overflow-x-auto"><table class="w-full text-left perf-table min-w-[640px]">
+            <thead><tr><th>Telecaller</th><th class="num">Policies</th><th class="num">Premium</th><th class="num">Target</th><th>How it adds up</th><th class="num">Incentive</th></tr></thead>
+            <tbody>${d.rows.map(r => `<tr><td class="font-semibold">${esc(r.person)}</td><td class="num">${num(r.policiesSold)}</td><td class="num">${inr(r.premium)}</td><td class="num">${pct(r.targetAchieved)}</td>
+                <td class="text-[11px] text-slate-600 whitespace-normal">${r.lines.map(l => `${esc(l.rule)}: ${inr(l.amount)} <span class="text-slate-400">(${esc(l.basis)})</span>`).join('<br>') || 'No incentive rules yet'}</td>
+                <td class="num font-semibold">${inr(r.total)}</td></tr>`).join('') || '<tr><td colspan="6" class="text-center text-slate-400 py-6">No telecallers yet.</td></tr>'}</tbody></table></div>
+        ${admin && d.status !== 'Approved' ? incentivePlanEditor() : ''}`;
+}
+function incentivePlanEditor() {
+    const kinds = incentiveData.kinds, measures = incentiveData.slabMeasures;
+    const products = leadOptions.products || [], sources = leadOptions.sources || [];
+    const field = (i, key, label, attrs = '') => `<label class="text-[11px] text-slate-600">${label}<input class="corp-input mt-0.5 py-0.5" data-inc="${i}.${key}" value="${esc(String(incentiveDraft[i][key] ?? ''))}" ${attrs}></label>`;
+    return `<section class="band space-y-2"><h3>Incentive rules</h3>
+        <p class="text-xs text-slate-500">Rules can change at any time; an approved month keeps the rules it was approved with.</p>
+        ${incentiveDraft.map((r, i) => `<div class="auto-action">
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                ${field(i, 'name', 'Name')}
+                <label class="text-[11px] text-slate-600">Kind<select class="corp-input mt-0.5 py-0.5" data-inc="${i}.kind" onchange="collectIncentiveDraft(); renderIncentives()">${Object.entries(kinds).map(([k, l]) => `<option value="${k}" ${k === r.kind ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>
+                ${r.kind === 'per_policy' ? field(i, 'amount', '₹ per policy', 'type="number" min="0"') : ''}
+                ${r.kind === 'premium_percent' ? field(i, 'percent', '% of premium', 'type="number" min="0" max="100" step="0.1"') : ''}
+                ${r.kind === 'target_bonus' ? field(i, 'amount', 'Bonus ₹', 'type="number" min="0"') + field(i, 'atPercent', 'When target reaches %', 'type="number" min="1"') : ''}
+                ${r.kind === 'slab' ? `<label class="text-[11px] text-slate-600">Levels measure<select class="corp-input mt-0.5 py-0.5" data-inc="${i}.measure">${Object.entries(measures).map(([k, l]) => `<option value="${k}" ${k === r.measure ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>
+                    ${field(i, 'slabText', 'Levels (from:₹, …)', 'placeholder="5:1000, 10:2500"')}` : ''}
+                ${['per_policy', 'premium_percent'].includes(r.kind) ? `<label class="text-[11px] text-slate-600">Only for<select class="corp-input mt-0.5 py-0.5" data-inc="${i}.limit">
+                    <option value="">Every sale</option>${products.map(p => `<option value="product:${esc(p)}" ${r.product === p ? 'selected' : ''}>${esc(p)}</option>`).join('')}
+                    ${sources.map(x => `<option value="source:${esc(x)}" ${r.source === x ? 'selected' : ''}>Leads from ${esc(x)}</option>`).join('')}</select></label>` : ''}
+            </div>
+            <div class="flex gap-2"><label class="auto-switch"><input type="checkbox" data-inc="${i}.enabled" ${r.enabled !== false ? 'checked' : ''}><span>On</span></label>
+                <button class="fu-btn" onclick="collectIncentiveDraft(); incentiveDraft.splice(${i},1); renderIncentives()">Remove</button></div></div>`).join('')}
+        <div class="flex gap-2"><button class="fu-btn" onclick="collectIncentiveDraft(); incentiveDraft.push({name:'', kind:'per_policy', amount:0, enabled:true}); renderIncentives()">+ Add rule</button>
+            <button class="fu-btn is-primary" onclick="saveIncentivePlan()">Save rules</button></div></section>`;
+}
+function collectIncentiveDraft() {
+    incentiveDraft.forEach(r => { if (r.slabs && r.slabText === undefined) r.slabText = r.slabs.map(x => `${x.from}:${x.amount}`).join(', '); });
+    document.querySelectorAll('[data-inc]').forEach(el => {
+        const [i, key] = el.dataset.inc.split('.'); const r = incentiveDraft[Number(i)]; if (!r) return;
+        if (key === 'enabled') r.enabled = el.checked;
+        else if (key === 'limit') { r.product = el.value.startsWith('product:') ? el.value.slice(8) : ''; r.source = el.value.startsWith('source:') ? el.value.slice(7) : ''; }
+        else r[key] = el.type === 'number' ? (el.value === '' ? '' : Number(el.value)) : el.value;
+    });
+    incentiveDraft.forEach(r => { if (r.kind === 'slab') r.slabs = String(r.slabText || '').split(',').map(x => x.split(':').map(v => v.trim())).filter(x => x.length === 2).map(([from, amount]) => ({ from, amount })); });
+}
+async function saveIncentivePlan() {
+    collectIncentiveDraft();
+    try { await apiJson('/api/incentives/plan', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rules: incentiveDraft }) }); showToast('Incentive rules saved'); loadIncentives(); }
+    catch (e) { showToast(e.message); }
+}
+async function approveIncentives() {
+    if (!await confirmDestructive({ title: `Approve incentives for ${incentiveData.month}?`, body: 'The amounts are frozen for payroll. Later sales or rule changes will not change them.', confirmLabel: 'Approve', tone: 'primary' })) return;
+    try { await apiJson(`/api/incentives/${incentiveData.month}/approve`, { method: 'POST' }); showToast('Approved'); loadIncentives(); } catch (e) { showToast(e.message); }
+}
+
+// ── Commission (slide 25) ──
+let commissionData = null, commissionRates = [];
+async function loadCommission(month) {
+    const m = month || commissionData?.month || localCalendarDate().slice(0, 7);
+    try { [commissionData, commissionRates] = await Promise.all([apiJson(`/api/commission?month=${m}`), apiJson('/api/commission/rules').then(r => r.rules)]); }
+    catch (e) { return showToast(e.message); }
+    const d = commissionData;
+    document.getElementById('perf-commission-pane').innerHTML = `
+        <div class="flex flex-wrap items-center gap-2 text-xs">
+            <label class="flex items-center gap-1.5">Month <input type="month" class="corp-input w-auto py-0.5" value="${d.month}" onchange="loadCommission(this.value)"></label>
+            <span>Expected <b>${inr(d.totals.expected)}</b> · received <b>${inr(d.totals.received)}</b></span>
+            ${d.totals.unrated ? `<span class="text-amber-700">${d.totals.unrated} sale${d.totals.unrated === 1 ? ' has' : 's have'} no rate</span><button class="fu-btn" onclick="applyMissingCommission()">Apply today's rates</button>` : ''}
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-[1fr_1.6fr] gap-3">
+            <section class="band space-y-2"><h3>By telecaller</h3>
+                <table class="w-full perf-table"><thead><tr><th>Telecaller</th><th class="num">Sales</th><th class="num">New</th><th class="num">Renewal</th><th class="num">Total</th></tr></thead>
+                <tbody>${d.byEmployee.map(r => `<tr><td class="font-semibold">${esc(r.employee)}</td><td class="num">${num(r.policies)}</td><td class="num">${inr(r.new)}</td><td class="num">${inr(r.renewal)}</td><td class="num font-semibold">${inr(r.total)}</td></tr>`).join('') || '<tr><td colspan="5" class="text-slate-400">No sales this month.</td></tr>'}</tbody></table></section>
+            <section class="band space-y-2"><h3>Rates</h3>
+                <p class="text-xs text-slate-500">A line can name a product, an insurer, both or neither; the most specific line applies. Commission is fixed when a policy is sold.</p>
+                <div id="commission-rates" class="space-y-1.5">${commissionRates.map((r, i) => rateRow(r, i)).join('')}</div>
+                <div class="flex gap-2"><button class="fu-btn" onclick="addRateRow()">+ Add rate</button><button class="fu-btn is-primary" onclick="saveCommissionRates()">Save rates</button></div></section>
+        </div>
+        <div class="bg-white border border-slateBorder rounded-lg overflow-x-auto"><table class="w-full text-left perf-table min-w-[900px]">
+            <thead><tr><th>Sold</th><th>Customer</th><th>Telecaller</th><th>Product · insurer</th><th class="num">Premium</th><th>Basis</th><th class="num">Rate</th><th class="num">Commission</th><th>Status</th><th></th></tr></thead>
+            <tbody>${d.rows.map(r => `<tr><td>${esc(formatShortDate(r.saleDate))}</td><td class="font-semibold">${esc(r.customerName)}</td><td>${esc(r.employee)}</td>
+                <td>${esc(r.product)}<span class="perf-sub">${esc(r.insurer || '—')}</span></td><td class="num">${inr(r.premium)}</td><td>${r.basis === 'renewal' ? 'Renewal' : 'New'}</td>
+                <td class="num">${r.rate === null ? '—' : pct(r.rate)}</td><td class="num">${r.amount === null ? '<span class="text-amber-700">No rate</span>' : inr(r.amount)}${r.override ? `<span class="perf-sub" title="${esc(r.note)}">changed by hand</span>` : ''}</td>
+                <td><span class="auto-pill ${r.status === 'Received' ? 'on' : 'off'}">${esc(r.status)}</span></td>
+                <td class="whitespace-nowrap">${r.status !== 'Received' && r.amount !== null ? `<button class="fu-btn" onclick="markCommissionReceived('${r.policyId}')">Received</button>` : ''}<button class="fu-btn" onclick="overrideCommission('${r.policyId}', ${r.amount ?? 0})">Change</button></td></tr>`).join('')
+                || '<tr><td colspan="10" class="text-center text-slate-400 py-6">No policies sold this month.</td></tr>'}</tbody></table></div>`;
+}
+function rateRow(r, i) {
+    const products = leadOptions.products || [];
+    return `<div class="grid grid-cols-2 sm:grid-cols-[1fr_1fr_5rem_5rem_auto] gap-1.5 items-center" data-rate="${i}">
+        <select class="corp-input py-0.5" data-rate-key="product"><option value="">Any product</option>${products.map(p => `<option ${p === r.product ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select>
+        <input class="corp-input py-0.5" data-rate-key="insurer" placeholder="Any insurer" value="${esc(r.insurer || '')}">
+        <input class="target-input" type="number" step="0.1" min="0" max="100" data-rate-key="newRate" placeholder="New %" value="${r.newRate ?? ''}" aria-label="New business rate">
+        <input class="target-input" type="number" step="0.1" min="0" max="100" data-rate-key="renewalRate" placeholder="Renew %" value="${r.renewalRate ?? ''}" aria-label="Renewal rate">
+        <button class="fu-btn" onclick="this.closest('[data-rate]').remove()" aria-label="Remove rate">✕</button></div>`;
+}
+function addRateRow() { document.getElementById('commission-rates').insertAdjacentHTML('beforeend', rateRow({}, Date.now())); }
+async function saveCommissionRates() {
+    const rules = [...document.querySelectorAll('[data-rate]')].map(row => Object.fromEntries([...row.querySelectorAll('[data-rate-key]')].map(el => [el.dataset.rateKey, el.value])));
+    try { await apiJson('/api/commission/rules', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rules }) }); showToast('Rates saved — they apply to new sales'); loadCommission(); }
+    catch (e) { showToast(e.message); }
+}
+async function applyMissingCommission() {
+    try { const r = await apiJson('/api/commission/apply-missing', { method: 'POST' }); showToast(`Rates applied to ${r.applied} sale${r.applied === 1 ? '' : 's'}`); loadCommission(); } catch (e) { showToast(e.message); }
+}
+async function markCommissionReceived(policyId) {
+    try { await apiJson(`/api/policies/${policyId}/commission`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'Received' }) }); showToast('Marked received'); loadCommission(); }
+    catch (e) { showToast(e.message); }
+}
+function overrideCommission(policyId, amount) {
+    openInsuranceForm('Change commission', [['amount', 'Commission (₹)', 'number', true], ['note', 'Why is it changing?', 'text', true]], async v => {
+        await apiJson(`/api/policies/${policyId}/commission`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount: Number(v.amount), note: v.note }) });
+        loadCommission();
+    }, { amount });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// REPORTS — slide 31 (the sales funnel) and slide 32 (lead sources)
+// ═══════════════════════════════════════════════════════════════════
+function reportRangeChanged() {
+    const custom = document.getElementById('rep-range').value === 'custom';
+    const box = document.getElementById('rep-custom'); box.classList.toggle('hidden', !custom); box.classList.toggle('flex', custom);
+    if (custom && !document.getElementById('rep-start').value) { document.getElementById('rep-start').value = isoDay(-30); document.getElementById('rep-end').value = isoDay(0); }
+    if (!custom) loadReports();
+}
+
+function reportRange() {
+    const range = document.getElementById('rep-range').value, today = new Date();
+    if (range === 'custom') return [document.getElementById('rep-start').value, document.getElementById('rep-end').value];
+    if (range === '90') return [isoDay(-89), isoDay(0)];
+    if (range === 'last-month') {
+        const first = new Date(today.getFullYear(), today.getMonth() - 1, 1), last = new Date(today.getFullYear(), today.getMonth(), 0);
+        return [localCalendarDate(first), localCalendarDate(last)];
+    }
+    return [localCalendarDate(new Date(today.getFullYear(), today.getMonth(), 1)), isoDay(0)];
+}
+
+async function loadReports() {
+    const [start, end] = reportRange();
+    const params = new URLSearchParams({ start, end });
+    ['person', 'product', 'source'].forEach(k => { const v = document.getElementById(`rep-${k}`).value; if (v) params.set(k, v); });
+    let d;
+    try { d = await apiJson(`/api/reports?${params}`); } catch (e) { return showToast(e.message); }
+    const fill = (id, label, values) => { const el = document.getElementById(id), keep = el.value;
+        el.innerHTML = `<option value="">${label}</option>` + values.map(v => `<option ${v === keep ? 'selected' : ''}>${esc(v)}</option>`).join(''); };
+    fill('rep-person', 'All telecallers', d.options.people); fill('rep-product', 'All products', d.options.products); fill('rep-source', 'All sources', d.options.sources);
+    const top = d.funnel[0]?.count || 0;
+    const undated = d.undatedLeads ? `<p class="text-[11px] text-slate-500">${d.undatedLeads} older lead${d.undatedLeads === 1 ? ' has' : 's have'} no recorded arrival date, so ${d.undatedLeads === 1 ? 'it is' : 'they are'} not in any period.</p>` : '';
+    document.getElementById('rep-body').innerHTML = `
+        <section class="band">
+            <h3>Sales funnel — ${num(d.cohortSize)} lead${d.cohortSize === 1 ? '' : 's'} that arrived ${esc(formatShortDate(d.period.start))} – ${esc(formatShortDate(d.period.end))}</h3>
+            ${d.cohortSize ? `<div class="funnel" role="table" aria-label="Sales funnel">${d.funnel.map(st => {
+                const width = top ? st.count * 100 / top : 0, inside = width > 18;
+                return `<div class="funnel-row" role="row" title="${esc(st.stage)}: ${st.count} of ${d.cohortSize} (${pct(st.ofStart)})${st.ofPrevious !== null ? `, ${pct(st.ofPrevious)} of the stage before` : ''}">
+                    <span role="rowheader" class="text-slate-700 font-medium">${esc(st.stage)}</span>
+                    <div class="funnel-track" role="cell"><div class="funnel-bar" style="width:${width}%"></div>
+                        <span class="funnel-count ${inside ? '' : 'is-outside'}" style="${inside ? '' : `left:calc(${width}% + 6px)`}">${num(st.count)}</span></div>
+                    <span class="funnel-rate" role="cell">${pct(st.ofStart)}${st.ofPrevious !== null ? `<span class="perf-sub">${pct(st.ofPrevious)} of previous</span>` : ''}</span></div>`; }).join('')}</div>
+            <p class="text-[11px] text-slate-500 mt-2">A lead counts at every stage it reached or passed, so a sale is also counted as contacted, interested and quoted.</p>`
+            : '<p class="text-xs text-slate-400">No leads arrived in this period with these filters.</p>'}
+            ${undated}
+        </section>
+        <section class="band">
+            <h3>Lead sources — which bring the best customers, not just the most leads</h3>
+            <div class="overflow-x-auto"><table class="w-full text-left perf-table min-w-[720px]"><thead><tr><th>Source</th><th class="num">Leads</th><th class="num">Contacted</th><th class="num">Interested</th><th class="num">Quoted</th><th class="num">Converted</th><th class="num">Premium</th><th class="num">Premium per lead</th></tr></thead>
+            <tbody>${d.sources.map(r => `<tr><td class="font-semibold">${esc(r.source)}</td><td class="num">${num(r.leads)}</td><td class="num">${pct(r.contactRate)}</td><td class="num">${pct(r.interestedRate)}</td>
+                <td class="num">${pct(r.quoteRate)}</td><td class="num">${pct(r.conversionRate)}<span class="perf-sub">${num(r.policies)} sold</span></td><td class="num">${inr(r.premium)}</td><td class="num">${inr(r.premiumPerLead)}</td></tr>`).join('')
+                || '<tr><td colspan="8" class="text-center text-slate-400 py-4">No leads in this period.</td></tr>'}</tbody></table></div>
+        </section>
+        <section class="band">
+            <h3>Why leads were lost</h3>
+            ${d.lostReasons.length ? `<ul class="text-xs space-y-1">${d.lostReasons.map(r => `<li class="flex justify-between border-b border-slate-100 py-1"><span>${esc(r.reason)}</span><b class="font-mono">${num(r.count)}</b></li>`).join('')}</ul>`
+                : '<p class="text-xs text-slate-400">No leads from this period were closed as not interested or lost.</p>'}
+        </section>`;
+}
+
+// ── Quotations on a lead (slide 20) ──
+const QUOTE_PILL = { Draft: 'off', Sent: 'later', Viewed: 'later', Negotiation: 'later', Accepted: 'on', Rejected: 'failed', Expired: 'failed' };
+const QUOTE_ACTION = { Sent: 'Mark sent', Viewed: 'Customer viewed', Negotiation: 'Negotiating', Accepted: 'Accepted', Rejected: 'Rejected', Expired: 'Mark expired' };
+const QUOTE_FLOW = ['Sent', 'Viewed', 'Negotiation', 'Accepted', 'Rejected', 'Expired'];
+
+async function quotationsCard(l) {
+    const quotes = await apiJson(`/api/quotations?leadId=${encodeURIComponent(l.id)}`).catch(() => []);
+    const moves = leadOptions.quoteTransitions || {};
+    return `<div class="border border-slateBorder rounded-lg p-3 bg-white space-y-2 text-xs">
+        <div class="flex items-center justify-between gap-2"><span class="text-[11px] font-bold uppercase tracking-wider">Quotations (${quotes.length})</span>
+            <span class="flex gap-1.5">${quotes.filter(q => q.status !== 'Rejected').length > 1 ? `<button class="fu-btn" onclick="openSideBySideQuoteComparison('lead','${l.id}')">Compare</button>` : ''}
+            <button class="fu-btn is-primary" onclick="openQuoteForm('${l.id}')">Add quotation</button></span></div>
+        ${quotes.map(q => `<div class="border-t border-slate-100 pt-2 space-y-1">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <span><b>${esc(q.insurer)}</b> · <span class="font-mono">${inr(q.premium)}</span>${q.sumInsured ? ` <span class="text-slate-400">· cover ${inr(q.sumInsured)}</span>` : ''}</span>
+                <span class="auto-pill ${QUOTE_PILL[q.status] || 'off'}">${esc(q.status)}</span></div>
+            <div class="text-[11px] text-slate-500">${[q.sentAt ? `sent ${formatShortDate(q.sentAt)}` : 'not sent yet', q.validityDate ? `valid until ${formatShortDate(q.validityDate)}` : '',
+                q.followUpDate ? `follow up ${formatShortDate(q.followUpDate)}` : ''].filter(Boolean).map(esc).join(' · ')}</div>
+            ${q.coverageSummary ? `<div class="text-slate-600">${esc(q.coverageSummary)}</div>` : ''}
+            ${q.customerResponse ? `<div class="text-slate-600">Customer said: “${esc(q.customerResponse)}”</div>` : ''}
+            ${(moves[q.status] || []).length ? `<div class="flex flex-wrap gap-1.5">${[...moves[q.status]].sort((a, b) => QUOTE_FLOW.indexOf(a) - QUOTE_FLOW.indexOf(b)).map(to => `<button class="fu-btn ${to === 'Accepted' ? 'is-primary' : ''}" onclick="setQuoteStatus('${q.id}','${to}',false,'${l.id}')">${esc(QUOTE_ACTION[to] || to)}</button>`).join('')}</div>` : ''}
+        </div>`).join('') || '<p class="text-slate-400">No quotations yet.</p>'}
+    </div>`;
+}
+
+function openQuoteForm(leadId) {
+    openInsuranceForm('Add quotation', [['insurer', 'Insurer', 'text', true], ['premium', 'Premium (₹)', 'number', true],
+        ['sumInsured', 'Cover / IDV (₹)', 'number', false], ['coverageSummary', 'What it covers', 'textarea', false],
+        ['validityDate', 'Valid until', 'date', false], ['followUpDate', 'Follow up on', 'date', false],
+        ['status', 'Status', 'selectpairs:Draft::Draft — not sent yet|Sent::Sent to the customer', true]], async v => {
+        await apiJson('/api/quotations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ leadId, ...v }) });
+        openLeadDrawer(leadId);
+    }, { status: 'Sent', followUpDate: isoDay(2) });
+}
+
+async function setQuoteStatus(id, status, quiet = false, leadId = '') {
+    let body = { status };
+    if (!quiet && ['Accepted', 'Rejected', 'Negotiation'].includes(status)) {
+        const said = prompt(status === 'Negotiation' ? 'What does the customer want changed?' : 'What did the customer say? (optional)') ;
+        if (said === null) return;
+        if (said.trim()) body.customerResponse = said.trim();
+    }
+    try {
+        await apiJson(`/api/quotations/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        if (!quiet) { showToast(`Quotation ${status.toLowerCase()}`); if (leadId) openLeadDrawer(leadId); }
+    } catch (e) { if (quiet) throw e; showToast(e.message); }
+}
+
 async function openCreateTaskModal(prefillType = '', prefillId = '') {
     const modal = document.getElementById('task-modal');
     modal.classList.remove('hidden');
@@ -1613,9 +3046,10 @@ async function openCreateTaskModal(prefillType = '', prefillId = '') {
         });
     } catch (e) { console.error(e); }
 
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    document.getElementById('task-modal-date').value = d.toISOString().split('T')[0];
+    document.getElementById('task-modal-date').value = isoDay(1);
+    document.getElementById('task-modal-time').value = '';
+    // Handing work to someone else is a manager's decision; a telecaller schedules their own.
+    document.getElementById('task-modal-assignee-field').classList.toggle('hidden', !canAssignLeads());
 }
 
 function closeTaskModal() {
@@ -1629,7 +3063,8 @@ async function handleTaskSubmit(e) {
     const entityVal = document.getElementById('task-modal-entity').value;
     const priority = document.getElementById('task-modal-priority').value;
     const dueDate = document.getElementById('task-modal-date').value;
-    const assignedTo = document.getElementById('task-modal-assignee').value;
+    const dueTime = document.getElementById('task-modal-time').value;
+    const assignedTo = canAssignLeads() ? document.getElementById('task-modal-assignee').value : undefined;
     const activityType = document.getElementById('task-modal-type').value;
 
     let associatedType = 'Lead';
@@ -1653,13 +3088,15 @@ async function handleTaskSubmit(e) {
                 associatedTitle,
                 priority,
                 dueDate,
-                assignedTo
-                ,activityType
+                dueTime,
+                assignedTo,
+                activityType
             })
         });
         closeTaskModal();
-        showToast('Action task scheduled.');
+        showToast('Follow-up scheduled');
         if (currentView === 'tasks') loadTasks();
+        else if (currentView === 'follow-ups') loadFollowUps();
         else refreshCurrentView();
     } catch (err) { showToast(err.message || 'Could not schedule task.'); }
 }
@@ -1676,66 +3113,131 @@ async function deleteTaskAction(id) {
 // ═══════════════════════════════════════════════════════════════════
 // 6. CREATE LEAD FORM SUBMISSION
 // ═══════════════════════════════════════════════════════════════════
-function openCreateModal() {
+// Suggested next actions for a telecalling day; any text is allowed.
+const NEXT_ACTIONS = ['First call', 'Call back', 'Retry call', 'Send quotation', 'Follow up on quotation',
+    'Collect documents', 'Confirm payment', 'Share policy copy'];
+const STATUS_NEXT_ACTION = { 'New': 'First call', 'Assigned': 'First call', 'Contacted': 'Call back',
+    'Interested': 'Send quotation', 'Quote Sent': 'Follow up on quotation', 'Follow-up': 'Call back',
+    'Documents Pending': 'Collect documents', 'Call Later': 'Call back', 'Unreachable': 'Retry call' };
+
+const isoDay = (offset = 0) => { const d = new Date(); d.setDate(d.getDate() + offset); return localCalendarDate(d); };
+const optionsHtml = (values, selected = '', blank = '') =>
+    (blank ? `<option value="">${esc(blank)}</option>` : '') +
+    values.map(v => `<option value="${esc(String(v))}" ${String(v) === String(selected ?? '') ? 'selected' : ''}>${esc(String(v))}</option>`).join('');
+
+async function prepareLeadForm() {
+    await loadLeadOptions();
+    const o = leadOptions;
+    document.getElementById('lead-product').innerHTML = optionsHtml(o.products, '', 'Choose product');
+    document.getElementById('lead-source').innerHTML = optionsHtml(o.sources, '', 'Not recorded');
+    document.getElementById('car-fuel').innerHTML = optionsHtml(o.fuelTypes, '', '—');
+    document.getElementById('car-ncb').innerHTML = optionsHtml(o.ncbLevels.map(n => `${n}`), '', '—');
+    document.getElementById('health-plan').innerHTML = optionsHtml(o.healthPlanTypes, '', '—');
+    document.getElementById('next-action-suggestions').innerHTML = NEXT_ACTIONS.map(a => `<option value="${esc(a)}"></option>`).join('');
+    // Assigning work is a manager's decision; a telecaller's own leads stay theirs.
+    document.getElementById('lead-owner-field').classList.toggle('hidden', !canAssignLeads());
+}
+
+function canAssignLeads() {
+    return !signedInUser || ['admin', 'manager', 'Administrator'].includes(signedInUser.role) || /admin|manager/i.test(roleLabel(signedInUser));
+}
+
+function showProductDetails(product) {
+    const p = (product || '').toLowerCase();
+    document.getElementById('lead-car-details').classList.toggle('hidden', !p.includes('car'));
+    document.getElementById('lead-health-details').classList.toggle('hidden', !p.includes('health'));
+}
+
+async function openCreateModal() {
     editingLeadId = null;
-    document.getElementById('lead-form-title').textContent = 'New Insurance Lead';
-    document.getElementById('lead-form-submit').textContent = 'Save Lead';
     document.querySelector('#create-modal form').reset();
-    document.getElementById('lead-next-action').value = 'Initial Discovery Discussion';
-    document.getElementById('lead-next-action-date').value = new Date().toISOString().split('T')[0];
+    await prepareLeadForm();
+    document.getElementById('lead-form-title').textContent = 'New Lead';
+    document.getElementById('lead-form-submit').textContent = 'Save lead';
+    document.getElementById('lead-next-action').value = 'First call';
+    document.getElementById('lead-next-action-date').value = isoDay(0);
+    showProductDetails('');
     document.getElementById('create-modal')?.classList.remove('hidden');
+    document.getElementById('lead-name').focus();
 }
 
 async function openEditLead(id) {
     const data = await apiJson(`/api/leads/${id}`); const l = data.lead; editingLeadId = id;
-    document.getElementById('lead-form-title').textContent = 'Edit Lead'; document.getElementById('lead-form-submit').textContent = 'Save Changes';
-    const values = { 'lead-name':l.name, 'lead-organization':l.organization, 'lead-mobile':l.mobile, 'lead-email':l.email, 'lead-policy-type':l.policyType,
-        'lead-premium':l.premium, 'lead-expiry':l.expiryDate, 'lead-owner':l.assignedTo, 'lead-next-action':l.nextAction, 'lead-next-action-date':l.nextActionDate };
-    Object.entries(values).forEach(([key,value]) => { const el=document.getElementById(key); if(el) el.value=value||''; });
-    document.getElementById('lead-notes').value=''; document.getElementById('create-modal').classList.remove('hidden');
+    document.querySelector('#create-modal form').reset();
+    await prepareLeadForm();
+    document.getElementById('lead-form-title').textContent = 'Edit lead';
+    document.getElementById('lead-form-submit').textContent = 'Save changes';
+    const v = l.vehicleDetails || {}, h = l.healthDetails || {};
+    const values = { 'lead-name': l.name, 'lead-mobile': l.mobile, 'lead-email': l.email, 'lead-city': l.city,
+        'lead-product': l.product, 'lead-source': l.source === 'Not recorded' ? '' : l.source, 'lead-expiry': l.expiryDate,
+        'lead-insurer': l.existingPolicy?.insurer, 'lead-premium': l.premium, 'lead-owner': l.assignedTo,
+        'lead-next-action': l.nextAction, 'lead-next-action-date': l.nextActionDate, 'lead-next-action-time': l.nextActionTime,
+        'car-registration': v.registrationNumber, 'car-make': v.make, 'car-model': [v.model, v.variant].filter(Boolean).join(' '),
+        'car-year': v.manufactureYear, 'car-fuel': v.fuelType, 'car-ncb': v.ncbPercent,
+        'health-plan': h.planType, 'health-sum': h.sumInsured, 'health-conditions': h.preExistingConditions,
+        'health-members': (h.members || []).map(m => `${m.relation} ${m.age}`).join(', ') };
+    Object.entries(values).forEach(([key, value]) => { const el = document.getElementById(key); if (el) el.value = value ?? ''; });
+    showProductDetails(l.product);
+    const open = needsNextAction(l.status);
+    document.getElementById('lead-next-action').closest('.grid').classList.toggle('hidden', !open);
+    document.getElementById('lead-next-action-date').required = open;
+    document.getElementById('create-modal').classList.remove('hidden');
 }
 
 function closeCreateModal() {
     document.getElementById('create-modal')?.classList.add('hidden');
+    document.getElementById('lead-next-action').closest('.grid').classList.remove('hidden');
+    document.getElementById('lead-next-action-date').required = true;
+}
+
+// "Self 38, Spouse 35, Son 8" → [{relation, age}]. The server validates each entry.
+function parseMembers(text) {
+    return (text || '').split(',').map(part => part.trim()).filter(Boolean).map(part => {
+        const match = part.match(/^(.*?)\s*(\d{1,3})$/);
+        return match ? { relation: match[1].trim() || 'Self', age: Number(match[2]) } : { relation: part, age: -1 };
+    });
+}
+
+function compact(obj) {
+    return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== '' && v !== null && v !== undefined && !(Array.isArray(v) && !v.length)));
 }
 
 async function handleCreateLeadSubmit(e) {
     e.preventDefault();
-    const fullName = document.getElementById('lead-name').value.trim();
-    const org = document.getElementById('lead-organization').value.trim();
-    const mobile = document.getElementById('lead-mobile').value.trim();
-    const email = document.getElementById('lead-email').value.trim();
-    const policyType = document.getElementById('lead-policy-type').value;
-    const premium = document.getElementById('lead-premium').value.trim() || '₹ 50,000';
-    const expiryDate = document.getElementById('lead-expiry').value || '';
-    const assignedTo = document.getElementById('lead-owner').value;
-    const nextAction = document.getElementById('lead-next-action').value.trim();
-    const nextActionDate = document.getElementById('lead-next-action-date').value;
-    const notes = document.getElementById('lead-notes').value.trim();
-
+    const val = id => document.getElementById(id).value.trim();
+    const product = val('lead-product');
+    const payload = {
+        firstName: val('lead-name'), name: val('lead-name'), mobile: val('lead-mobile'), email: val('lead-email'),
+        city: val('lead-city'), product, leadSource: val('lead-source'), expiryDate: val('lead-expiry'),
+        premium: val('lead-premium'), notes: val('lead-notes'),
+        existingPolicy: compact({ insurer: val('lead-insurer') }),
+    };
+    if (!document.getElementById('lead-next-action').closest('.grid').classList.contains('hidden')) {
+        payload.nextAction = val('lead-next-action') || 'First call';
+        payload.nextActionDate = val('lead-next-action-date');
+        payload.nextActionTime = val('lead-next-action-time');
+    }
+    if (canAssignLeads() && val('lead-owner')) payload.assignedTo = val('lead-owner');
+    if (product.toLowerCase().includes('car')) {
+        const [model, ...variant] = val('car-model').split(' ');
+        payload.vehicleDetails = compact({ registrationNumber: val('car-registration'), make: val('car-make'), model,
+            variant: variant.join(' '), manufactureYear: val('car-year') ? Number(val('car-year')) : null,
+            fuelType: val('car-fuel'), ncbPercent: val('car-ncb') === '' ? null : Number(val('car-ncb')) });
+    }
+    if (product.toLowerCase().includes('health')) {
+        payload.healthDetails = compact({ planType: val('health-plan'), sumInsured: val('health-sum') ? Number(val('health-sum')) : null,
+            members: parseMembers(val('health-members')), preExistingConditions: val('health-conditions') });
+    }
+    if (editingLeadId) delete payload.notes;
     try {
         await apiJson(editingLeadId ? `/api/leads/${editingLeadId}` : '/api/leads', {
-            method: editingLeadId ? 'PUT' : 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                firstName: fullName, name: fullName,
-                organization: org,
-                mobile,
-                email,
-                policyType,
-                premium,
-                expiryDate,
-                assignedTo,
-                nextAction,
-                nextActionDate,
-                notes
-            })
-        });
-
+            method: editingLeadId ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const edited = editingLeadId;
         closeCreateModal();
-        showToast(editingLeadId ? 'Lead details updated and synchronized.' : 'Commercial lead created. Account and contact synced.');
+        showToast(edited ? 'Lead updated' : 'Lead created');
         editingLeadId = null;
-        loadLeads();
+        await loadLeads();
+        if (edited && document.getElementById('detail-drawer')?.classList.contains('translate-x-0')) openLeadDrawer(edited);
     } catch (err) { showToast(err.message || 'Could not save lead.'); }
 }
 
@@ -1748,6 +3250,7 @@ async function handleCreateLeadSubmit(e) {
 let dashboardLayout = null;
 
 async function loadDashboard() {
+    renderRoleDashboard();
     try {
         const [data, layout] = await Promise.all([apiJson('/api/dashboard'), apiJson('/api/dashboard/layout')]);
         dashboardLayout = layout;
@@ -2066,7 +3569,7 @@ async function loadCustomers() {
 
 function editCustomer(id) {
     const c=(window.crmCustomers||[]).find(x=>x.id===id); if(!c)return;
-    openInsuranceForm('Edit customer profile',[['name','Customer name','text',true],['organization','Organization','text',false],['email','Email','email',false],['mobile','Mobile','text',false],['status','Status','select:Active|Inactive',true],['assignedTo','Account owner',ownerFieldOptions(),false],['gstNumber','GST number','text',false],['address','Address','textarea',false]],v=>apiJson(`/api/customers/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)}),c);
+    openInsuranceForm('Edit customer profile',[['name','Customer name','text',true],['organization','Organization','text',false],['email','Email','email',false],['mobile','Mobile','text',false],['status','Status','select:Active|Inactive',true],['assignedTo','Account owner',ownerFieldOptions(),false],['city','City','text',false],['preferences','Preferences (language, best time to call…)','text',false],['gstNumber','GST number','text',false],['address','Address','textarea',false]],v=>apiJson(`/api/customers/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)}),c);
 }
 
 function createCustomer() {
@@ -2074,15 +3577,35 @@ function createCustomer() {
         values => apiJson('/api/customers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(values)}));
 }
 
+// Slide 18: one customer, one complete history — the eight blocks of the client's profile.
 async function openCustomer360(id) {
-    try { const c=await apiJson(`/api/customers/${id}`); const root=document.getElementById('customer-360'); root.classList.remove('hidden');
-        const activity=[...(c.auditHistory||[]).map(x=>({at:x.createdAt,label:x.action,detail:x.actor})),...(c.notes||[]).map(x=>({at:x.createdAt,label:x.title,detail:x.author})),...(c.communications||[]).map(x=>({at:x.createdAt,label:`${x.channel} · ${x.status}`,detail:x.subject||x.content}))].sort((a,b)=>String(b.at).localeCompare(String(a.at))).slice(0,12);
-        root.innerHTML=`<div class="flex flex-wrap justify-between gap-3"><div><h2 class="font-semibold text-base">${esc(c.name)}</h2><p class="text-xs text-slate-500">${esc(c.organization||'Individual')} · ${esc(c.email||'No email')} · ${esc(c.mobile||'No mobile')}</p></div><div class="flex gap-2"><button onclick="openCalendarEventForm('Customer','${c.id}')" class="px-2.5 py-1 border rounded text-xs font-semibold">Schedule</button><button onclick="editCustomer('${c.id}')" class="px-2.5 py-1 border rounded text-xs font-semibold">Edit profile</button><button onclick="switchView('policies')" class="px-2.5 py-1 border rounded text-xs font-semibold">Policies</button><button aria-label="Close customer profile" onclick="document.getElementById('customer-360').classList.add('hidden')">✕</button></div></div>
-        <div class="grid grid-cols-2 md:grid-cols-5 gap-2 mt-4">${[['Contacts',c.contacts.length],['Policies',c.policies.length],['Renewals',c.renewals.length],['Open tasks',c.tasks.filter(x=>x.status!=='Completed').length],['Documents',c.documents.filter(x=>x.status!=='Archived').length]].map(x=>`<div class="bg-slate-50 border rounded p-2"><div class="text-[10px] uppercase text-slate-500">${x[0]}</div><strong class="text-lg">${x[1]}</strong></div>`).join('')}</div>
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 mt-3"><section class="border rounded p-3"><h3 class="text-xs font-bold uppercase text-slate-500">Contacts</h3>${c.contacts.map(x=>`<div class="text-xs mt-2"><strong>${esc(x.name)}</strong><div class="text-slate-500">${esc(x.designation||'')} · ${esc(x.phone||x.email||'')}</div></div>`).join('')||'<p class="text-xs text-slate-400 mt-2">None linked</p>'}</section><section class="border rounded p-3"><h3 class="text-xs font-bold uppercase text-slate-500">Policies & renewals</h3>${c.policies.map(x=>`<button onclick="switchView('policies')" class="block text-left text-xs mt-2"><strong>${esc(x.policyNumber||'Draft')}</strong><span class="block text-slate-500">${esc(x.policyType)} · ${esc(x.issuanceStatus)}</span></button>`).join('')||'<p class="text-xs text-slate-400 mt-2">No policies</p>'}</section><section class="border rounded p-3"><h3 class="text-xs font-bold uppercase text-slate-500">Pipeline & service</h3><p class="text-xs mt-2">${c.deals.length} deal(s) · ${c.quotations.length} quote(s)</p><p class="text-xs text-slate-500 mt-1">${c.renewals.filter(x=>!['Renewed','Lost','Lapsed'].includes(x.stage)).length} open renewal(s)</p></section></div>
-        <section class="border rounded p-3 mt-3"><h3 class="text-xs font-bold uppercase text-slate-500">Upcoming meetings & follow-ups</h3>${(c.calendarEvents||[]).filter(x=>!['Completed','Archived','Cancelled'].includes(x.status)).sort((a,b)=>`${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`)).map(x=>`<div class="flex justify-between gap-3 border-t first:border-0 py-2 text-xs"><div><strong>${esc(x.title)}</strong><div class="text-slate-500">${esc(x.type)} · ${esc(x.assignedTo||'Unassigned')}</div></div><time class="text-[11px] text-slate-500 shrink-0">${esc(x.date)} ${esc(x.time||'')}</time></div>`).join('')||'<p class="text-xs text-slate-400 mt-2">Nothing scheduled.</p>'}</section>
-        <section class="border rounded p-3 mt-3"><h3 class="text-xs font-bold uppercase text-slate-500">Chronological activity</h3>${activity.map(x=>`<div class="flex justify-between gap-3 border-t first:border-0 py-2 text-xs"><div><strong>${esc(x.label)}</strong><div class="text-slate-500 truncate max-w-xl">${esc(x.detail||'')}</div></div><time class="text-[11px] text-slate-400 shrink-0">${esc((x.at||'').slice(0,10))}</time></div>`).join('')||'<p class="text-xs text-slate-400 mt-2">No activity yet.</p>'}</section>`;
-    } catch(e){showToast(e.message)}
+    try {
+        const c = await apiJson(`/api/customers/${id}`);
+        const root = document.getElementById('customer-360'); root.classList.remove('hidden');
+        const box = (title, count, body) => `<section class="border border-slateBorder rounded-lg p-3 bg-white min-w-0"><h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex justify-between">${title}${count === null ? '' : `<span class="num-tabular">${count}</span>`}</h3><div class="mt-1.5 space-y-1.5 text-xs">${body}</div></section>`;
+        const none = text => `<p class="text-slate-400">${text}</p>`;
+        const row = (main, sub, right = '') => `<div class="border-t border-slate-100 first:border-0 pt-1.5 flex justify-between gap-2"><div class="min-w-0"><div class="font-medium truncate">${main}</div>${sub ? `<div class="text-slate-500">${sub}</div>` : ''}</div>${right ? `<span class="text-[11px] text-slate-400 shrink-0 font-mono">${right}</span>` : ''}</div>`;
+        const openRenewals = c.renewals.filter(r => !['Renewed', 'Lost', 'Lapsed'].includes(r.stage));
+        const docs = c.documents.filter(d => d.status !== 'Archived');
+        root.innerHTML = `<div class="flex flex-wrap justify-between gap-3"><div><h2 class="font-semibold text-base">${esc(c.name)}</h2><p class="text-xs text-slate-500">${esc(c.mobile || 'No mobile')} · ${esc(c.email || 'No email')}${c.city ? ` · ${esc(c.city)}` : ''} · owned by ${esc(c.assignedTo || 'nobody')}</p></div>
+            <div class="flex gap-2">${c.leads[0] ? callButton(c.leads[0].id) : ''}<button onclick="openCalendarEventForm('Customer','${c.id}')" class="px-2.5 py-1 border rounded text-xs font-semibold">Schedule</button><button onclick="editCustomer('${c.id}')" class="px-2.5 py-1 border rounded text-xs font-semibold">Edit profile</button><button aria-label="Close customer profile" onclick="document.getElementById('customer-360').classList.add('hidden')">✕</button></div></div>
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 mt-4">
+            ${box('Basic details', null, `${row('Contact', `${esc(c.mobile || '—')}<br>${esc(c.email || '—')}`)}${row('City', esc(c.city || 'Not recorded'))}${row('Preferences', esc(c.preferences || 'None recorded'))}
+                ${c.leads.length ? row('Came to us as', c.leads.map(l => `<button class="underline" onclick="openLeadDrawer('${l.id}')">${esc(l.product || 'Lead')}</button> · ${esc(l.source || 'source not recorded')}${l.leadDate ? ` · ${esc(formatShortDate(l.leadDate))}` : ''}`).join('<br>')) : ''}`)}
+            ${box('Insurance history', c.insuranceHistory.length, c.insuranceHistory.map(h => row(`${esc(h.insurer || 'Insurer not recorded')} · ${esc(h.product || '')}`,
+                `${esc(h.source)}${h.policyNumber ? ` · ${esc(h.policyNumber)}` : ''}${h.status ? ` · ${esc(h.status)}` : ''}${h.hadClaim ? ' · had a claim' : ''}`, esc(h.expiryDate || ''))).join('') || none('No earlier policies recorded.'))}
+            ${box('Call history', c.calls.length, c.calls.slice(0, 8).map(x => row(esc(x.status === 'In progress' ? 'Outcome not recorded' : (x.outcome || '—')),
+                `${esc(x.assignedTo || '')}${x.notes ? ` · ${esc(x.notes)}` : ''}${x.recordingUrl ? ` · <a class="underline" href="${esc(x.recordingUrl)}" target="_blank" rel="noopener">recording</a>` : ''}`,
+                `${esc(formatShortDate(x.startedAt))} · ${formatDuration(x.durationSeconds)}`)).join('') + (c.calls.length > 8 ? `<p class="text-slate-400">and ${c.calls.length - 8} earlier</p>` : '') || none('No calls yet.'))}
+            ${box('Quotations', c.quotations.length, c.quotations.map(q => row(`${esc(q.insurer)} · ₹${Number(q.premium || 0).toLocaleString('en-IN')}`, `${esc(q.status)}${q.validityDate ? ` · valid to ${esc(q.validityDate)}` : ''}`, esc(formatShortDate(q.sentAt || q.createdAt)))).join('') || none('No quotations.'))}
+            ${box('Documents', docs.length, docs.map(d => row(`<a class="underline" href="/api/documents/${d.id}/content" target="_blank" rel="noopener">${esc(d.docType || d.category || d.title)}</a>`, `${esc(d.originalName || '')} · ${esc(d.verification || '')}`, esc(formatShortDate(d.createdAt)))).join('') || none('No documents uploaded.'))}
+            ${box('Policies', c.policies.length, c.policies.map(x => row(`${esc(x.policyNumber || 'Draft')} · ${esc(x.policyType || '')}`, `${esc(x.insurer || '')} · ${esc(x.status || x.issuanceStatus || '')}`, x.expiryDate ? `to ${esc(x.expiryDate)}` : '')).join('')
+                + (openRenewals.length ? `<p class="text-amber-700">${openRenewals.length} renewal${openRenewals.length === 1 ? '' : 's'} open — <button class="underline" onclick="switchView('renewals')">Renewals</button></p>` : '') || none('No policies yet.'))}
+            ${box('Follow-ups', c.followUps.upcoming.length, (c.followUps.upcoming.map(t => row(esc(t.title), esc(t.assignedTo || ''), `${esc(t.dueDate || '')} ${esc(t.dueTime || '')}`)).join('') || none('Nothing upcoming.'))
+                + (c.followUps.completed.length ? `<p class="text-[11px] font-semibold text-slate-500 pt-1">Completed (${c.followUps.completed.length})</p>${c.followUps.completed.slice(0, 5).map(t => row(esc(t.title), esc(t.assignedTo || ''), esc(formatShortDate(t.completedAt)))).join('')}` : ''))}
+            ${box('Notes', c.notes.length, c.notes.slice(0, 8).map(n => row(esc(n.title || 'Note'), esc(n.content || n.body || '').slice(0, 160), esc(formatShortDate(n.createdAt)))).join('') || none('No notes.'))}
+        </div>`;
+    } catch (e) { showToast(e.message) }
 }
 
 async function loadNotifications(){
@@ -2135,10 +3658,10 @@ async function switchSettingTab(tab) {
                     <div class="w-11 h-11 rounded-full bg-slate-900 text-white flex items-center justify-center font-semibold text-sm">${esc(getInitials(me.name))}</div>
                     <div class="min-w-0">
                         <div class="font-semibold text-slate-900 text-sm">${esc(me.name)}</div>
-                        <div class="text-[11px] text-slate-500">${esc(me.role || '')}${me.managerName ? ` · reports to ${esc(me.managerName)}` : ''}</div>
+                        <div class="text-[11px] text-slate-500">${esc(roleLine(me))}${me.managerName ? ` · reports to ${esc(me.managerName)}` : ''}</div>
                     </div>
                     <div class="ml-auto grid grid-cols-3 gap-2 text-center shrink-0">
-                        ${[['openLeads', 'Open leads'], ['wonLeads', 'Won'], ['openTasks', 'Open tasks']].map(([k, l]) =>
+                        ${[['openLeads', 'Open leads'], ['wonLeads', 'Sold'], ['openTasks', 'Open tasks']].map(([k, l]) =>
                             `<div class="px-2"><strong class="block text-base font-semibold num-tabular">${me.stats[k]}</strong><span class="text-[10px] text-slate-400 uppercase tracking-wider">${l}</span></div>`).join('')}
                     </div>
                 </div>
@@ -2147,26 +3670,18 @@ async function switchSettingTab(tab) {
                         <label class="block text-xs font-medium text-slate-700">Full name<input id="prof-name" class="corp-input mt-1" value="${esc(me.name)}" required></label>
                         <label class="block text-xs font-medium text-slate-700">Email<input id="prof-email" type="email" class="corp-input mt-1" value="${esc(me.email || '')}"></label>
                         <label class="block text-xs font-medium text-slate-700">Phone<input id="prof-phone" class="corp-input mt-1" value="${esc(me.phone || '')}"></label>
-                        <label class="block text-xs font-medium text-slate-700">Job title<input id="prof-role" class="corp-input mt-1" value="${esc(me.role || '')}"></label>
+                        <label class="block text-xs font-medium text-slate-700">Job title<input id="prof-title" class="corp-input mt-1" value="${esc(me.title || '')}" placeholder="e.g. Senior Telecaller"></label>
                     </div>
                     <p class="text-[11px] text-slate-500">Renaming yourself moves every lead, task and policy you own to the new name.</p>
                     <button class="px-4 py-2 bg-slate-900 text-white rounded text-xs font-semibold">Save profile</button>
                 </form>
                 ${me.directReports.length ? `<div><h4 class="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Reports to me</h4>
-                    <div class="space-y-1">${me.directReports.map(r => `<div class="text-xs border border-slateBorder rounded px-2.5 py-1.5">${esc(r.name)} <span class="text-slate-400">· ${esc(r.role || '')}</span></div>`).join('')}</div></div>` : ''}
-                <div class="pt-3 border-t border-slateBorder">
-                    <label class="block text-xs font-medium text-slate-700">Viewing the CRM as
-                        <span class="block text-[11px] font-normal text-slate-500 mb-1">Until individual sign-ins are rolled out to your team, this decides whose name new work is recorded under.</span>
-                        <select class="corp-input" onchange="switchActiveUser(this.value)">
-                            ${users.map(u => `<option value="${esc(u.id)}" ${u.id === me.id ? 'selected' : ''}>${esc(u.name)}${u.status === 'Inactive' ? ' (inactive)' : ''}</option>`).join('')}
-                        </select>
-                    </label>
-                </div>
+                    <div class="space-y-1">${me.directReports.map(r => `<div class="text-xs border border-slateBorder rounded px-2.5 py-1.5">${esc(r.name)} <span class="text-slate-400">· ${esc(roleLine(r))}</span></div>`).join('')}</div></div>` : ''}
             </div>`;
     } else if (tab === 'users') {
         const [users, leads] = await Promise.all([apiJson('/api/users'), apiJson('/api/leads')]);
         if (!stillCurrent()) return;
-        const load = name => leads.filter(l => l.assignedTo === name && !['Won', 'Lost'].includes(l.status)).length;
+        const load = name => leads.filter(l => l.assignedTo === name && isOpenLead(l)).length;
         pane.innerHTML = `
             <div class="space-y-4">
                 <div class="flex items-start justify-between gap-3">
@@ -2183,7 +3698,7 @@ async function switchSettingTab(tab) {
                                 <div class="w-8 h-8 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center text-[10px] font-semibold shrink-0">${esc(getInitials(u.name))}</div>
                                 <div class="min-w-0">
                                     <div class="text-xs font-semibold text-slate-900 truncate">${esc(u.name)} ${u.status === 'Inactive' ? '<span class="text-[10px] text-slate-400">(inactive)</span>' : ''}</div>
-                                    <div class="text-[11px] text-slate-500 truncate">${esc(u.role || '')}${u.email ? ` · ${esc(u.email)}` : ''} · ${load(u.name)} open leads</div>
+                                    <div class="text-[11px] text-slate-500 truncate">${esc(roleLine(u))}${u.email ? ` · ${esc(u.email)}` : ''} · ${load(u.name)} open leads</div>
                                 </div>
                             </div>
                             <div class="flex items-center gap-2 shrink-0 text-[11px] font-semibold">
@@ -2222,68 +3737,11 @@ async function switchSettingTab(tab) {
                 <div class="space-y-1.5">${data.tree.map(n => node(n, 0)).join('') || '<p class="text-xs text-slate-400">No active users.</p>'}</div>
                 <p class="text-[11px] text-slate-500 border-t border-slateBorder pt-3">Use <strong>Move</strong> to place someone under a manager. Reporting loops are refused.</p>
             </div>`;
-    } else if (tab === 'rules') {
-        const [rules, opts] = await Promise.all([apiJson('/api/assignment-rules'), apiJson('/api/assignment-rules/options')]);
-        if (!stillCurrent()) return;
-        window.crmRuleOptions = opts;
-        const methodLabel = m => (opts.methods.find(x => x.method === m) || {}).label || m;
-        const readable = r => (r.conditions || []).length
-            ? (r.conditions || []).map(c => {
-                const f = (opts.fields.find(x => x.field === c.field) || {}).label || c.field;
-                const o = (opts.operators.find(x => x.op === c.operator) || {}).label || c.operator;
-                return `${f} ${o}${c.value ? ` “${c.value}”` : ''}`;
-              }).join(' and ')
-            : 'Every new enquiry';
-        pane.innerHTML = `
-            <div class="space-y-4">
-                <div class="flex items-start justify-between gap-3">
-                    <div>
-                        <h3 class="font-semibold text-slate-900 text-sm">Assignment rules</h3>
-                        <p class="text-xs text-slate-500 mt-0.5">Decide who new enquiries go to automatically. Rules are checked top to bottom and the first match wins — anything unmatched is balanced across the team as usual.</p>
-                    </div>
-                    <button onclick="editAssignmentRule()" class="px-3 py-1.5 bg-slate-900 text-white rounded text-xs font-semibold shrink-0">New rule</button>
-                </div>
-                <div class="space-y-2">
-                    ${rules.map((r, i) => `
-                        <div class="rule-card ${r.enabled === false ? 'is-off' : ''}">
-                            <div class="flex items-start justify-between gap-3">
-                                <div class="min-w-0">
-                                    <div class="flex items-center gap-2 flex-wrap">
-                                        <span class="rule-order">${i + 1}</span>
-                                        <strong class="text-xs text-slate-900">${esc(r.name)}</strong>
-                                        ${r.enabled === false ? '<span class="rule-pill">Off</span>' : ''}
-                                        ${r.matchCount ? `<span class="rule-pill is-count">${r.matchCount} assigned</span>` : ''}
-                                    </div>
-                                    <p class="text-[11.5px] text-slate-600 mt-1.5 leading-relaxed">
-                                        <span class="text-slate-400">When</span> ${esc(readable(r))}
-                                        <span class="text-slate-400">→ give it to</span> ${esc((r.assignees || []).join(', '))}
-                                        <span class="text-slate-400">(${esc(methodLabel(r.method).toLowerCase())})</span>
-                                        ${r.createTask ? `<br><span class="text-slate-400">and raise a task:</span> ${esc(r.taskTitle || 'Follow up')} in ${r.taskDueInDays || 1} day(s)` : ''}
-                                        ${(r.days || []).length ? `<br><span class="text-slate-400">only on:</span> ${esc((r.days || []).join(', '))}` : ''}
-                                    </p>
-                                </div>
-                                <div class="flex flex-col items-end gap-1.5 shrink-0 text-[11px] font-semibold">
-                                    <div class="flex gap-1">
-                                        <button onclick="moveRule('${r.id}','up')" title="Higher priority" class="rule-move">↑</button>
-                                        <button onclick="moveRule('${r.id}','down')" title="Lower priority" class="rule-move">↓</button>
-                                    </div>
-                                    <button onclick="toggleRule('${r.id}', ${r.enabled === false})" class="text-slate-700">${r.enabled === false ? 'Turn on' : 'Turn off'}</button>
-                                    <button onclick="editAssignmentRule('${r.id}')" class="text-slate-700">Edit</button>
-                                    <button onclick="deleteRule('${r.id}')" class="text-rose-600">Delete</button>
-                                </div>
-                            </div>
-                        </div>`).join('') || `<div class="border border-dashed border-slate-300 rounded p-6 text-center">
-                            <p class="text-xs text-slate-600">No rules yet — every enquiry is shared evenly across the team.</p>
-                            <p class="text-[11px] text-slate-400 mt-1">A first rule might be: fleet enquiries go to your motor specialist.</p>
-                        </div>`}
-                </div>
-                ${rules.length ? `<button onclick="testAssignmentRules()" class="text-[11px] font-semibold text-slate-700 underline">Test with an example enquiry</button>` : ''}
-            </div>`;
     } else if (tab === 'team') {
         const [users, leads] = await Promise.all([apiJson('/api/users'), apiJson('/api/leads')]);
         if (!stillCurrent()) return;
-        const active = users.filter(u => (u.status || 'Active') === 'Active' && u.role !== 'System Administrator');
-        const openLeads = leads.filter(l => !['Won', 'Lost'].includes(l.status));
+        const active = users.filter(u => (u.status || 'Active') === 'Active' && !['admin', 'readonly'].includes(u.role));
+        const openLeads = leads.filter(isOpenLead);
         const countFor = name => openLeads.filter(l => l.assignedTo === name).length;
         const most = Math.max(1, ...active.map(u => countFor(u.name)));
         pane.innerHTML = `
@@ -2293,7 +3751,7 @@ async function switchSettingTab(tab) {
                     <p class="text-xs text-slate-500 mt-0.5">Invite login users, control their role and balance inbound work.</p></div>
                     <button onclick="createTeamUser()" class="px-3 py-1.5 bg-slate-900 text-white rounded text-xs font-semibold">Add user</button>
                 </div>
-                <div class="border border-slateBorder rounded divide-y">${users.map(u=>`<div class="p-2.5 flex items-center justify-between gap-3"><div><strong class="text-xs">${esc(u.name)}</strong><div class="text-[11px] text-slate-500">${esc(u.email||'No login email')} · ${esc(u.role)} · ${esc(u.status||'Active')}</div></div>${u.status!=='Inactive'?`<button onclick="deactivateTeamUser('${u.id}')" class="text-[11px] font-semibold text-rose-700">Deactivate</button>`:''}</div>`).join('')}</div>
+                <div class="border border-slateBorder rounded divide-y">${users.map(u=>`<div class="p-2.5 flex items-center justify-between gap-3"><div><strong class="text-xs">${esc(u.name)}</strong><div class="text-[11px] text-slate-500">${esc(u.email||'No login email')} · ${esc(roleLine(u))} · ${esc(u.status||'Active')}</div></div>${u.status!=='Inactive'?`<button onclick="deactivateTeamUser('${u.id}')" class="text-[11px] font-semibold text-rose-700">Deactivate</button>`:''}</div>`).join('')}</div>
                 <div class="p-3 bg-slate-50 border border-slateBorder rounded text-xs flex items-center justify-between">
                     <span>Status: <strong>Active (Round-Robin)</strong></span>
                     <span class="text-[11px] text-slate-500">Each new enquiry goes to whoever holds the fewest open leads</span>
@@ -2442,161 +3900,9 @@ async function switchSettingTab(tab) {
         const [archived,records]=await Promise.all([apiJson('/api/archived-leads'),apiJson('/api/archived-records')]);
         pane.innerHTML=`<div class="space-y-3"><h3 class="font-semibold text-sm">Archive & restore</h3><p class="text-xs text-slate-500">Restore records without losing their identity. Deleted-lead notes remain retained separately.</p>${archived.map(l=>`<div class="border rounded p-3 flex justify-between"><div><strong>${esc(l.name)}</strong><div class="text-xs text-slate-500">Lead · ${esc(l.organization)} · ${esc(l.archivedReason||'Archived')}</div></div><button onclick="restoreLead('${l.id}')" class="text-xs font-semibold">Restore</button></div>`).join('')}${records.map(x=>`<div class="border rounded p-3 flex justify-between"><div><strong>${esc(x.record?.name||x.record?.customerName||x.record?.policyNumber||x.record?.dealName||x.archiveId)}</strong><div class="text-xs text-slate-500">${esc(x.sourceCollection)} · ${esc(x.archivedAt)}</div></div><button onclick="restoreOperationalRecord('${x.archiveId}')" class="text-xs font-semibold">Restore</button></div>`).join('')||(!archived.length?'<p class="text-xs text-slate-400">No archived records.</p>':'')}</div>`;
     } else if (tab === 'reports') {
-        const [report,backups]=await Promise.all([apiJson('/api/reports/operations'),apiJson('/api/backups')]);
-        pane.innerHTML=`<div class="space-y-4"><div class="flex justify-between"><div><h3 class="font-semibold text-sm">Operations report</h3><p class="text-xs text-slate-500">Conversion, retention, employee workload and overdue work.</p></div><button onclick="createSystemBackup()" class="px-3 py-1.5 bg-slate-900 text-white rounded text-xs">Create backup</button></div><div class="grid grid-cols-3 gap-3"><div class="border rounded p-3"><small>Conversion</small><strong class="block text-xl">${report.conversionRate}%</strong></div><div class="border rounded p-3"><small>Renewal retention</small><strong class="block text-xl">${report.renewal.retentionRate}%</strong></div><div class="border rounded p-3"><small>Overdue tasks</small><strong class="block text-xl">${report.overdueTasks}</strong></div></div><div><strong class="text-xs">Employee activity</strong>${Object.entries(report.employeeActivity).map(([name,x])=>`<div class="text-xs border-b py-2 flex justify-between"><span>${esc(name)}</span><span>${x.leads} leads · ${x.won} won · ${x.openTasks} open tasks</span></div>`).join('')}</div><div><strong class="text-xs">Available backups</strong>${backups.map(b=>`<div class="text-xs py-2">${esc(b.name)} · ${Math.ceil(b.size/1024)} KB</div>`).join('')||'<p class="text-xs text-slate-400 mt-2">No backups created.</p>'}</div></div>`;
+        const backups = await apiJson('/api/backups');
+        pane.innerHTML=`<div class="space-y-4"><div class="flex justify-between gap-3"><div><h3 class="font-semibold text-sm">Backups</h3><p class="text-xs text-slate-500">Reports on leads, sources and the sales funnel are on the <button class="underline" onclick="closeSettingsModal(); switchView('reports')">Reports</button> screen; each telecaller's figures are under <button class="underline" onclick="closeSettingsModal(); switchView('performance')">Performance</button>.</p></div><button onclick="createSystemBackup()" class="px-3 py-1.5 bg-slate-900 text-white rounded text-xs shrink-0">Create backup</button></div><div>${backups.map(b=>`<div class="text-xs py-2 border-b border-slate-100">${esc(b.name)} · ${Math.ceil(b.size/1024)} KB</div>`).join('')||'<p class="text-xs text-slate-400 mt-2">No backups created.</p>'}</div></div>`;
     }
-}
-
-// ── Assignment rules ────────────────────────────────────────────────
-// Written as one plain sentence — "When X, give it to Y" — rather than the
-// condition-builder grid this kind of feature usually turns into.
-let ruleDraft = { conditions: [], assignees: [], days: [] };
-
-async function editAssignmentRule(id) {
-    const opts = window.crmRuleOptions || await apiJson('/api/assignment-rules/options');
-    window.crmRuleOptions = opts;
-    const existing = id ? (await apiJson('/api/assignment-rules')).find(r => r.id === id) : null;
-    ruleDraft = {
-        id, name: existing?.name || '', conditions: JSON.parse(JSON.stringify(existing?.conditions || [])),
-        assignees: [...(existing?.assignees || [])], method: existing?.method || 'least_busy',
-        days: [...(existing?.days || [])], createTask: existing?.createTask || false,
-        taskTitle: existing?.taskTitle || '', taskDueInDays: existing?.taskDueInDays || 1
-    };
-    renderRuleForm();
-}
-
-function renderRuleForm() {
-    const opts = window.crmRuleOptions;
-    const form = document.getElementById('insurance-dynamic-form');
-    document.getElementById('insurance-form-title').textContent = ruleDraft.id ? 'Edit rule' : 'New assignment rule';
-    const d = ruleDraft;
-
-    form.innerHTML = `
-        <label class="block">
-            <span class="block text-xs font-medium text-slate-700 mb-1">Name this rule</span>
-            <input id="rule-name" class="corp-input" value="${esc(d.name)}" placeholder="Fleet enquiries to the motor team" required>
-        </label>
-
-        <div class="rule-sentence">
-            <div class="rule-line"><span class="rule-word">When</span>
-                <span class="text-[11.5px] text-slate-500">${d.conditions.length ? 'an enquiry matches all of these' : 'any new enquiry arrives'}</span>
-            </div>
-            <div class="space-y-2 mt-2">
-                ${d.conditions.map((c, i) => `
-                    <div class="rule-cond">
-                        <select class="corp-input text-xs py-1" onchange="updateCondition(${i},'field',this.value)">
-                            ${opts.fields.map(f => `<option value="${f.field}" ${c.field === f.field ? 'selected' : ''}>${esc(f.label)}</option>`).join('')}
-                        </select>
-                        <select class="corp-input text-xs py-1" onchange="updateCondition(${i},'operator',this.value)">
-                            ${opts.operators.map(o => `<option value="${o.op}" ${c.operator === o.op ? 'selected' : ''}>${esc(o.label)}</option>`).join('')}
-                        </select>
-                        <input class="corp-input text-xs py-1" value="${esc(c.value || '')}" placeholder="value"
-                               ${c.operator === 'is_empty' ? 'disabled' : ''} onchange="updateCondition(${i},'value',this.value)">
-                        <button type="button" onclick="removeCondition(${i})" class="rule-x" title="Remove">✕</button>
-                    </div>`).join('')}
-            </div>
-            <button type="button" onclick="addCondition()" class="rule-add">+ Add a condition</button>
-
-            <div class="rule-line mt-3"><span class="rule-word">Give it to</span></div>
-            <div class="rule-people">
-                ${opts.people.map(p => `
-                    <label class="rule-person ${d.assignees.includes(p) ? 'is-on' : ''}">
-                        <input type="checkbox" ${d.assignees.includes(p) ? 'checked' : ''} onchange="togglePerson('${esc(p)}')"> ${esc(p)}
-                    </label>`).join('')}
-            </div>
-            <div class="rule-line mt-3"><span class="rule-word">Choosing</span>
-                <select id="rule-method" class="corp-input text-xs py-1 max-w-[280px]">
-                    ${opts.methods.map(m => `<option value="${m.method}" ${d.method === m.method ? 'selected' : ''}>${esc(m.label)}</option>`).join('')}
-                </select>
-            </div>
-        </div>
-
-        <details class="advanced-block">
-            <summary>Optional — follow-up task and active days</summary>
-            <div class="space-y-3 pt-3">
-                <label class="flex items-center gap-2 text-xs text-slate-700">
-                    <input type="checkbox" id="rule-task" ${d.createTask ? 'checked' : ''} class="rounded" onchange="document.getElementById('rule-task-fields').classList.toggle('hidden', !this.checked)">
-                    Also raise a follow-up task for whoever gets it
-                </label>
-                <div id="rule-task-fields" class="grid grid-cols-3 gap-2 ${d.createTask ? '' : 'hidden'}">
-                    <input id="rule-task-title" class="corp-input col-span-2 text-xs" value="${esc(d.taskTitle)}" placeholder="Call the new enquiry">
-                    <input id="rule-task-days" type="number" min="0" max="30" class="corp-input text-xs" value="${d.taskDueInDays}" title="Due in days">
-                </div>
-                <div>
-                    <span class="block text-xs font-medium text-slate-700 mb-1">Only active on these days <span class="font-normal text-slate-400">(leave all off for every day)</span></span>
-                    <div class="rule-people">
-                        ${opts.days.map(day => `<label class="rule-person ${d.days.includes(day) ? 'is-on' : ''}">
-                            <input type="checkbox" ${d.days.includes(day) ? 'checked' : ''} onchange="toggleDay('${day}')"> ${day.slice(0, 3)}</label>`).join('')}
-                    </div>
-                </div>
-            </div>
-        </details>
-
-        <div class="pt-3 border-t border-slateBorder flex flex-wrap justify-end gap-2">
-            <button type="button" onclick="closeInsuranceForm()" class="px-3 py-1.5 border border-slate-300 rounded text-xs">Cancel</button>
-            <button type="submit" class="px-4 py-1.5 bg-slate-900 text-white rounded text-xs font-semibold">${ruleDraft.id ? 'Save rule' : 'Create rule'}</button>
-        </div>`;
-
-    form.onsubmit = async e => {
-        e.preventDefault();
-        const body = {
-            name: document.getElementById('rule-name').value.trim(),
-            conditions: ruleDraft.conditions.filter(c => c.field && c.operator),
-            assignees: ruleDraft.assignees, method: document.getElementById('rule-method').value,
-            days: ruleDraft.days, createTask: document.getElementById('rule-task').checked,
-            taskTitle: document.getElementById('rule-task-title').value.trim(),
-            taskDueInDays: Number(document.getElementById('rule-task-days').value || 1)
-        };
-        try {
-            if (ruleDraft.id) await apiJson(`/api/assignment-rules/${ruleDraft.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-            else await apiJson('/api/assignment-rules', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-            closeInsuranceForm(); showToast('Rule saved'); switchSettingTab('rules');
-        } catch (err) { showToast(err.message); }
-    };
-    document.getElementById('insurance-form-modal').classList.remove('hidden');
-}
-
-function addCondition() { ruleDraft.conditions.push({ field: 'policyType', operator: 'contains', value: '' }); renderRuleForm(); }
-function removeCondition(i) { ruleDraft.conditions.splice(i, 1); renderRuleForm(); }
-function updateCondition(i, key, value) {
-    ruleDraft.conditions[i][key] = value;
-    if (key === 'operator') renderRuleForm();
-}
-function togglePerson(name) {
-    const at = ruleDraft.assignees.indexOf(name);
-    at === -1 ? ruleDraft.assignees.push(name) : ruleDraft.assignees.splice(at, 1);
-    renderRuleForm();
-}
-function toggleDay(day) {
-    const at = ruleDraft.days.indexOf(day);
-    at === -1 ? ruleDraft.days.push(day) : ruleDraft.days.splice(at, 1);
-    renderRuleForm();
-}
-
-async function toggleRule(id, enable) {
-    await apiJson(`/api/assignment-rules/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: enable }) });
-    switchSettingTab('rules');
-}
-async function moveRule(id, direction) {
-    await apiJson(`/api/assignment-rules/${id}/move`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ direction }) });
-    switchSettingTab('rules');
-}
-async function deleteRule(id) {
-    if (!confirm('Delete this rule? Enquiries it would have caught go back to being balanced across the team.')) return;
-    await apiJson(`/api/assignment-rules/${id}`, { method: 'DELETE' });
-    switchSettingTab('rules');
-}
-
-function testAssignmentRules() {
-    openInsuranceForm('Test with an example enquiry', [
-        ['policyType', 'Policy category', 'text', false],
-        ['source', 'Where it came from', 'text', false],
-        ['territory', 'Territory', 'text', false],
-        ['premium', 'Premium', 'text', false]
-    ], async v => {
-        const r = await apiJson('/api/assignment-rules/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(v) });
-        showToast(r.explanation);
-    }, { policyType: 'Commercial Fleet Motor' });
 }
 
 // ── Profile, users & hierarchy actions ──────────────────────────────
@@ -2606,19 +3912,20 @@ async function saveProfile(event) {
         body: JSON.stringify({ name: document.getElementById('prof-name').value.trim(),
             email: document.getElementById('prof-email').value.trim(),
             phone: document.getElementById('prof-phone').value.trim(),
-            role: document.getElementById('prof-role').value.trim() }) });
+            title: document.getElementById('prof-title').value.trim() }) });
     showToast('Profile saved'); await loadBrokerRoster(); switchSettingTab('profile');
 }
 
-async function switchActiveUser(id) {
-    await apiJson('/api/profile', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ currentUserId: id }) });
-    showToast('Switched user'); switchSettingTab('profile');
-}
+// The four roles. Permission comes only from these; a job title is display text.
+const ROLES = { admin: 'Owner / Admin', manager: 'Manager', telecaller: 'Telecaller', readonly: 'Read-only' };
+const ROLE_PICKER = 'selectpairs:' + Object.entries(ROLES).map(([k, l]) => `${k}::${l}`).join('|');
+const roleLabel = u => ROLES[u?.role] || u?.role || '';
+const roleLine = u => [roleLabel(u), u?.title].filter(Boolean).join(' · ');
 
 function addUser() {
-    openInsuranceForm('Add user', [['name', 'Full name', 'text', true], ['email', 'Email', 'email', false],
-        ['role', 'Job title', 'text', false]], async v => {
+    openInsuranceForm('Add user', [['name', 'Full name', 'text', true], ['email', 'Work email', 'email', true],
+        ['role', 'Role', ROLE_PICKER, true], ['title', 'Job title (optional)', 'text', false],
+        ['temporaryPassword', 'Temporary password (12+ characters)', 'password', true]], async v => {
         await apiJson('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(v) });
         await loadBrokerRoster(); switchSettingTab('users');
     });
@@ -2627,7 +3934,8 @@ function addUser() {
 async function editUser(id) {
     const user = (await apiJson('/api/users')).find(u => u.id === id);
     openInsuranceForm('Edit user', [['name', 'Full name', 'text', true], ['email', 'Email', 'email', false],
-        ['role', 'Job title', 'text', false], ['status', 'Status', 'select:Active|Inactive', true]], async v => {
+        ['role', 'Role', ROLE_PICKER, true], ['title', 'Job title (optional)', 'text', false],
+        ['status', 'Status', 'select:Active|Inactive', true]], async v => {
         await apiJson(`/api/users/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(v) });
         await loadBrokerRoster(); switchSettingTab('users');
     }, user);
@@ -2796,7 +4104,7 @@ function editCommunicationTemplate(id){const item=(window.crmCommunicationTempla
 async function archiveTemplate(id){await apiJson(`/api/communication-templates/${id}`,{method:'DELETE'});showToast('Template archived and removed from Send message');await switchSettingTab('templates')}
 async function restoreTemplate(id){await apiJson(`/api/communication-templates/${id}/restore`,{method:'POST'});showToast('Template restored');await switchSettingTab('templates')}
 async function deleteTemplatePermanently(id){if(!confirm('Permanently delete this archived template? This cannot be undone.'))return;await apiJson(`/api/communication-templates/${id}?permanent=true`,{method:'DELETE'});showToast('Archived template permanently deleted');await switchSettingTab('templates')}
-function createTeamUser(){openInsuranceForm('Add CRM user',[['name','Full name','text',true],['email','Work email','email',true],['role','Role','select:Sales Executive|Senior Sales Executive|Account Manager|Manager|Read-only Auditor',true],['temporaryPassword','Temporary password','password',true]],async values=>{await apiJson('/api/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(values)});await loadBrokerRoster();switchSettingTab('team')})}
+function createTeamUser(){openInsuranceForm('Add CRM user',[['name','Full name','text',true],['email','Work email','email',true],['role','Role',ROLE_PICKER,true],['title','Job title (optional)','text',false],['temporaryPassword','Temporary password','password',true]],async values=>{await apiJson('/api/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(values)});await loadBrokerRoster();switchSettingTab('team')})}
 async function deactivateTeamUser(id){if(!confirm('Deactivate this login? Historical ownership is retained and open work must be reassigned.'))return;await apiJson(`/api/users/${id}`,{method:'DELETE'});showToast('User deactivated');await switchSettingTab('team')}
 async function saveCrmConfiguration(e){e.preventDefault();const lines=id=>document.getElementById(id).value.split('\n').map(x=>x.trim()).filter(Boolean);await apiJson('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({crm:{leadStages:lines('config-stages'),insuranceProducts:lines('config-products'),insurers:lines('config-insurers'),companyTimezone:document.getElementById('config-timezone').value,upcomingReminderMinutes:Number(document.getElementById('config-reminder-minutes').value)}})});showToast('CRM configuration saved')}
 async function restoreLead(id){await apiJson(`/api/archived-leads/${id}/restore`,{method:'POST'});await switchSettingTab('archive');showToast('Lead restored')}
@@ -3180,7 +4488,7 @@ async function editChannelMapping(id) {
 }
 
 // ── Sending a message to a client ────────────────────────────────────
-async function openSendMessage(leadId) {
+async function openSendMessage(leadId, draft = '') {
     const [opts, lead] = await Promise.all([
         apiJson(`/api/leads/${leadId}/message-options`),
         apiJson(`/api/leads/${leadId}`)
@@ -3265,6 +4573,12 @@ async function openSendMessage(leadId) {
         } catch (err) { showToast(err.message); }
     };
     document.getElementById('insurance-form-modal').classList.remove('hidden');
+    if (draft) {
+        const channel = document.getElementById('msg-channel');
+        const whatsapp = [...channel.options].find(o => o.value.toLowerCase() === 'whatsapp');
+        if (whatsapp) channel.value = whatsapp.value;
+        document.getElementById('msg-content').value = draft;
+    }
     updateMessageChannel();
 }
 
@@ -3653,16 +4967,34 @@ async function handleAdvisorSubmit(e) {
 // UTILITIES
 // ═══════════════════════════════════════════════════════════════════
 function stagePillClass(stage) {
-    switch (stage) {
-        case 'New': return 'bg-slate-100 text-slate-800 border border-slate-200';
-        case 'Contacted': return 'bg-blue-50 text-blue-800 border border-blue-200';
-        case 'Risk / Underwriting': return 'bg-amber-50 text-amber-800 border border-amber-200';
-        case 'Quotation Sent': return 'bg-purple-50 text-purple-800 border border-purple-200';
-        case 'Won': return 'bg-emerald-50 text-emerald-900 border border-emerald-300 font-semibold';
-        case 'Lost': return 'bg-rose-50 text-rose-800 border border-rose-200';
-        default: return 'bg-slate-100 text-slate-700';
-    }
+    const palette = {
+        'New': 'bg-slate-100 text-slate-800 border border-slate-200',
+        'Assigned': 'bg-slate-100 text-slate-800 border border-slate-200',
+        'Contacted': 'bg-blue-50 text-blue-800 border border-blue-200',
+        'Follow-up': 'bg-blue-50 text-blue-800 border border-blue-200',
+        'Call Later': 'bg-blue-50 text-blue-800 border border-blue-200',
+        'Interested': 'bg-violet-50 text-violet-800 border border-violet-200',
+        'Quote Sent': 'bg-violet-50 text-violet-800 border border-violet-200',
+        'Documents Pending': 'bg-amber-50 text-amber-800 border border-amber-200',
+        'Policy Sold': 'bg-emerald-50 text-emerald-900 border border-emerald-300 font-semibold',
+        'Unreachable': 'bg-orange-50 text-orange-800 border border-orange-200',
+        'Wrong Number': 'bg-orange-50 text-orange-800 border border-orange-200',
+        'Not Interested': 'bg-rose-50 text-rose-800 border border-rose-200',
+        'Lost': 'bg-rose-50 text-rose-800 border border-rose-200',
+    };
+    return palette[stage] || 'bg-slate-100 text-slate-700';
 }
+
+// Calling priority is shown as a word, not colour alone.
+function priorityBadge(lead) {
+    const p = (lead.leadPriority || '').toUpperCase();
+    const cls = { HOT: 'bg-rose-50 text-rose-700 border-rose-200', WARM: 'bg-amber-50 text-amber-800 border-amber-200',
+        COLD: 'bg-slate-50 text-slate-600 border-slate-200' }[p];
+    return cls ? `<span class="inline-block px-1.5 py-0.5 rounded border text-[10px] font-bold tracking-wider ${cls}" title="Calling priority">${p}</span>`
+        : '<span class="text-slate-300">—</span>';
+}
+
+const productLine = l => [l.product || l.policyType || 'Product not set', l.city].filter(Boolean).join(' · ');
 
 function getCategoryColor(cat) {
     switch (cat) {

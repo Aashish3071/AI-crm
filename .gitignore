@@ -16,3 +16,14 @@ __pycache__/
 .DS_Store
 uvicorn.log
 node_modules/
+
+# Identity stores and their backups hold password hashes — never versioned
+crm_identity*.json
+# iCloud conflict copies of runtime state
+crm_db *.json
+crm_db.json *.lock
+# Local scratch and tool output
+output/
+tmp/
+test_output.log
+.agents/

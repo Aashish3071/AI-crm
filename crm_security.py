@@ -197,7 +197,7 @@ def bootstrap_company(company_name: str, admin_name: str, email: str, password: 
     user_id = f"USR_{uuid.uuid4().hex[:12]}"
     company = {"id": company_id, "name": company_name.strip(), "status": "Active", "createdAt": int(time.time())}
     user = {"id": user_id, "companyId": company_id, "name": admin_name.strip(), "email": email.strip().lower(),
-            "role": "Administrator", "status": "Active", "passwordHash": _password_hash(password),
+            "role": "admin", "status": "Active", "passwordHash": _password_hash(password),
             "createdAt": int(time.time()), "passwordChangedAt": int(time.time())}
     store["companies"].append(company)
     store["users"].append(user)
@@ -232,7 +232,7 @@ def create_identity_user(company_id: str, name: str, email: str, role: str, pass
     if not any(c.get("id") == company_id and c.get("status") == "Active" for c in store["companies"]):
         raise ValueError("Company was not found")
     user = {"id": f"USR_{uuid.uuid4().hex[:12]}", "companyId": company_id, "name": name.strip(),
-            "email": normalized, "role": role, "status": "Active", "passwordHash": _password_hash(password),
+            "email": normalized, "role": validate_role(role), "status": "Active", "passwordHash": _password_hash(password),
             "createdAt": int(time.time()), "passwordChangedAt": int(time.time())}
     store["users"].append(user)
     _save_identities(store)
@@ -246,7 +246,7 @@ def update_identity_user(user_id: str, company_id: str, changes: Dict[str, Any])
         return None
     for key in ["name", "role", "status"]:
         if key in changes:
-            user[key] = changes[key]
+            user[key] = validate_role(changes[key]) if key == "role" else changes[key]
     if changes.get("password"):
         error = password_policy(changes["password"])
         if error:
@@ -304,37 +304,71 @@ def current_actor(fallback: str = "System") -> str:
     return user.get("name", fallback) if user else fallback
 
 
+# The four roles a person can hold. Permission comes only from these keys; a job title
+# such as "Senior Sales Executive" is display text and grants nothing.
+ROLES = {
+    "admin": "Owner / Admin",
+    "manager": "Manager",
+    "telecaller": "Telecaller",
+    "readonly": "Read-only",
+}
+
+# Exact spellings already stored by earlier versions. Matching is exact on purpose: the
+# previous substring rules turned any title containing "senior" or "lead" into a manager.
+_LEGACY_ROLES = {
+    "administrator": "admin", "system administrator": "admin", "owner": "admin",
+    "owner / admin": "admin", "owner/admin": "admin",
+    "team manager": "manager", "sales manager": "manager",
+    "broker": "telecaller", "agent": "telecaller", "sales executive": "telecaller",
+    "senior sales executive": "telecaller", "account manager": "telecaller",
+    "corporate renewal specialist": "telecaller",
+    "read-only": "readonly", "read only": "readonly", "read-only auditor": "readonly",
+    "auditor": "readonly", "viewer": "readonly",
+}
+
+
 def normalized_role(role: str) -> str:
-    value = (role or "").lower()
-    if "admin" in value:
-        return "admin"
-    if "manager" in value or "lead" in value or "senior" in value:
-        return "manager"
-    if "read" in value or "viewer" in value or "auditor" in value:
-        return "readonly"
-    return "broker"
+    """Map a stored role to its permission level. Unknown values never gain privilege."""
+    value = (role or "").strip().lower()
+    if value in ROLES:
+        return value
+    return _LEGACY_ROLES.get(value, "telecaller")
+
+
+def validate_role(role: str) -> str:
+    """Return the canonical key for a role being written, or raise for an unknown one."""
+    value = (role or "").strip().lower()
+    if value in ROLES:
+        return value
+    if value in _LEGACY_ROLES:
+        return _LEGACY_ROLES[value]
+    labels = {label.lower(): key for key, label in ROLES.items()}
+    if value in labels:
+        return labels[value]
+    raise ValueError(f"Role must be one of: {', '.join(ROLES.values())}")
 
 
 def may_mutate_path(role: str, path: str) -> bool:
     level = normalized_role(role)
     if level == "readonly":
         return False
-    admin_only = ("/api/users", "/api/settings", "/api/backups", "/api/admin")
+    admin_only = ("/api/users", "/api/settings", "/api/backups", "/api/admin", "/api/automations", "/api/commission",
+                  "/api/incentives", "/api/recognition")
     if path.startswith(admin_only):
         return level == "admin"
     # /api/leads/import is the legacy bulk path; it must carry the same permission as /api/imports.
-    management_only = ("/api/channels", "/api/imports", "/api/leads/import", "/api/assignment-rules")
+    management_only = ("/api/channels", "/api/imports", "/api/leads/import", "/api/assignment-rules", "/api/records", "/api/archived-records")
     if path.startswith(management_only):
         return level in {"admin", "manager"}
-    return level in {"admin", "manager", "broker"}
+    return level in {"admin", "manager", "telecaller"}
 
 
 def may_read_path(role: str, path: str) -> bool:
     level = normalized_role(role)
-    if path.startswith(("/api/backups", "/api/admin")):
+    if path.startswith(("/api/backups", "/api/admin", "/api/commission")):
         return level == "admin"
-    if path.startswith("/api/audit-logs"):
+    if path.startswith(("/api/leaderboard", "/api/reports")):
+        return level in {"admin", "manager", "readonly"}
+    if path.startswith(("/api/audit-logs", "/api/channel-events", "/api/archived-records", "/api/automations")):
         return level in {"admin", "manager"}
-    if path.startswith("/api/channel-events"):
-        return level in {"admin", "manager"}
-    return level in {"admin", "manager", "broker", "readonly"}
+    return level in {"admin", "manager", "telecaller", "readonly"}

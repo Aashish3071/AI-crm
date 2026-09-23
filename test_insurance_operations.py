@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi.testclient import TestClient
 
+import crm_test_isolation  # noqa: F401  (must precede app imports; keeps tests off live data)
 import pipecat_server as server
 
 
@@ -176,7 +177,7 @@ class InsuranceOperationsTests(unittest.TestCase):
         self.assertEqual(deleted.status_code, 200)
         self.assertGreaterEqual(deleted.json()["affected"]["notesArchived"], 1)
         self.assertEqual(self.client.get(f"/api/leads/{lead['id']}").status_code, 404)
-        notes = self.client.get("/api/notes").json()
+        notes = self.client.get("/api/notes?includeArchived=true").json()
         archived = [n for n in notes if n.get("archivedLeadId") == lead["id"]]
         self.assertTrue(archived and all(n["archived"] for n in archived))
         archived_event = next(event for event in server.load_db()["calendarEvents"] if event["id"] == appointment["id"])
@@ -234,6 +235,9 @@ class InsuranceOperationsTests(unittest.TestCase):
     def test_policy_document_checklist_and_notification_workflow(self):
         lead = self.client.post("/api/leads", json={"firstName":"Issue","lastName":"Flow","mobile":"+919900000003","expiryDate":"2027-01-01"}).json()
         policy = self.client.post(f"/api/leads/{lead['id']}/convert", json={"insurer":"Alpha","startDate":"2026-01-01","expiryDate":"2027-01-01"}).json()["policy"]
+        for dt in ("proposalForm", "kyc", "payment", "schedule"):
+            # A real (minimal) PDF with a file name: uploads are checked for type and contents.
+            self.client.post("/api/documents", json={"associatedType": "Policy", "associatedId": policy["id"], "docType": dt, "filename": f"{dt}.pdf", "content": "JVBERi0xLjQKJSB0ZXN0IGV2aWRlbmNlCg=="})
         incomplete = self.client.post(f"/api/policies/{policy['id']}/issue", json={"policyNumber":"P-1","documentChecklist":{"proposalForm":True,"kyc":True,"payment":False,"schedule":True}})
         self.assertEqual(incomplete.status_code, 422)
         issued = self.client.post(f"/api/policies/{policy['id']}/issue", json={"policyNumber":"P-1","documentChecklist":{"proposalForm":True,"kyc":True,"payment":True,"schedule":True}})

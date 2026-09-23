@@ -100,24 +100,24 @@ class CommercialCrmBrowserFlows(unittest.TestCase):
     def test_dashboard_lead_conversion_and_customer_360(self):
         page = self.page
         page.goto(f"{self.base_url}/", wait_until="networkidle")
-        expect(page.get_by_role("heading", name="Commercial Insurance Operations")).to_be_visible()
+        expect(page.get_by_role("heading", name="Car & Health Insurance")).to_be_visible()
 
         sidebar = page.locator("#app-sidebar")
-        sidebar.get_by_role("button", name="Leads & Accounts", exact=True).click()
+        sidebar.get_by_role("button", name="Leads", exact=True).click()
         page.get_by_role("button", name="New Lead", exact=True).click()
         lead_dialog = page.get_by_role("dialog", name="Create lead")
         expect(lead_dialog).to_be_visible()
 
         name = "Browser Acceptance Client"
         page.locator("#lead-name").fill(name)
-        page.locator("#lead-organization").fill("Browser Acceptance Logistics")
+        page.locator("#lead-product").select_option("Car Insurance")
         page.locator("#lead-mobile").fill("+91 98765 40001")
         page.locator("#lead-email").fill("browser-acceptance@example.invalid")
         page.locator("#lead-premium").fill("125000")
         page.locator("#lead-expiry").fill("2027-09-30")
         page.locator("#lead-next-action").fill("Schedule risk discovery meeting")
         page.locator("#lead-next-action-date").fill("2026-09-10")
-        lead_dialog.get_by_role("button", name="Save Lead").click()
+        lead_dialog.get_by_role("button", name="Save lead").click()
 
         row = page.locator("#leads-table-body tr").filter(has_text=name)
         expect(row).to_have_count(1)
@@ -131,7 +131,7 @@ class CommercialCrmBrowserFlows(unittest.TestCase):
         stage = page.locator("#stage-transition-modal")
         stage.locator("#stage-modal-new-stage").select_option("Contacted")
         stage.locator("#stage-modal-action-date").fill("2026-10-10")
-        stage.get_by_role("button", name="Update Stage & Action", exact=True).click()
+        stage.get_by_role("button", name="Save status", exact=True).click()
         expect(stage).to_be_hidden()
         expect(row.get_by_title("Click to transition stage")).to_have_text("Contacted")
 
@@ -149,17 +149,19 @@ class CommercialCrmBrowserFlows(unittest.TestCase):
         customer_row.get_by_role("button", name="360°", exact=True).click()
         customer_view = page.locator("#customer-360")
         expect(customer_view.get_by_role("heading", name=name)).to_be_visible()
-        expect(customer_view.get_by_role("heading", name="Policies & renewals")).to_be_visible()
+        for block in ("Basic details", "Insurance history", "Call history", "Quotations",      # slide 18's eight blocks
+                      "Documents", "Policies", "Follow-ups", "Notes"):
+            expect(customer_view.locator("h3", has_text=block).first).to_be_visible()
 
     def test_mobile_navigation_and_lead_dialog_remain_usable(self):
         page = self.page
         page.set_viewport_size({"width": 390, "height": 844})
         page.goto(f"{self.base_url}/", wait_until="networkidle")
-        page.locator("#app-sidebar").get_by_role("button", name="Leads & Accounts", exact=True).click()
+        page.locator("#app-sidebar").get_by_role("button", name="Leads", exact=True).click()
         page.get_by_role("button", name="New Lead", exact=True).click()
         dialog = page.get_by_role("dialog", name="Create lead")
         expect(dialog).to_be_visible()
-        expect(dialog.get_by_role("button", name="Save Lead")).to_be_visible()
+        expect(dialog.get_by_role("button", name="Save lead")).to_be_visible()
         expect(dialog.get_by_role("button", name="Close lead form")).to_be_visible()
         self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), 392)
 
@@ -189,8 +191,8 @@ class CommercialCrmBrowserFlows(unittest.TestCase):
     def test_rejected_task_save_keeps_form_and_shows_error(self):
         page = self.page
         page.goto(f"{self.base_url}/", wait_until="networkidle")
-        page.locator("#app-sidebar").get_by_role("button", name="Action Tasks", exact=True).click()
-        page.get_by_role("button", name="Schedule Task", exact=True).click()
+        page.locator("#app-sidebar").get_by_role("button", name="Follow-ups", exact=True).click()
+        page.get_by_role("button", name="Schedule follow-up", exact=True).click()
         dialog = page.get_by_role("dialog", name="Add action task")
         dialog.locator("#task-modal-title").fill("Must not pretend to save")
         dialog.locator("#task-modal-date").fill("2026-10-10")

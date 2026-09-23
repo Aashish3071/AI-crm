@@ -26,7 +26,9 @@ class BlueprintBrowserAcceptance(unittest.TestCase):
         self.page.goto(self.base_url, wait_until="networkidle")
         selectors = self.page.locator("#app-sidebar .nav-btn[data-view]").evaluate_all(
             "buttons => buttons.map(button => button.getAttribute('data-view'))")
-        self.assertGreaterEqual(len(selectors), 12)
+        # The telecalling navigation: retired commercial modules and duplicate task screens are gone.
+        self.assertEqual(set(selectors), {"dashboard", "leads", "follow-ups", "policies", "renewals", "customers",
+                                          "notes", "calendar", "performance", "reports", "channels", "automation"})
         for view in selectors:
             with self.subTest(module=view):
                 self.page.locator(f'#app-sidebar [data-view="{view}"]').click()
@@ -45,7 +47,8 @@ class BlueprintBrowserAcceptance(unittest.TestCase):
             return {customer:customer.id, task:task.id};
         }""")
         self.assertTrue(ids["task"])
-        self.page.locator('#app-sidebar [data-view="tasks"]').click()
+        self.page.locator('#app-sidebar [data-view="follow-ups"]').click()
+        self.page.get_by_role("tab", name="Upcoming").click()
         self.page.get_by_role("button", name="Task Navigation Customer", exact=False).click()
         expect(self.page.locator("#customer-360").get_by_role("heading", name="Task Navigation Customer", exact=True)).to_be_visible()
 
@@ -61,7 +64,9 @@ class BlueprintBrowserAcceptance(unittest.TestCase):
         expect(modal).to_be_visible()
         sections = modal.locator("[data-setting-tab]").evaluate_all(
             "buttons => buttons.map(button => button.dataset.settingTab)")
-        self.assertEqual(len(sections), 11)
+        # Assignment rules now live on the Automation screen.
+        self.assertEqual(set(sections), {"import", "profile", "users", "hierarchy", "team", "templates", "watemplates",
+                                         "configuration", "archive", "reports"})
         for section in sections:
             with self.subTest(section=section):
                 modal.locator(f'[data-setting-tab="{section}"]').click()

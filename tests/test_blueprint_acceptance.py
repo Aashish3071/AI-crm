@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
+import crm_test_isolation  # noqa: F401  (must precede app imports; keeps tests off live data)
 import pipecat_server as server
 import crm_security
 import test_insurance_operations
@@ -33,6 +34,10 @@ class BlueprintAcceptance(unittest.TestCase):
         test_insurance_operations.InsuranceOperationsTests.setUp(self)
         state = server._empty_company_db()
         state["users"] = server.get_initial_db()["users"]
+        # These criteria concern premiums, issuance and renewals rather than the product
+        # catalogue, so they declare the products they use; the default is car and health.
+        state["settings"]["crm"]["insuranceProducts"] = ["Car Insurance", "Health Insurance", "Property",
+                                                         "Commercial Motor", "Motor"]
         server.save_db(state)
         original_request = self.client.request
         def tracked(method, url, **kwargs):
@@ -177,8 +182,10 @@ class BlueprintAcceptance(unittest.TestCase):
 
     @criterion("M07.3")
     def test_deal_close_is_projected_to_calendar(self):
-        lead = self.lead(); self.ok("post", f"/api/leads/{lead['id']}/convert", json={})
-        deal = self.ok("get", "/api/deals")[0]
+        # Conversion no longer creates deals (the module is retired), so create one directly.
+        lead = self.lead()
+        deal = self.ok("post", "/api/deals", json={"leadId": lead["id"], "organization": "Calendar Deal Co",
+                                                   "dealName": "Calendar deal"})
         self.ok("put", f"/api/deals/{deal['id']}", json={"status": "Open", "expectedCloseDate": "2026-10-11"})
         entries = self.ok("get", "/api/calendar")["entries"]
         self.assertEqual(len([e for e in entries if e.get("linkType") == "Deal" and e.get("linkId") == deal["id"]]), 1)

@@ -6,6 +6,7 @@ import unittest
 
 from fastapi.testclient import TestClient
 
+import crm_test_isolation  # noqa: F401  (must precede app imports; keeps tests off live data)
 import crm_security
 import pipecat_server as server
 

@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlparse
 from unittest.mock import patch
 
+import crm_test_isolation  # noqa: F401  (must precede app imports; keeps tests off live data)
 import crm_store
 from tests.test_blueprint_acceptance import criterion
 

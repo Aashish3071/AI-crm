@@ -4,6 +4,161 @@ InsureCRM is a CRM-first operating system for commercial insurance brokers. It m
 
 ## Current release
 
+The build follows the client's own requirement document, *Insurance Telecalling CRM Blueprint* (car and health insurance, one owner and a small telecalling team). The agreed order is: finish the four working foundations first — identity and access, lead capture, follow-ups, WhatsApp and documents — then build the modules that are missing, starting with calling. AI calling is out of scope for now.
+
+An alternative plan, [CLIENT_NON_AI_LAUNCH_PLAN.md](uat/CLIENT_NON_AI_LAUNCH_PLAN.md), proposes shipping every non-AI module before launch. It was written in a separate session and is **not** the plan being followed; it is kept for reference.
+
+### Clean-up — 23 September 2026
+
+- **Target achieved:** a telecaller is now notified once, the moment they reach 100% of their monthly target, and their manager sees it too. Their incentive estimate already updated with every sale. The last row of the automation table is now marked as built in.
+- **No more invented owners:** new deals, policies and policies imported from leads no longer default to the sample person "Sarah Connor". They belong to whoever creates them, or to the lead's owner.
+- **Telecalling wording:** the browser tab, the sidebar and the reporting assistant describe a car and health insurance telecalling business instead of a commercial broker. Template previews use a car-insurance example.
+- **Correct open-lead counts:** the Users and Team settings screens counted open leads using the old Won/Lost statuses. They now use the same definition as the rest of the CRM.
+
+Verification: 275 automated tests pass, 106 of them against the client's blueprint, and all 7 browser tests.
+
+### Customer 360° — 23 September 2026
+
+A customer's profile now shows the eight blocks on slide 18: **basic details** (contact, city, preferences such as language or best time to call, and which enquiry they came from), **insurance history** (the policy they held before us, then our own policies that have ended), **call history** with outcomes, notes and durations, **quotations**, **documents**, **policies** with any open renewal, **follow-ups** upcoming and completed, and **notes**. It pulls together every enquiry the person made, so a customer who bought car insurance and later asked about health cover has one history. City and preferences can be edited from *Edit profile*.
+
+Verification: 274 automated tests pass, 105 of them against the client's blueprint, and all 7 browser tests.
+
+### Lead assignment methods — 23 September 2026
+
+The *Assign to* action in Automation now offers every method on slide 12: **workload** (fewest open leads), **round-robin**, **equal distribution** (fewest leads received this month), **performance-based** (leads shared by each person's conversion over the last 30 days — better converters get more, nobody gets none) and **priority-based** (HOT leads to the best converter, the rest by workload). Product-based routing is a condition on the rule, as before.
+
+**Availability:** a telecaller can press *I'm away* on their dashboard (with an optional reason such as "on leave until Monday"), and receives no new leads until they press *I'm back*. The owner's dashboard shows who is away and can mark anyone away or back; a manager can do the same for their own team. Every method respects it.
+
+Verification: 273 automated tests pass, 104 of them against the client's blueprint, and all 7 browser tests.
+
+### Quotations and renewals — 23 September 2026
+
+**Quotations on leads.** A telecaller can add quotations to their own lead from the lead card. A quote moves Draft → Sent → Viewed → Negotiation → Accepted or Rejected, and the history of each move is kept. Sending a quote moves the lead to *Quote Sent* with a follow-up; acceptance moves it to *Documents Pending* and names the documents still missing. A quote past its validity date expires by itself, and an accepted quote can't be edited.
+
+**Renewals run themselves.** A renewal opens automatically 60 days before a policy expires, owned by the telecaller who sold it. The telecaller is reminded at 60, 30, 15 and 7 days and on the due date; if the policy expires unrenewed, they and their manager are told. Each reminder is sent once. The Renewals screen now opens with a **renewal dashboard** for a chosen month — due this month and next, renewed, pending, lost, the renewal rate (renewed ÷ due) and each telecaller's renewed against pending — and each renewal shows which reminder stage it is at.
+
+Verification: 269 automated tests pass, 100 of them against the client's blueprint, and all 7 browser tests.
+
+### Reports — 23 September 2026
+
+**A Reports screen** for owners and managers follows the leads that arrived in a chosen period. The **sales funnel** shows how many reached each stage from new lead to policy sold, as a share of the start and of the stage before. The **lead sources** table shows, for each source, contact, interest, quote and conversion rates and the premium it brought — including premium per lead, so the best source isn't mistaken for the busiest. A list shows why leads were lost. Everything can be filtered by telecaller, product, source and dates.
+
+Older leads without a recorded arrival date can't be placed in a period, and the report says how many there are. The operations summary in Settings is replaced by this screen; that tab now holds backups only.
+
+Verification: 269 automated tests pass, 93 of them against the client's blueprint and all 7 browser tests.
+
+### Commission, incentives and recognition — 23 September 2026
+
+**Commission.** The owner sets commission rates by product and insurer, with separate rates for new business and renewals. Each sale's commission is worked out when it is sold and kept — changing a rate later doesn't rewrite what earlier sales earned. The owner sees commission per sale and per telecaller each month, can correct a figure (with a reason), and can mark commission as received. Only the owner sees commission.
+
+**Incentives.** The owner writes the incentive rules — so much per policy, a percentage of premium, a bonus for hitting target, or levels — and can limit a rule to one product or one lead source for campaigns. Each telecaller's incentive for the month is worked out as sales happen, with the reasoning shown line by line; telecallers see their own estimate on their dashboard. When a month ends, the owner approves it for payroll and it no longer changes.
+
+**Leaderboard and Employee of the Month.** A leaderboard ranks the team and names the most policies, highest premium, highest conversion, best follow-up discipline and best renewal performer — but only once there is enough to judge by. Employee of the Month is a weighted score the owner can adjust. Call quality isn't measured yet, so it's left out of the score and the screen says so rather than inventing a number.
+
+All of this is on the Performance screen, alongside the team table and targets.
+
+Verification: 265 automated tests pass, 89 of them against the client's blueprint and all 7 browser tests.
+
+### Dashboards, performance and targets — 23 September 2026
+
+**The dashboard now depends on who you are.** A telecaller sees their day as the client's blueprint draws it: today's leads, calls done, connected, follow-ups due, interested, quotes sent, policies sold and target achieved, above a list of priority leads with a Call button on each. The owner sees today, this week and this month side by side, the team's best performer, who needs support, target achievement and who is online, and what needs attention today. The existing panels stay below and can still be arranged.
+
+**A Performance screen** for owners and managers shows each telecaller's new leads, calls, connection rate, average call length, quotes, policies, premium, conversion, follow-ups kept on time, renewals and documents, for today, this week, this month or any range. Its **Targets** tab sets monthly targets per telecaller and shows progress against them; last month's targets can be copied forward.
+
+**One definition of every number.** All of these figures come from a single place, so the dashboard, the Performance screen and targets always agree. Where there is nothing to measure yet the screen shows a dash, not a zero or an invented figure.
+
+Verification: 256 automated tests pass, 80 of them against the client's blueprint and all 7 browser tests.
+
+### Calling — 23 September 2026
+
+**Telecallers can call from the CRM.** A Call button on the lead list, the lead card and every follow-up dials the customer from the telecaller's own phone and opens a call screen showing their record — product, priority, current insurer and expiry, car or health details, missing documents and earlier calls — with space for notes. When the call ends, the telecaller picks one of the blueprint's eight outcomes, and the CRM takes the next step itself: a quotation follow-up for an interested customer, a booked call-back, a retry for no answer, a renewal-watchlist call before a competitor's policy expires, a document chase, or — for a sale — the customer and policy with its renewal date. Wrong numbers are flagged to a manager. Each lead now shows its call history.
+
+The CRM times each call on screen and says so; a call logged afterwards records only the length the telecaller enters. A cloud calling provider can be connected later through the same interface, at which point it supplies call lengths and recordings.
+
+**Conversion fixes.** Recording a sale now stores when it was sold, where the lead came from and when it renews. It no longer creates an organisation called "Private Individual" or an unused deal, and a telecaller can no longer convert another telecaller's lead.
+
+Verification: 250 automated tests pass, 74 of them against the client's blueprint and all 7 browser tests.
+
+### Automation — 23 September 2026
+
+**A general automation engine**, built from the blueprint reviewed before building. Every rule reads as one sentence — *when* something happens, *if* the record matches, *then* act — and is built from three dropdowns on a new **Automation** screen (owner and managers only). The client's own slide-33 table is offered as ready-made rules: switch on "Share new leads between telecallers", "Quote interested customers the same day", "Chase quotations after two days", "Open a renewal for every policy sold", "Warn telecallers 30 days before expiry", "Tell telecallers about new leads" or "Ask customers for missing documents" with one click. The two rows the product already does are marked built in, and the incentive row is marked as coming with targets.
+
+**Safe by design.** Rules start switched off and can be tried against recent records first without changing anything. Two rules that trigger each other stop instead of looping. A rule never repeats itself for the same event, stops at an hourly limit, and never messages customers who opted out, outside WhatsApp's rules, or at night — messages due in quiet hours wait for the morning. One switch pauses everything. Every run is logged in an Activity tab, showing what each action did or why it was blocked.
+
+**Assignment rules moved here.** Existing assignment rules were carried over unchanged, and the Settings tab that edited them is replaced by this screen. Rules no longer assign leads to someone who has been deactivated.
+
+**Fixes found along the way:** scheduled WhatsApp template messages were sent as free text, which WhatsApp rejects outside its 24-hour window; renewals created without an owner defaulted to the demo user "Sarah Connor"; and `/api/auth/me` crashed when sign-in was disabled for local development.
+
+Verification: 236 automated tests pass, including 60 against the client's blueprint and all 7 browser tests. The browser tests were updated for the renamed and removed screens; where they counted screens, they now check the exact expected set.
+
+### Documents and customer messaging — 23 September 2026
+
+**The client's document types.** RC, Driving Licence, ID Proof, Previous Policy and Health Documents replace the corporate list. Each lead shows what its product needs — a car policy needs the RC, previous policy and ID proof — and which of those are missing, awaiting a check, verified or rejected. One button drafts a WhatsApp or email message asking for exactly the missing documents.
+
+**Verification.** An Owner / Admin or Manager marks each document verified or rejected, and a rejection says why. A rejected document doesn't count towards the checklist or as evidence for issuing a policy.
+
+**Two serious problems removed.** Converting any lead whose name started with "Issue" silently created fake KYC, payment and proposal documents, letting a policy be issued with no real evidence. And a second upload route stored anything as a PDF, skipped every file check, and saved the words "document content" as the file when nothing was sent. Both came from uncommitted work in a separate session; neither is in the product now, and every upload goes through the same checks.
+
+**Access fixes.** A telecaller could previously message another telecaller's customer and attach documents to their record. Both now respect the same boundary as the lead list.
+
+**The lead card no longer shows a finished action as upcoming.** When a follow-up is done and nothing is scheduled after it, the card says so and offers to schedule the next step.
+
+Verification: 214 automated tests pass, 45 of them against the client's blueprint. Two older test fixtures uploaded the word "Hello" as a PDF with no file name; they now upload a minimal real PDF, since the product rightly rejects the old fixture.
+
+### Follow-ups — 23 September 2026
+
+**Reminders now run for real companies.** On a normal single-process start, the built-in scheduler only ever processed the demo workspace, so follow-up reminders and escalations never reached a real company. It now runs for every company and records failures instead of silently swallowing them.
+
+**A Follow-ups screen replaces the blank "Follow-up Queue".** It shows the four counters from the client's blueprint — due today, overdue, upcoming and on-time rate — and lists every follow-up with the customer, product, calling priority, next action, telecaller and the last time anyone spoke to them. Call, Done and Reschedule sit on each row. Marking one done asks what happens next, so no lead is left without a next step. "Action Tasks" is no longer in the sidebar, since this screen covers it.
+
+**Follow-ups can have a time**, not just a date, so "call this afternoon" can be scheduled and a missed call-back is noticed within the day.
+
+**The on-time rate is measured.** It is the share of follow-ups finished by their due time over the last 30 days. It used to show 96% whenever nothing had been completed — the illustrative figure from the client's own deck.
+
+**Four alerts, as the blueprint lists them:** a reminder before a follow-up is due, a missed alert to the telecaller when it passes, an overdue alert escalated to their manager after the escalation period, and a high-value alert when a HOT lead has a follow-up due.
+
+**Access fixes.** Any user could edit, complete or delete any task, and every form's record picker loaded the whole company's customers and phone numbers. Both now respect visibility. Tasks created without an owner no longer default to the demo user "Sarah Connor".
+
+**Removed from the sidebar:** "Telecaller Dashboard" and "Call History", which opened a blank page. They return when those modules are built.
+
+Verification: 207 automated tests pass, 38 of them against the client's blueprint.
+
+### Retail lead model — 23 September 2026
+
+**Leads now describe car and health enquiries.** A lead is a person, not a company. The form asks for name, mobile, product, source and current policy, with optional car details (registration, make, model, year, fuel, no-claim bonus) or health details (plan, who is covered, cover wanted, existing illnesses) that open to match the product. Registration numbers are normalised — "mh 12 de 4521" is stored as MH12DE4521 — and invalid values are refused with a message saying why.
+
+**No more invented data.** Every lead used to get a made-up city, territory, industry, company revenue, headcount and a ₹ 35,000–₹ 50,000 premium, and pipeline value was summed from those premiums. The list also showed "Sarah Connor" for unassigned leads and "Follow-up discussion" for leads with no next action. All of these are gone. Existing records keep their values, because an invented figure can't be told apart from a real one after the fact.
+
+**Thirteen statuses from the client's process** replace the six commercial stages, with existing leads migrated. A finished lead (Policy Sold, Not Interested, Lost) needs no next action; Not Interested and Lost need a reason. The status can no longer be set directly through lead editing to skip those rules. Calling priority (HOT / WARM / COLD) is now shown on the list, board and lead card.
+
+**Sources come from a fixed list**, with any older wording kept alongside — "Cold Outreach" becomes *Calling list*, "Meta Lead Ads" becomes *Meta Ads*. Each lead records when the enquiry arrived, fixed at creation, so response time can be measured. Existing demo leads have no evidence of when they arrived and show "Not recorded" rather than a guess. Sales record their own date, so editing an old sale no longer counts it in this month's figures.
+
+**Tighter access.** A telecaller could previously edit any lead by id — including reassigning it to themselves — and move any lead's status. Both now respect the same boundary as the lead list. Only an Owner / Admin or Manager can reassign, and a lead a telecaller creates stays theirs.
+
+Deals, Contacts and Organisations are removed from the sidebar and search; their data is kept.
+
+Verification: 197 automated tests pass. Suites that exercise premiums, issuance and renewals now declare the product catalogue they use instead of relying on the old commercial default; no assertion changed. The migration was dry-run on a copy of the live workspace (18 leads in, 18 out, no field removed, other collections untouched) and the live file was backed up before the switch.
+
+### Roles, record visibility and test safety — 23 September 2026
+
+**Sign-in restored.** An end-to-end test run had replaced the live identity store with test fixtures, so no real account could sign in. A new administrator was created through first-run setup, and `.env` points the app at it with `IDENTITY_STORE_PATH`. The `.env` file was previously loaded *after* the security module read its settings, so any security setting placed there was silently ignored; it now loads first.
+
+**Tests can no longer touch live data.** Every test module imports `crm_test_isolation`, which forces all storage into a throwaway directory before the app loads. Live data files were fingerprinted before and after the full suite to confirm they are unchanged.
+
+**Four fixed roles.** Owner / Admin, Manager, Telecaller and Read-only. Roles used to be free text matched by substring, so "Senior Sales Executive" — offered by the user form — and any title containing "lead" silently became managers. Job title is now a separate display-only field. Unknown roles are refused. The last active Owner / Admin cannot be demoted or deactivated, and names stay unique on rename.
+
+**A telecaller sees only their own work — everywhere.** Global search, notes, communications, documents (including download), quotations, contacts and direct customer and lifecycle lookups were previously company-wide. They now follow the owner of the record they belong to.
+
+**Stable ownership.** Every owned record now carries an `assignedToId` alongside the owner's name, so renames heal across every collection and future commission attribution is by person rather than by name.
+
+**Removed:** the profile screen's "Viewing the CRM as" switcher, which impersonated another user and has been refused by the server since the identity fix. "Add user" now asks for the temporary password the server requires; before, it always failed.
+
+Verification: 181 automated tests pass (169 existing, 12 new in `tests/test_client_blueprint.py`, each tagged with the blueprint slide it proves).
+
+### Client requirements planning — 7 September 2026
+
+The client's supplied Insurance Telecalling CRM Blueprint defines a car/health insurance telecalling product. See the [client Phase 1 gap comparison and plan](uat/CLIENT_PHASE_1_GAP_PLAN.md) for existing foundations, missing human-calling workflows, required adaptations and retained later-phase work. This is a planning-only source review, not a new test certification or implementation. Page 38's Phase 1 roadmap is used provisionally; conflicting recording/AI phase labels and the quotation/document handoff need client confirmation. Earlier internal blueprints remain engineering references, not a substitute for the client's scope. SMS remains excluded under the user's explicit instruction.
+
 The commercial readiness standard is defined in [CRM Blueprint v2](uat/CRM_BLUEPRINT_V2.md), which supersedes [v1](uat/CRM_BLUEPRINT.md) without lowering any criterion in it. v2 adds record-level visibility as a release requirement, an honest-module-boundary standard, and a split dashboard numeric contract; it also records the measured position (43 of 89 acceptance tests passing on 5 September 2026) and the build order derived from it. v1 remains, covering 28 modules, 84 acceptance criteria and seven cross-module journeys. Read the [current assessment](uat/CRM_BLUEPRINT_ASSESSMENT.md) before treating the feature list below as verified commercial capability. The expanded acceptance tests expose failures that earlier smoke tests did not cover. This assessment changes test/documentation files only; it does not silently fix or waive the failures.
 
 Repeat the comparison on disposable data:
@@ -135,6 +290,8 @@ Prerequisites: Python 3.11+ and a modern browser.
 
 Open `http://127.0.0.1:8080/`. On the first authenticated launch, the CRM asks for the company and first administrator. Local JSON storage is supported only for development and migration rehearsals.
 
+Keep the project out of iCloud Drive, Dropbox or any folder that offloads files. macOS once moved the virtual environment and the live database to the cloud, and the server then hung on startup waiting for files that were not on disk. Sync services also create conflict copies such as `crm_db 2.json`, which can silently lose records.
+
 To use the existing demonstration workspace without authentication during automated local checks only:
 
 ```bash
@@ -146,7 +303,10 @@ AUTH_DISABLED=1 .venv/bin/python3 -m uvicorn pipecat_server:app --host 127.0.0.1
 ```bash
 .venv/bin/python3 -m py_compile pipecat_server.py crm_security.py crm_store.py crm_storage.py crm_worker.py migrate_to_postgres.py
 .venv/bin/python3 -m unittest -v test_insurance_operations.py test_security_foundation.py tests.test_workflow_integrity
+PYTHONWARNINGS=ignore .venv/bin/python3 -m pytest tests/test_client_blueprint.py tests/test_blueprint_acceptance.py tests/test_e2e_remediation.py -q
 ```
+
+`tests/test_client_blueprint.py` is the acceptance suite for the client's own requirement document; each test names the slide it proves.
 
 The suite covers lead-to-renewal lifecycle calculations, issuance evidence, relationship repair, cascading deletion/note retention, Customer 360°, master editing, lead-source ingestion/deduplication, Email/WhatsApp-only enforcement, WhatsApp delivery-failure callbacks and notification creation, template archive/restore, servicing, canonical calendar/task synchronization, scheduling conflicts and reminders, saved views, pagination, reporting, document versioning, backup/restore, sign-in, CSRF, roles, immediate deactivation and cross-company isolation.
 

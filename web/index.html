@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>InsureCRM — Commercial Insurance Operations</title>
+    <title>InsureCRM — Insurance Telecalling</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Inter Font -->
@@ -68,8 +68,8 @@
                     <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
                 </div>
                 <div class="min-w-0">
-                    <div class="font-semibold text-white text-[13px] leading-tight truncate tracking-tight">InsureCRM</div>
-                    <div class="text-[10px] text-slate-400 truncate">Enterprise Operations</div>
+                    <h1 class="font-semibold text-white text-[13px] leading-tight truncate tracking-tight">InsureCRM</h1>
+                    <h2 class="text-[10px] text-slate-400 truncate">Car &amp; Health Insurance</h2>
                 </div>
             </div>
             <span class="w-1.5 h-1.5 rounded-full bg-emerald-500" title="System Operational"></span>
@@ -77,17 +77,17 @@
 
         <!-- Navigation Menu -->
         <div class="flex-1 overflow-y-auto px-2 py-2.5 space-y-0.5">
-            <button data-view="dashboard" class="nav-btn w-full flex items-center px-2.5 py-1.5 rounded active-nav bg-brandNavHover text-white text-left text-[12px] font-medium transition-colors">
+            <button data-view="dashboard" class="nav-btn w-full flex items-center px-2.5 py-1.5 rounded active-nav bg-brandNavHover text-white hover:text-white hover:bg-brandNavHover text-left text-[12px] font-medium transition-colors">
                 <svg class="w-4 h-4 mr-2.5 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
                 <span>Dashboard</span>
             </button>
             <button data-view="leads" class="nav-btn w-full flex items-center px-2.5 py-1.5 rounded text-slate-400 hover:text-white hover:bg-brandNavHover text-left text-[12px] font-medium transition-colors">
                 <svg class="w-4 h-4 mr-2.5 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                <span>Leads & Accounts</span>
+                <span>Leads</span>
             </button>
-            <button data-view="deals" class="nav-btn w-full flex items-center px-2.5 py-1.5 rounded text-slate-400 hover:text-white hover:bg-brandNavHover text-left text-[12px] font-medium transition-colors">
-                <svg class="w-4 h-4 mr-2.5 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-                <span>Pipeline Deals</span>
+            <button data-view="follow-ups" class="nav-btn w-full flex items-center px-2.5 py-1.5 rounded text-slate-400 hover:text-white hover:bg-brandNavHover text-left text-[12px] font-medium transition-colors">
+                <svg class="w-4 h-4 mr-2.5 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <span>Follow-ups</span>
             </button>
             <button data-view="policies" class="nav-btn w-full flex items-center px-2.5 py-1.5 rounded text-slate-400 hover:text-white hover:bg-brandNavHover text-left text-[12px] font-medium transition-colors">
                 <svg class="w-4 h-4 mr-2.5 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 13c0 5-3.5 7.5-7.7 9C7.5 20.5 4 18 4 13V6l8-3 8 3z"/><path d="M9 12l2 2 4-4"/></svg>
@@ -97,21 +97,9 @@
             <button data-view="customers" class="nav-btn w-full flex items-center px-2.5 py-1.5 rounded text-slate-400 hover:text-white hover:bg-brandNavHover text-left text-[12px] font-medium transition-colors">
                 <svg class="w-4 h-4 mr-2.5 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span>Customers</span>
             </button>
-            <button data-view="contacts" class="nav-btn w-full flex items-center px-2.5 py-1.5 rounded text-slate-400 hover:text-white hover:bg-brandNavHover text-left text-[12px] font-medium transition-colors">
-                <svg class="w-4 h-4 mr-2.5 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                <span>Contacts</span>
-            </button>
-            <button data-view="organizations" class="nav-btn w-full flex items-center px-2.5 py-1.5 rounded text-slate-400 hover:text-white hover:bg-brandNavHover text-left text-[12px] font-medium transition-colors">
-                <svg class="w-4 h-4 mr-2.5 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect width="16" height="20" x="4" y="2" rx="2" ry="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M12 10h.01"/><path d="M12 14h.01"/><path d="M16 10h.01"/><path d="M16 14h.01"/><path d="M8 10h.01"/><path d="M8 14h.01"/></svg>
-                <span>Organizations</span>
-            </button>
             <button data-view="notes" class="nav-btn w-full flex items-center px-2.5 py-1.5 rounded text-slate-400 hover:text-white hover:bg-brandNavHover text-left text-[12px] font-medium transition-colors">
                 <svg class="w-4 h-4 mr-2.5 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>
                 <span>Activity Notes</span>
-            </button>
-            <button data-view="tasks" class="nav-btn w-full flex items-center px-2.5 py-1.5 rounded text-slate-400 hover:text-white hover:bg-brandNavHover text-left text-[12px] font-medium transition-colors">
-                <svg class="w-4 h-4 mr-2.5 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/></svg>
-                <span>Action Tasks</span>
             </button>
             <button data-view="calendar" class="nav-btn w-full flex items-center px-2.5 py-1.5 rounded text-slate-400 hover:text-white hover:bg-brandNavHover text-left text-[12px] font-medium transition-colors">
                 <svg class="w-4 h-4 mr-2.5 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg><span>Calendar</span>
@@ -120,7 +108,22 @@
                 <svg class="w-4 h-4 mr-2.5 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3v6m0 6v6"/><circle cx="12" cy="12" r="3"/><path d="M5.6 5.6 9 9m6 6 3.4 3.4M18.4 5.6 15 9m-6 6-3.4 3.4"/></svg><span>Lead Sources</span>
             </button>
 
+            <button data-view="performance" data-requires="manage" class="nav-btn w-full flex items-center px-2.5 py-1.5 rounded text-slate-400 hover:text-white hover:bg-brandNavHover text-left text-[12px] font-medium transition-colors hidden">
+                <svg class="w-4 h-4 mr-2.5 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>
+                <span>Performance</span>
+            </button>
+
+            <button data-view="reports" data-requires="manage" class="nav-btn w-full flex items-center px-2.5 py-1.5 rounded text-slate-400 hover:text-white hover:bg-brandNavHover text-left text-[12px] font-medium transition-colors hidden">
+                <svg class="w-4 h-4 mr-2.5 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 4h16l-6 8v6l-4 2v-8z"/></svg>
+                <span>Reports</span>
+            </button>
+
             <div class="pt-4 pb-1 px-2.5 text-[10px] uppercase font-semibold text-slate-500 tracking-wider">Administration</div>
+
+            <button data-view="automation" data-requires="manage" class="nav-btn w-full flex items-center px-2.5 py-1.5 rounded text-slate-400 hover:text-white hover:bg-brandNavHover text-left text-[12px] font-medium transition-colors hidden">
+                <svg class="w-4 h-4 mr-2.5 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></svg>
+                <span>Automation</span>
+            </button>
 
             <button aria-label="Settings & Data" title="Settings & Data" onclick="openSettingsModal()" class="w-full flex items-center px-2.5 py-1.5 rounded text-slate-400 hover:text-white hover:bg-brandNavHover text-left text-[12px] font-medium transition-colors">
                 <svg class="w-4 h-4 mr-2.5 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -131,10 +134,10 @@
         <!-- User Profile Footer -->
         <div class="p-2.5 border-t border-slate-800/80 text-[11px] relative">
             <button type="button" onclick="toggleAccountMenu(event)" class="account-trigger" aria-haspopup="true" aria-expanded="false">
-                <div id="current-user-initials" class="w-6 h-6 rounded bg-slate-700 text-white flex items-center justify-center font-bold text-[10px] shrink-0">SC</div>
+                <div id="current-user-initials" class="w-6 h-6 rounded bg-slate-700 text-white flex items-center justify-center font-bold text-[10px] shrink-0"></div>
                 <div class="min-w-0 flex-1">
-                    <div id="current-user-name" class="font-medium text-white truncate leading-tight">Sarah Connor</div>
-                    <div id="current-user-role" class="text-[10px] text-slate-400 truncate">Senior Commercial Broker</div>
+                    <div id="current-user-name" class="font-medium text-white truncate leading-tight"></div>
+                    <div id="current-user-role" class="text-[10px] text-slate-400 truncate"></div>
                 </div>
                 <svg class="w-3 h-3 text-slate-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 15 6-6 6 6"/></svg>
             </button>
@@ -143,6 +146,10 @@
                 <span id="notification-count" class="sidebar-bell-count hidden">0</span>
             </button>
             <div id="account-menu" class="account-menu hidden">
+                <a id="demo-cleanup-link" href="#" onclick="event.preventDefault(); openDemoCleanup()" class="account-menu-item text-slate-300 hover:text-white">
+                    <svg class="w-3.5 h-3.5 text-rose-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    <span>Clear Demo Data</span>
+                </a>
                 <button type="button" onclick="confirmLogout()" class="account-menu-item">
                     <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/></svg>
                     <span>Sign out</span>
@@ -213,18 +220,12 @@
 
                         <!-- Stage Filter -->
                         <select id="leads-status-filter" class="text-xs border border-slate-300 rounded px-2 py-1 bg-white focus:outline-none cursor-pointer">
-                            <option value="">All Stages</option>
-                            <option value="New">New</option>
-                            <option value="Contacted">Contacted</option>
-                            <option value="Risk / Underwriting">Risk / Underwriting</option>
-                            <option value="Quotation Sent">Quotation Sent</option>
-                            <option value="Won">Won</option>
-                            <option value="Lost">Lost</option>
+                            <option value="">All statuses</option>
                         </select>
 
                         <!-- Owner Filter -->
                         <select id="leads-owner-filter" data-roster="with-all" class="text-xs border border-slate-300 rounded px-2 py-1 bg-white focus:outline-none cursor-pointer">
-                            <option value="">All Brokers</option>
+                            <option value="">All telecallers</option>
                         </select>
 
                         <div class="h-4 w-px bg-slate-200 mx-1"></div>
@@ -265,12 +266,12 @@
                                 <th class="w-10 px-4 py-2.5 text-center border-r border-slateBorder">
                                     <input type="checkbox" id="select-all-leads" class="rounded cursor-pointer">
                                 </th>
-                                <th class="px-4 py-2.5 border-r border-slateBorder font-semibold">Contact & Policy</th>
-                                <th class="px-4 py-2.5 border-r border-slateBorder font-semibold">Organization</th>
-                                <th class="px-4 py-2.5 border-r border-slateBorder font-semibold">Stage</th>
-                                <th class="px-4 py-2.5 border-r border-slateBorder font-semibold">Next Scheduled Action & Due Date</th>
-                                <th class="px-4 py-2.5 border-r border-slateBorder font-semibold">Annual Premium</th>
-                                <th class="px-4 py-2.5 border-r border-slateBorder font-semibold">Broker</th>
+                                <th class="px-4 py-2.5 border-r border-slateBorder font-semibold">Customer & product</th>
+                                <th class="px-4 py-2.5 border-r border-slateBorder font-semibold">Priority</th>
+                                <th class="px-4 py-2.5 border-r border-slateBorder font-semibold">Status</th>
+                                <th class="px-4 py-2.5 border-r border-slateBorder font-semibold">Next action</th>
+                                <th class="px-4 py-2.5 border-r border-slateBorder font-semibold">Premium</th>
+                                <th class="px-4 py-2.5 border-r border-slateBorder font-semibold">Telecaller</th>
                                 <th class="w-16 px-2 py-2.5 text-center font-semibold">Action</th>
                             </tr>
                         </thead>
@@ -308,6 +309,7 @@
                         <button onclick="openDashboardCustomiser()" class="px-2.5 py-1.5 border border-slate-300 rounded bg-white text-xs font-medium hover:bg-slate-50">Customise</button>
                     </div>
                 </div>
+                <div id="dashboard-role" class="space-y-4"></div>
                 <div id="dashboard-panels" class="space-y-4"></div>
             </div>
 
@@ -317,6 +319,7 @@
             <div id="view-deals" class="view-panel hidden flex flex-col h-full bg-white">
                 <div class="border-b border-slateBorder px-4 py-2 bg-white flex items-center justify-between gap-2 z-10 flex-shrink-0">
                     <input type="text" id="deals-search" placeholder="Search deals..." class="px-2.5 py-1 text-xs border border-slate-300 rounded bg-white w-56 outline-none">
+                    <button id="new-deal-button" onclick="openNewDealPrompt()" class="px-3 py-1.5 bg-slate-900 text-white rounded text-xs font-semibold hover:bg-black transition-colors">+ New Deal</button>
                 </div>
                 <div class="flex-1 overflow-auto">
                     <table class="w-full text-left border-collapse min-w-[800px] corp-table">
@@ -343,11 +346,19 @@
                     </div>
                     <div class="flex gap-2">
                         <button onclick="migrateLeadPolicies()" class="px-3 py-1.5 border border-slate-300 rounded bg-white text-xs font-medium hover:bg-slate-50">Import policies from leads</button>
-                        <button id="generate-renewals-button" onclick="generateRenewals()" class="px-3 py-1.5 bg-slate-900 text-white rounded text-xs font-semibold hover:bg-black">Generate 60-day renewals</button>
+                        <button id="generate-renewals-button" onclick="generateRenewals()" title="Renewals open by themselves 60 days before expiry; this checks now instead of waiting for the next scheduler run" class="px-3 py-1.5 bg-slate-900 text-white rounded text-xs font-semibold hover:bg-black">Check for renewals now</button>
                     </div>
                 </div>
 
                 <div id="insurance-kpis" class="grid grid-cols-2 md:grid-cols-5 gap-3"></div>
+
+                <div id="renewal-dashboard-section" class="hidden bg-white border border-slateBorder rounded-lg overflow-hidden">
+                    <div class="px-4 py-3 border-b border-slateBorder flex flex-wrap items-center justify-between gap-2">
+                        <div><h2 class="text-xs font-semibold uppercase tracking-wider">Renewal dashboard</h2><p class="text-[11px] text-slate-500 mt-0.5">Policies expiring in the month. Renewal rate is renewed ÷ due this month.</p></div>
+                        <input id="renewal-dashboard-month" type="month" class="corp-input py-1 text-xs" onchange="loadRenewalDashboard()">
+                    </div>
+                    <div id="renewal-dashboard-body" class="p-4 space-y-4"></div>
+                </div>
 
                 <div id="renewal-pipeline-section" class="bg-white border border-slateBorder rounded-lg overflow-hidden">
                     <div class="px-4 py-3 border-b border-slateBorder flex items-center justify-between">
@@ -357,7 +368,13 @@
                 </div>
 
                 <div id="quotation-section" class="bg-white border border-slateBorder rounded-lg overflow-hidden">
-                    <div class="px-4 py-3 border-b border-slateBorder"><h2 class="text-xs font-semibold uppercase tracking-wider">Quotation Comparison</h2><p class="text-[11px] text-slate-500 mt-0.5">Compare insurer pricing, coverage and deductibles by renewal.</p></div>
+                    <div class="px-4 py-3 border-b border-slateBorder flex items-center justify-between">
+                        <div>
+                            <h2 class="text-xs font-semibold uppercase tracking-wider">Quotation Comparison</h2>
+                            <p class="text-[11px] text-slate-500 mt-0.5">Compare insurer pricing, coverage and deductibles across renewals and pipeline deals.</p>
+                        </div>
+                        <button onclick="openQuotationModalPrompt()" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded text-xs font-medium border border-slate-300">+ Add Quote</button>
+                    </div>
                     <div id="quotation-comparison" class="p-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"></div>
                 </div>
 
@@ -394,6 +411,116 @@
             <!-- ═══════════════════════════════════════════════════════════ -->
             <!-- VIEW: CALENDAR                                             -->
             <!-- ═══════════════════════════════════════════════════════════ -->
+            <!-- Reports (client blueprint, slides 31 and 32) -->
+            <div id="view-reports" class="view-panel hidden p-4 sm:p-5 max-w-6xl mx-auto space-y-4">
+                <div class="border-b border-slateBorder pb-3">
+                    <h2 class="text-base font-semibold text-slate-900">Reports</h2>
+                    <p class="text-xs text-slate-500">Follow the leads that arrived in a period: how far they got, which sources brought the best customers, and why the rest were lost.</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 text-xs" role="group" aria-label="Filters">
+                    <select id="rep-range" class="corp-input w-auto py-0.5" onchange="reportRangeChanged()" aria-label="Period">
+                        <option value="month">This month</option><option value="last-month">Last month</option>
+                        <option value="90">Last 90 days</option><option value="custom">Custom range</option></select>
+                    <span id="rep-custom" class="hidden items-center gap-1.5"><input type="date" id="rep-start" class="corp-input w-auto py-0.5" aria-label="From">
+                        <span class="text-slate-400">to</span><input type="date" id="rep-end" class="corp-input w-auto py-0.5" aria-label="To"></span>
+                    <select id="rep-person" class="corp-input w-auto py-0.5" onchange="loadReports()" aria-label="Telecaller"></select>
+                    <select id="rep-product" class="corp-input w-auto py-0.5" onchange="loadReports()" aria-label="Product"></select>
+                    <select id="rep-source" class="corp-input w-auto py-0.5" onchange="loadReports()" aria-label="Lead source"></select>
+                    <button onclick="loadReports()" class="fu-btn">Show</button>
+                </div>
+                <div id="rep-body" class="space-y-4"></div>
+            </div>
+
+            <!-- Performance (client blueprint, slides 26 and 29) -->
+            <div id="view-performance" class="view-panel hidden p-4 sm:p-5 max-w-7xl mx-auto space-y-4">
+                <div class="flex flex-wrap items-start justify-between gap-3 border-b border-slateBorder pb-3">
+                    <div>
+                        <h2 class="text-base font-semibold text-slate-900">Performance</h2>
+                        <p class="text-xs text-slate-500">Each telecaller's calls, sales and follow-through, and how far they are towards this month's targets.</p>
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-1.5 text-xs" role="tablist" aria-label="Performance">
+                    <button role="tab" data-perf-tab="team" onclick="setPerformanceTab('team')" class="fu-tab">Team</button>
+                    <button role="tab" data-perf-tab="targets" onclick="setPerformanceTab('targets')" class="fu-tab">Targets</button>
+                    <button role="tab" data-perf-tab="leaderboard" onclick="setPerformanceTab('leaderboard')" class="fu-tab">Leaderboard</button>
+                    <button role="tab" data-perf-tab="incentives" onclick="setPerformanceTab('incentives')" class="fu-tab">Incentives</button>
+                    <button role="tab" data-perf-tab="commission" data-requires="admin" onclick="setPerformanceTab('commission')" class="fu-tab">Commission</button>
+                </div>
+                <div id="perf-team-pane" class="space-y-3">
+                    <div class="flex flex-wrap items-center gap-1.5 text-xs" role="group" aria-label="Period">
+                        <button data-period="today" onclick="setPerformancePeriod('today')" class="fu-tab">Today</button>
+                        <button data-period="week" onclick="setPerformancePeriod('week')" class="fu-tab">This week</button>
+                        <button data-period="month" onclick="setPerformancePeriod('month')" class="fu-tab">This month</button>
+                        <button data-period="custom" onclick="setPerformancePeriod('custom')" class="fu-tab">Custom range</button>
+                        <span id="perf-custom" class="hidden items-center gap-1.5">
+                            <input type="date" id="perf-start" class="corp-input w-auto py-0.5" aria-label="From">
+                            <span class="text-slate-400">to</span>
+                            <input type="date" id="perf-end" class="corp-input w-auto py-0.5" aria-label="To">
+                            <button onclick="loadPerformanceTeam()" class="fu-btn">Show</button>
+                        </span>
+                        <span id="perf-period-label" class="ml-auto text-[11px] text-slate-400"></span>
+                    </div>
+                    <div class="bg-white border border-slateBorder rounded-lg overflow-x-auto">
+                        <table class="w-full text-left perf-table min-w-[980px]"><thead id="perf-team-head"></thead><tbody id="perf-team-body"></tbody><tfoot id="perf-team-foot"></tfoot></table>
+                    </div>
+                    <p class="text-[11px] text-slate-500">Conversion is policies sold ÷ new leads in the same period. Average call length counts connected calls with a known length. A dash means there is nothing to measure yet, not zero.</p>
+                </div>
+                <div id="perf-leaderboard-pane" class="hidden space-y-4"></div>
+                <div id="perf-incentives-pane" class="hidden space-y-4"></div>
+                <div id="perf-commission-pane" class="hidden space-y-4"></div>
+                <div id="perf-targets-pane" class="hidden space-y-3">
+                    <div class="flex flex-wrap items-center gap-2 text-xs">
+                        <label class="flex items-center gap-1.5">Month <input type="month" id="targets-month" class="corp-input w-auto py-0.5" onchange="loadTargets()"></label>
+                        <label class="flex items-center gap-1.5">Dashboards show <select id="targets-headline" class="corp-input w-auto py-0.5" onchange="setTargetHeadline(this.value)"></select></label>
+                        <button onclick="copyLastMonthTargets()" class="fu-btn ml-auto">Copy last month's targets</button>
+                    </div>
+                    <div id="targets-team" class="text-xs"></div>
+                    <div class="bg-white border border-slateBorder rounded-lg overflow-x-auto">
+                        <table class="w-full text-left perf-table min-w-[860px]"><thead id="targets-head"></thead><tbody id="targets-body"></tbody></table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Automation (client blueprint, slide 33) -->
+            <div id="view-automation" class="view-panel hidden p-4 sm:p-5 max-w-6xl mx-auto space-y-4">
+                <div class="flex flex-wrap items-start justify-between gap-3 border-b border-slateBorder pb-3">
+                    <div>
+                        <h2 class="text-base font-semibold text-slate-900">Automation</h2>
+                        <p class="text-xs text-slate-500 max-w-2xl">Rules that do the routine work. Each one reads as a sentence: <em>when</em> something happens, <em>if</em> the record matches, <em>then</em> act. New rules start switched off.</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2" data-requires="admin">
+                        <label class="auto-switch" title="Stops every rule at once">
+                            <input type="checkbox" id="auto-paused" onchange="setAutomationPaused(this.checked)">
+                            <span>Pause everything</span>
+                        </label>
+                        <button onclick="openRuleBuilder()" class="px-3 py-1.5 bg-slate-900 text-white rounded text-xs font-semibold">New rule</button>
+                    </div>
+                </div>
+                <div id="auto-paused-banner" class="hidden rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                    Every automation is paused. Nothing below will run until you switch it back on.
+                </div>
+                <div class="flex items-center gap-1.5 text-xs" role="tablist" aria-label="Automation">
+                    <button role="tab" data-auto-tab="rules" onclick="setAutomationTab('rules')" class="fu-tab">Rules</button>
+                    <button role="tab" data-auto-tab="activity" onclick="setAutomationTab('activity')" class="fu-tab">Activity</button>
+                </div>
+                <div id="auto-rules-pane" class="space-y-5">
+                    <section>
+                        <h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">From the client's plan</h3>
+                        <div id="auto-recipes" class="grid grid-cols-1 lg:grid-cols-2 gap-2"></div>
+                    </section>
+                    <section>
+                        <h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">Rules, in the order they are tried</h3>
+                        <div id="auto-rules" class="space-y-2"></div>
+                    </section>
+                </div>
+                <div id="auto-activity-pane" class="hidden">
+                    <div class="bg-white border border-slateBorder rounded-lg overflow-x-auto">
+                        <table class="w-full text-left auto-runs-table min-w-[720px]"><thead><tr><th>When</th><th>Rule</th><th>Record</th><th>Result</th><th>What happened</th></tr></thead>
+                        <tbody id="auto-runs"></tbody></table>
+                    </div>
+                </div>
+            </div>
+
             <div id="view-calendar" class="view-panel hidden p-5 max-w-6xl mx-auto space-y-4">
                 <div class="flex flex-wrap items-start justify-between gap-3 border-b border-slateBorder pb-3">
                     <div>
@@ -510,6 +637,26 @@
             <!-- ═══════════════════════════════════════════════════════════ -->
             <!-- VIEW: ACTION TASKS (TRIAGED CORPORATE UX)                  -->
             <!-- ═══════════════════════════════════════════════════════════ -->
+            <!-- Follow-ups (client blueprint, slide 17) -->
+            <div id="view-follow-ups" class="view-panel hidden p-4 sm:p-5 max-w-6xl mx-auto space-y-4">
+                <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slateBorder pb-3">
+                    <div>
+                        <h2 class="text-base font-semibold text-slate-900">Follow-ups</h2>
+                        <p class="text-xs text-slate-500">Every customer waiting on a call, in the order they fall due. No interested customer should be forgotten.</p>
+                    </div>
+                    <button onclick="openCreateTaskModal()" class="px-3 py-1.5 bg-slate-900 text-white rounded text-xs font-semibold">Schedule follow-up</button>
+                </div>
+                <div id="fu-metrics" class="grid grid-cols-2 lg:grid-cols-4 gap-3"></div>
+                <div class="flex flex-wrap items-center gap-1.5 text-xs" role="tablist" aria-label="Follow-up lists">
+                    <button role="tab" data-fu-tab="overdue" onclick="setFollowUpTab('overdue')" class="fu-tab">Overdue <span data-fu-count="overdue"></span></button>
+                    <button role="tab" data-fu-tab="dueToday" onclick="setFollowUpTab('dueToday')" class="fu-tab">Due today <span data-fu-count="dueToday"></span></button>
+                    <button role="tab" data-fu-tab="upcoming" onclick="setFollowUpTab('upcoming')" class="fu-tab">Upcoming <span data-fu-count="upcoming"></span></button>
+                    <button role="tab" data-fu-tab="doneToday" onclick="setFollowUpTab('doneToday')" class="fu-tab">Done today <span data-fu-count="doneToday"></span></button>
+                    <span id="fu-timezone" class="ml-auto text-[11px] text-slate-400"></span>
+                </div>
+                <div id="fu-list" class="bg-white border border-slateBorder rounded-lg divide-y divide-slate-100"></div>
+            </div>
+
             <div id="view-tasks" class="view-panel hidden p-5 max-w-5xl mx-auto space-y-4">
                 <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slateBorder pb-3">
                     <div>
@@ -552,7 +699,7 @@
         <div class="bg-white rounded-lg shadow-2xl border border-slateBorder w-full max-w-md flex flex-col corp-modal">
             <div class="px-4 py-3 border-b border-slateBorder flex items-center justify-between bg-slate-50/80 rounded-t-lg">
                 <div>
-                    <h2 class="font-semibold text-slate-900 text-xs uppercase tracking-wider">Update Pipeline Stage</h2>
+                    <h2 id="stage-modal-title" class="font-semibold text-slate-900 text-xs uppercase tracking-wider">Update status</h2>
                     <p id="stage-modal-lead-name" class="text-xs text-slate-600 font-medium"></p>
                 </div>
                 <button onclick="closeStageTransitionModal()" class="text-slate-400 hover:text-slate-700">✕</button>
@@ -561,67 +708,39 @@
             <form onsubmit="handleStageTransitionSubmit(event)" class="p-4 space-y-3.5 text-xs">
                 <input type="hidden" id="stage-modal-lead-id">
                 
-                <!-- Stage Transition Indicator -->
-                <div class="p-2.5 rounded bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">
+                <div class="p-2.5 rounded bg-slate-50 border border-slate-200 grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-xs">
                     <div>
-                        <span class="text-[10px] text-slate-400 block uppercase font-medium">Current Stage</span>
+                        <span class="text-[10px] text-slate-400 block uppercase font-medium">Now</span>
                         <span id="stage-modal-old-stage" class="font-semibold text-slate-700"></span>
                     </div>
                     <span class="text-slate-400 font-mono">→</span>
-                    <div>
-                        <span class="text-[10px] text-slate-400 block uppercase font-medium">New Stage</span>
-                        <select id="stage-modal-new-stage" class="font-bold text-slate-900 bg-white border border-slate-300 rounded px-2 py-0.5 outline-none cursor-pointer">
-                            <option value="New">New</option>
-                            <option value="Contacted">Contacted</option>
-                            <option value="Risk / Underwriting">Risk / Underwriting</option>
-                            <option value="Quotation Sent">Quotation Sent</option>
-                            <option value="Won">Won</option>
-                            <option value="Lost">Lost</option>
-                        </select>
-                    </div>
+                    <label>
+                        <span class="text-[10px] text-slate-400 block uppercase font-medium">New status</span>
+                        <select id="stage-modal-new-stage" onchange="updateStageFields(this.value)" class="w-full font-bold text-slate-900 bg-white border border-slate-300 rounded px-2 py-0.5 outline-none cursor-pointer"></select>
+                    </label>
                 </div>
 
-                <!-- Next Action Selection Dropdown -->
-                <div>
-                    <label class="block font-medium text-slate-700 mb-1">Scheduled Next Action *</label>
-                    <select id="stage-modal-next-action-select" onchange="handleNextActionSelectChange(this.value)" class="corp-input">
-                        <option value="Collect Fleet RC Books & NCB Proof">Collect Fleet RC Books & NCB Proof</option>
-                        <option value="Dispatch Surveyor for On-site Inspection">Dispatch Surveyor for On-site Inspection</option>
-                        <option value="Submit Risk Schedule to Underwriters">Submit Risk Schedule to Underwriters</option>
-                        <option value="Deliver Comparative Quotation to Client">Deliver Comparative Quotation to Client</option>
-                        <option value="Negotiate Premium & Terms with CFO">Negotiate Premium & Terms with CFO</option>
-                        <option value="Collect Payment & Issue Policy Schedule">Collect Payment & Issue Policy Schedule</option>
-                        <option value="custom">Other Custom Action...</option>
-                    </select>
-                    <input type="text" id="stage-modal-custom-action" placeholder="Type custom action..." class="corp-input mt-1.5 hidden">
+                <div id="stage-modal-next-container" class="grid grid-cols-2 sm:grid-cols-[1fr_9rem_6.5rem] gap-2.5">
+                    <label class="block font-medium text-slate-700 col-span-2 sm:col-span-1">Next action *
+                        <input type="text" id="stage-modal-custom-action" list="next-action-suggestions" class="corp-input mt-1"></label>
+                    <label class="block font-medium text-slate-700">Due *
+                        <input type="date" id="stage-modal-action-date" class="corp-input mt-1 font-mono"></label>
+                    <label class="block font-medium text-slate-700">Time
+                        <input type="time" id="stage-modal-action-time" class="corp-input mt-1 font-mono"></label>
                 </div>
 
-                <!-- Next Action Due Date -->
-                <div>
-                    <label class="block font-medium text-slate-700 mb-1">Next Action Due Date *</label>
-                    <input type="date" id="stage-modal-action-date" required class="corp-input font-mono">
-                </div>
-
-                <!-- Conversation Summary Note -->
-                <div>
-                    <label class="block font-medium text-slate-700 mb-1">Stage Note / Activity Memo</label>
-                    <textarea id="stage-modal-note" rows="3" placeholder="Key updates from conversation, surveyor observations, or client requirements..." class="corp-input"></textarea>
-                </div>
-
-                <!-- Lost Reason (Appears only if Lost) -->
                 <div id="stage-modal-lost-container" class="hidden">
-                    <label class="block font-medium text-rose-700 mb-1">Loss Reason *</label>
-                    <select id="stage-modal-lost-reason" class="corp-input border-rose-300 text-rose-900">
-                        <option value="Competitor offered lower premium">Competitor offered lower premium</option>
-                        <option value="Underwriter declined hazardous risk">Underwriter declined hazardous risk</option>
-                        <option value="Client postponed asset renewal">Client postponed asset renewal</option>
-                        <option value="Unresponsive after 5 follow-ups">Unresponsive after 5 follow-ups</option>
-                    </select>
+                    <label class="block font-medium text-rose-700">Reason *
+                        <input type="text" id="stage-modal-lost-reason" list="close-reason-suggestions" placeholder="Why is this lead closing?" class="corp-input mt-1 border-rose-300"></label>
+                    <datalist id="close-reason-suggestions"></datalist>
                 </div>
+
+                <label class="block font-medium text-slate-700">Note
+                    <textarea id="stage-modal-note" rows="3" placeholder="What the customer said" class="corp-input mt-1"></textarea></label>
 
                 <div class="pt-2 border-t border-slateBorder flex items-center justify-end gap-2">
                     <button type="button" onclick="closeStageTransitionModal()" class="px-3 py-1.5 border border-slate-300 rounded text-slate-700 hover:bg-slate-50">Cancel</button>
-                    <button type="submit" class="px-4 py-1.5 bg-accentPrimary hover:bg-black text-white rounded font-semibold shadow-xs">Update Stage & Action</button>
+                    <button type="submit" class="px-4 py-1.5 bg-accentPrimary hover:bg-black text-white rounded font-semibold shadow-xs">Save status</button>
                 </div>
             </form>
         </div>
@@ -692,7 +811,7 @@
             <form onsubmit="handleTaskSubmit(event)" class="p-4 space-y-3 text-xs">
                 <div>
                     <label class="block font-medium text-slate-700 mb-1">Task Title *</label>
-                    <input type="text" id="task-modal-title" required placeholder="e.g. Obtain vehicle fleet NCB certificate" class="corp-input">
+                    <input type="text" id="task-modal-title" required placeholder="e.g. Call back about the quotation" class="corp-input">
                 </div>
 
                 <div class="grid grid-cols-2 gap-2.5">
@@ -712,19 +831,13 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-2 gap-2.5">
-                    <div>
-                        <label class="block font-medium text-slate-700 mb-1">Due Date *</label>
-                        <input type="date" id="task-modal-date" required class="corp-input font-mono">
-                    </div>
-                    <div>
-                        <label class="block font-medium text-slate-700 mb-1">Assignee</label>
-                        <select id="task-modal-assignee" class="corp-input">
-                            <option value="Sarah Connor">Sarah Connor</option>
-                            <option value="Aarav Sharma">Aarav Sharma</option>
-                            <option value="John Parker">John Parker</option>
-                        </select>
-                    </div>
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                    <label class="block font-medium text-slate-700">Due *
+                        <input type="date" id="task-modal-date" required class="corp-input mt-1 font-mono"></label>
+                    <label class="block font-medium text-slate-700">Time
+                        <input type="time" id="task-modal-time" class="corp-input mt-1 font-mono"></label>
+                    <label id="task-modal-assignee-field" class="block font-medium text-slate-700 col-span-2 sm:col-span-1">For
+                        <select id="task-modal-assignee" data-roster="names-only" class="corp-input mt-1"></select></label>
                 </div>
 
                 <div><label class="block font-medium text-slate-700 mb-1">Activity Type</label><select id="task-modal-type" class="corp-input"><option>Follow-up</option><option>Call</option><option>Meeting</option><option>Email</option><option>Document Collection</option><option>Quotation</option><option>General Task</option></select></div>
@@ -756,77 +869,126 @@
     <!-- MODAL: CREATE NEW LEAD                                         -->
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <div id="create-modal" role="dialog" aria-modal="true" aria-label="Create lead" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden">
-        <div class="bg-white rounded-lg shadow-2xl border border-slateBorder w-full max-w-lg flex flex-col corp-modal">
+        <div class="bg-white rounded-lg shadow-2xl border border-slateBorder w-full max-w-lg flex flex-col corp-modal max-h-[92vh]">
             <div class="px-4 py-3 border-b border-slateBorder flex items-center justify-between bg-slate-50/80 rounded-t-lg">
-                <h2 id="lead-form-title" class="font-semibold text-slate-900 text-xs uppercase tracking-wider">New Insurance Lead</h2>
+                <h2 id="lead-form-title" class="font-semibold text-slate-900 text-xs uppercase tracking-wider">New Lead</h2>
                 <button aria-label="Close lead form" onclick="closeCreateModal()" class="text-slate-400 hover:text-slate-700">✕</button>
             </div>
-            <form onsubmit="handleCreateLeadSubmit(event)" class="p-4 space-y-3 text-xs">
-                <div class="grid grid-cols-2 gap-2.5">
-                    <div>
-                        <label class="block font-medium text-slate-700 mb-1">Contact Name *</label>
-                        <input type="text" id="lead-name" required placeholder="e.g. Vikram Mehta" class="corp-input">
-                    </div>
-                    <div>
-                        <label class="block font-medium text-slate-700 mb-1">Company / Organization *</label>
-                        <input type="text" id="lead-organization" required placeholder="e.g. Mehta Logistics Ltd" class="corp-input">
-                    </div>
+            <form onsubmit="handleCreateLeadSubmit(event)" class="p-4 space-y-3 text-xs overflow-y-auto">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <label class="block font-medium text-slate-700">Customer name *
+                        <input type="text" id="lead-name" required autocomplete="off" placeholder="e.g. Vikram Mehta" class="corp-input mt-1"></label>
+                    <label class="block font-medium text-slate-700">Mobile *
+                        <input type="tel" id="lead-mobile" required placeholder="+91 98765 43210" class="corp-input mt-1 font-mono"></label>
+                    <label class="block font-medium text-slate-700">Email
+                        <input type="email" id="lead-email" placeholder="optional" class="corp-input mt-1 font-mono"></label>
+                    <label class="block font-medium text-slate-700">City
+                        <input type="text" id="lead-city" placeholder="e.g. Pune" class="corp-input mt-1"></label>
+                    <label class="block font-medium text-slate-700">Product *
+                        <select id="lead-product" required onchange="showProductDetails(this.value)" class="corp-input mt-1"></select></label>
+                    <label class="block font-medium text-slate-700">Lead source
+                        <select id="lead-source" class="corp-input mt-1"></select></label>
+                    <label class="block font-medium text-slate-700">Current policy expires
+                        <input type="date" id="lead-expiry" class="corp-input mt-1 font-mono"></label>
+                    <label class="block font-medium text-slate-700">Current insurer
+                        <input type="text" id="lead-insurer" placeholder="e.g. ICICI Lombard" class="corp-input mt-1"></label>
+                    <label class="block font-medium text-slate-700">Current premium (₹)
+                        <input type="text" id="lead-premium" inputmode="decimal" placeholder="optional" class="corp-input mt-1 font-mono"></label>
+                    <label id="lead-owner-field" class="block font-medium text-slate-700">Telecaller
+                        <select id="lead-owner" data-roster="names-only" class="corp-input mt-1"></select></label>
                 </div>
 
-                <div class="grid grid-cols-2 gap-2.5">
-                    <div>
-                        <label class="block font-medium text-slate-700 mb-1">Mobile Phone *</label>
-                        <input type="tel" id="lead-mobile" required placeholder="+91 98765 43210" class="corp-input font-mono">
+                <details id="lead-car-details" class="border border-slateBorder rounded-md hidden">
+                    <summary class="px-3 py-2 cursor-pointer font-semibold text-slate-700">Car details <span class="font-normal text-slate-400">— optional</span></summary>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 p-3 pt-1">
+                        <label class="block font-medium text-slate-700 col-span-2 sm:col-span-1">Registration no.
+                            <input type="text" id="car-registration" placeholder="MH12AB1234" class="corp-input mt-1 font-mono uppercase"></label>
+                        <label class="block font-medium text-slate-700">Make
+                            <input type="text" id="car-make" placeholder="Maruti" class="corp-input mt-1"></label>
+                        <label class="block font-medium text-slate-700">Model
+                            <input type="text" id="car-model" placeholder="Swift VXi" class="corp-input mt-1"></label>
+                        <label class="block font-medium text-slate-700">Year
+                            <input type="number" id="car-year" min="1980" placeholder="2019" class="corp-input mt-1 font-mono"></label>
+                        <label class="block font-medium text-slate-700">Fuel
+                            <select id="car-fuel" class="corp-input mt-1"></select></label>
+                        <label class="block font-medium text-slate-700">No-claim bonus
+                            <select id="car-ncb" class="corp-input mt-1"></select></label>
                     </div>
-                    <div>
-                        <label class="block font-medium text-slate-700 mb-1">Email Address</label>
-                        <input type="email" id="lead-email" placeholder="contact@company.in" class="corp-input font-mono">
-                    </div>
-                </div>
+                </details>
 
-                <div class="grid grid-cols-2 gap-2.5">
-                    <div>
-                        <label class="block font-medium text-slate-700 mb-1">Policy Category</label>
-                        <select id="lead-policy-type" class="corp-input">
-                            <option value="Comprehensive Commercial Fleet Motor">Commercial Fleet Motor</option>
-                            <option value="Corporate Group Health Care Shield">Group Health Care Shield</option>
-                            <option value="Plant & Heavy Machinery Cover">Plant & Heavy Machinery</option>
-                            <option value="Cyber Security & Professional Indemnity">Cyber Security & Indemnity</option>
-                            <option value="Industrial All Risk (IAR) & Fire">Industrial All Risk (IAR)</option>
-                        </select>
+                <details id="lead-health-details" class="border border-slateBorder rounded-md hidden">
+                    <summary class="px-3 py-2 cursor-pointer font-semibold text-slate-700">Health details <span class="font-normal text-slate-400">— optional</span></summary>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-3 pt-1">
+                        <label class="block font-medium text-slate-700">Plan type
+                            <select id="health-plan" class="corp-input mt-1"></select></label>
+                        <label class="block font-medium text-slate-700">Cover wanted (₹)
+                            <input type="number" id="health-sum" min="0" step="50000" placeholder="500000" class="corp-input mt-1 font-mono"></label>
+                        <label class="block font-medium text-slate-700 sm:col-span-2">Who is covered
+                            <input type="text" id="health-members" placeholder="Self 38, Spouse 35, Son 8" class="corp-input mt-1">
+                            <span class="block font-normal text-[11px] text-slate-400 mt-0.5">Relation and age, separated by commas.</span></label>
+                        <label class="block font-medium text-slate-700 sm:col-span-2">Existing illnesses
+                            <input type="text" id="health-conditions" placeholder="e.g. diabetes, BP — or leave blank" class="corp-input mt-1"></label>
                     </div>
-                    <div>
-                        <label class="block font-medium text-slate-700 mb-1">Annual Premium (₹)</label>
-                        <input type="text" id="lead-premium" placeholder="₹ 65,000" class="corp-input font-mono">
-                    </div>
-                </div>
+                </details>
 
-                <div class="grid grid-cols-2 gap-2.5">
-                    <div>
-                        <label class="block font-medium text-slate-700 mb-1">Policy Expiry / Renewal Date</label>
-                        <input type="date" id="lead-expiry" class="corp-input font-mono">
-                    </div>
-                    <div>
-                        <label class="block font-medium text-slate-700 mb-1">Assigned Broker</label>
-                        <select id="lead-owner" data-roster="names-only" class="corp-input"></select>
-                    </div>
+                <div class="grid grid-cols-2 sm:grid-cols-[1fr_9rem_6.5rem] gap-2.5">
+                    <label class="block font-medium text-slate-700 col-span-2 sm:col-span-1">Next action *
+                        <input type="text" id="lead-next-action" list="next-action-suggestions" value="First call" class="corp-input mt-1"></label>
+                    <label class="block font-medium text-slate-700">Due *
+                        <input type="date" id="lead-next-action-date" required class="corp-input mt-1 font-mono"></label>
+                    <label class="block font-medium text-slate-700">Time
+                        <input type="time" id="lead-next-action-time" class="corp-input mt-1 font-mono"></label>
                 </div>
+                <datalist id="next-action-suggestions"></datalist>
 
-                <div class="grid grid-cols-2 gap-2.5">
-                    <div><label class="block font-medium text-slate-700 mb-1">Next Action *</label><input type="text" id="lead-next-action" value="Initial Discovery Discussion" class="corp-input"></div>
-                    <div><label class="block font-medium text-slate-700 mb-1">Action Due Date *</label><input type="date" id="lead-next-action-date" required class="corp-input font-mono"></div>
-                </div>
-
-                <div>
-                    <label class="block font-medium text-slate-700 mb-1">Underwriting Scope / Initial Memo</label>
-                    <textarea id="lead-notes" rows="2" placeholder="Fleet size, past claims, specific coverage needs..." class="corp-input"></textarea>
-                </div>
+                <label class="block font-medium text-slate-700">Notes
+                    <textarea id="lead-notes" rows="2" placeholder="What the customer said on the call" class="corp-input mt-1"></textarea></label>
 
                 <div class="pt-3 border-t border-slateBorder flex items-center justify-end gap-2">
                     <button type="button" onclick="closeCreateModal()" class="px-3 py-1.5 border border-slate-300 rounded text-slate-700 hover:bg-slate-50">Cancel</button>
-                    <button id="lead-form-submit" type="submit" class="px-4 py-1.5 bg-accentPrimary hover:bg-black text-white rounded font-semibold shadow-xs">Save Lead</button>
+                    <button id="lead-form-submit" type="submit" class="px-4 py-1.5 bg-accentPrimary hover:bg-black text-white rounded font-semibold shadow-xs">Save lead</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Call screen (client blueprint, slides 15–16) -->
+    <div id="call-modal" role="dialog" aria-modal="true" aria-labelledby="call-title" class="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-3 z-50 hidden">
+        <div class="bg-white rounded-lg shadow-2xl border border-slateBorder w-full max-w-4xl max-h-[94vh] flex flex-col corp-modal overflow-hidden">
+            <div class="px-4 py-3 border-b border-slateBorder flex items-center justify-between gap-3 bg-slate-50/80">
+                <div class="min-w-0">
+                    <h2 id="call-title" class="font-semibold text-slate-900 text-sm truncate"></h2>
+                    <p id="call-subtitle" class="text-[11px] text-slate-500 truncate"></p>
+                </div>
+                <div class="flex items-center gap-3 shrink-0">
+                    <span id="call-timer" class="font-mono text-lg font-semibold text-slate-900 num-tabular" aria-live="off">0:00</span>
+                    <button aria-label="Close call screen" onclick="closeCallScreen()" class="text-slate-400 hover:text-slate-700">✕</button>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-[1.1fr_1fr] min-h-0 flex-1 overflow-y-auto">
+                <section id="call-customer" class="p-4 space-y-3 border-b md:border-b-0 md:border-r border-slateBorder text-xs" aria-label="Customer"></section>
+                <section class="p-4 space-y-3 text-xs">
+                    <div id="call-dialling" class="space-y-3">
+                        <p id="call-instructions" class="text-slate-600"></p>
+                        <a id="call-dial-link" class="inline-flex items-center gap-2 px-3 py-1.5 border border-slate-300 rounded text-xs font-semibold" href="#">Dial again</a>
+                        <label class="block font-medium text-slate-700">Notes during the call
+                            <textarea id="call-notes" rows="6" class="corp-input mt-1" placeholder="What the customer says — needs, objections, what to send"></textarea></label>
+                        <button type="button" onclick="showCallOutcomes()" class="w-full px-4 py-2 bg-slate-900 text-white rounded text-xs font-semibold">End call and record the outcome</button>
+                    </div>
+                    <form id="call-outcome-form" class="space-y-3 hidden" onsubmit="submitCallOutcome(event)">
+                        <fieldset>
+                            <legend class="font-semibold text-slate-800 mb-1.5">How did it go?</legend>
+                            <div id="call-outcomes" class="space-y-2"></div>
+                        </fieldset>
+                        <div id="call-outcome-fields" class="grid grid-cols-2 gap-2.5"></div>
+                        <p id="call-outcome-error" class="text-rose-700 text-[11px]" role="alert"></p>
+                        <div class="flex justify-between gap-2 pt-2 border-t border-slateBorder">
+                            <button type="button" onclick="backToCall()" class="px-3 py-1.5 border border-slate-300 rounded text-xs">Back to call</button>
+                            <button type="submit" class="px-4 py-1.5 bg-slate-900 text-white rounded text-xs font-semibold">Save outcome</button>
+                        </div>
+                    </form>
+                </section>
+            </div>
         </div>
     </div>
 
@@ -847,13 +1009,12 @@
                     <button data-setting-tab="profile" onclick="switchSettingTab('profile')" class="setting-tab-btn w-full text-left px-2.5 py-1.5 rounded font-medium text-slate-600 hover:bg-slate-100">My Profile</button>
                     <button data-setting-tab="users" onclick="switchSettingTab('users')" class="setting-tab-btn w-full text-left px-2.5 py-1.5 rounded font-medium text-slate-600 hover:bg-slate-100">Users</button>
                     <button data-setting-tab="hierarchy" onclick="switchSettingTab('hierarchy')" class="setting-tab-btn w-full text-left px-2.5 py-1.5 rounded font-medium text-slate-600 hover:bg-slate-100">Sales Hierarchy</button>
-                    <button data-setting-tab="rules" onclick="switchSettingTab('rules')" class="setting-tab-btn w-full text-left px-2.5 py-1.5 rounded font-medium text-slate-600 hover:bg-slate-100">Assignment Rules</button>
                     <button data-setting-tab="team" onclick="switchSettingTab('team')" class="setting-tab-btn w-full text-left px-2.5 py-1.5 rounded font-medium text-slate-600 hover:bg-slate-100">Team Allocation</button>
                     <button data-setting-tab="templates" onclick="switchSettingTab('templates')" class="setting-tab-btn w-full text-left px-2.5 py-1.5 rounded font-medium text-slate-600 hover:bg-slate-100">Message Templates</button>
                     <button data-setting-tab="watemplates" onclick="switchSettingTab('watemplates')" class="setting-tab-btn w-full text-left px-2.5 py-1.5 rounded font-medium text-slate-600 hover:bg-slate-100">WhatsApp Templates</button>
                     <button data-setting-tab="configuration" onclick="switchSettingTab('configuration')" class="setting-tab-btn w-full text-left px-2.5 py-1.5 rounded font-medium text-slate-600 hover:bg-slate-100">CRM Configuration</button>
                     <button data-setting-tab="archive" onclick="switchSettingTab('archive')" class="setting-tab-btn w-full text-left px-2.5 py-1.5 rounded font-medium text-slate-600 hover:bg-slate-100">Archive & Restore</button>
-                    <button data-setting-tab="reports" onclick="switchSettingTab('reports')" class="setting-tab-btn w-full text-left px-2.5 py-1.5 rounded font-medium text-slate-600 hover:bg-slate-100">Reports & Backups</button>
+                    <button data-setting-tab="reports" onclick="switchSettingTab('reports')" class="setting-tab-btn w-full text-left px-2.5 py-1.5 rounded font-medium text-slate-600 hover:bg-slate-100">Backups</button>
                 </div>
                 <!-- Content -->
                 <div class="flex-1 p-5 overflow-y-auto" id="setting-pane-content"></div>
@@ -949,6 +1110,44 @@
     <button onclick="toggleAiAdvisor()" class="fixed bottom-5 right-5 w-10 h-10 rounded-full bg-accentPrimary hover:bg-black text-white shadow-lg flex items-center justify-center z-40 transition-transform hover:scale-105 active:scale-95" title="Open AI Advisor">
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
     </button>
+
+    <!-- Side-by-Side Quotation Comparison Modal -->
+    <div id="quote-comparison-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden">
+        <div class="corp-modal bg-white rounded-lg shadow-xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="px-5 py-4 border-b border-slateBorder flex items-center justify-between bg-slate-50">
+                <div>
+                    <h2 id="quote-modal-title" class="text-sm font-semibold text-slate-900">Side-by-Side Quotation Comparison</h2>
+                    <p id="quote-modal-subtitle" class="text-xs text-slate-500 mt-0.5">Evaluate competing insurer proposals</p>
+                </div>
+                <button type="button" onclick="closeQuoteComparisonModal()" class="text-slate-400 hover:text-slate-700 p-1">✕</button>
+            </div>
+            <div id="quote-modal-body" class="p-5 overflow-auto flex-1"></div>
+            <div class="px-5 py-3 border-t border-slateBorder bg-slate-50 flex justify-end">
+                <button type="button" onclick="closeQuoteComparisonModal()" class="px-4 py-1.5 border border-slate-300 rounded text-xs font-medium text-slate-700 bg-white hover:bg-slate-50">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Policy Issuance Document Checklist Evidence Modal -->
+    <div id="policy-issuance-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden">
+        <div class="corp-modal bg-white rounded-lg shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="px-5 py-4 border-b border-slateBorder flex items-center justify-between bg-slate-50">
+                <div>
+                    <h2 class="text-sm font-semibold text-slate-900">Issue Policy — Document Checklist Evidence</h2>
+                    <p id="issuance-modal-subtitle" class="text-xs text-slate-500 mt-0.5">Mandatory uploaded document proof required before activation</p>
+                </div>
+                <button type="button" onclick="closePolicyIssuanceModal()" class="text-slate-400 hover:text-slate-700 p-1">✕</button>
+            </div>
+            <div id="issuance-modal-body" class="p-5 overflow-y-auto space-y-4 flex-1"></div>
+            <div class="px-5 py-3 border-t border-slateBorder bg-slate-50 flex justify-between items-center">
+                <div id="issuance-status-indicator" class="text-xs font-medium text-amber-700">Checking document evidence...</div>
+                <div class="flex gap-2">
+                    <button type="button" onclick="closePolicyIssuanceModal()" class="px-3 py-1.5 border border-slate-300 rounded text-xs font-medium text-slate-700 bg-white hover:bg-slate-50">Cancel</button>
+                    <button id="confirm-issue-button" onclick="submitPolicyIssuance()" disabled class="px-4 py-1.5 bg-emerald-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded text-xs font-semibold hover:bg-emerald-700 transition-colors">Issue Policy</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- TOAST NOTIFICATION -->
     <div id="toast" role="status" aria-live="polite" class="fixed bottom-5 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-3.5 py-1.5 rounded text-xs font-medium shadow-xl z-50 pointer-events-none opacity-0 transition-opacity duration-200 flex items-center gap-2 border border-slate-700">
