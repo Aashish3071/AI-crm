@@ -365,7 +365,7 @@ def may_mutate_path(role: str, path: str) -> bool:
 
 def may_read_path(role: str, path: str) -> bool:
     level = normalized_role(role)
-    if path.startswith(("/api/backups", "/api/admin", "/api/commission")):
+    if path.startswith(("/api/backups", "/api/admin", "/api/commission", "/api/export")):
         return level == "admin"
     if path.startswith(("/api/leaderboard", "/api/reports")):
         return level in {"admin", "manager", "readonly"}

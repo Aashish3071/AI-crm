@@ -27,3 +27,7 @@ output/
 tmp/
 test_output.log
 .agents/
+# Outdated conflict copies and the old commercial-broker readme
+README 2.md
+ARCHITECTURE 2.md
+Read.md

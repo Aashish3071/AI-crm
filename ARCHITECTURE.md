@@ -472,6 +472,10 @@ Every document starts `Pending`. An Owner / Admin or Manager marks it `Verified`
 
 The lead card shows the checklist for the lead's product, with a button that drafts a WhatsApp or email message naming exactly what is still missing (slide 19). The 24-hour WhatsApp rule still applies: outside it, only an approved template can be sent, and the composer says so.
 
+### Data export and restore (slides 41–42)
+
+`GET /api/export[?includeFiles=true]` (Owner / Admin: path-level in `may_read_path` and `_require_admin` in the handler) builds a ZIP in a temporary file, deleted after it is sent: one UTF-8-with-BOM CSV per collection listed in `EXPORT_SHEETS`, plus `targets.csv`, the whole company data as `crm-data.json` (keys beginning `_` left out), optional `documents/<id>-<name>` files read through the same storage adapter as downloads, and a `README.txt` with row counts. Columns are the union of record keys, and internal markers (`automationState`, `automationKeys`) are dropped. Nested values are written as JSON text. Text starting with `= + - @` or a tab or carriage return is prefixed with an apostrophe, so a formula typed into a public lead form cannot execute in Excel. Sign-in data lives in the identity store and is never included. Each export writes a **Data Exported** audit event with row counts. The Backups tab offers **Restore** for each in-app backup through the existing `POST /api/backups/{name}/restore`, which saves a safety copy first, and it shows `GET /api/admin/jobs` (last scheduler run and error).
+
 ## 9. Search, filters, reporting and accessibility
 
 Global search resolves leads, customers, policies, renewals, deals, contacts and organizations and returns navigation context. Lead lists provide server-side pagination. User-owned saved lead views retain search, stage, owner and urgency criteria.

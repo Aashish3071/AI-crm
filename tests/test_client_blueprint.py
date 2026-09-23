@@ -1533,3 +1533,49 @@ class TargetAchieved(ClientBlueprintCase):
         self.assertEqual([(a["assignedTo"], a["title"]) for a in alerts()], [("Priya Sharma", "Target achieved — Priya Sharma")])
         recipes = {r["key"]: r for r in self.call(self.owner, "GET", "/api/automations").json()["recipes"]}
         self.assertIn("builtIn", recipes["target-incentive"])
+
+
+# ─── Slides 41–42: the business can take all of its data away ───────────────
+class DataExport(ClientBlueprintCase):
+
+    @slide(41, "The owner exports every record as spreadsheets plus one complete file; nobody else can")
+    def test_export(self):
+        import csv as _csv, io as _io, json as _json, zipfile as _zip
+        self.add_staff("Priya Sharma", "telecaller")
+        self.add_staff("Meena Rao", "manager")
+        lead = self.call(self.owner, "POST", "/api/leads", json={"firstName": "=HYPERLINK(\"x\")", "mobile": "+91 90005 00001",
+                                                                   "product": "Car Insurance", "assignedTo": "Priya Sharma"}).json()
+        res = self.call(self.owner, "GET", "/api/export")
+        self.assertEqual(res.status_code, 200, res.text)
+        archive = _zip.ZipFile(_io.BytesIO(res.content))
+        names = set(archive.namelist())
+        for expected in ("leads.csv", "customers.csv", "policies.csv", "calls.csv", "follow-ups.csv", "team.csv",
+                         "targets.csv", "audit-log.csv", "crm-data.json", "README.txt"):
+            self.assertIn(expected, names)
+        rows = list(_csv.DictReader(_io.StringIO(archive.read("leads.csv").decode("utf-8-sig"))))
+        row = next(r for r in rows if r["id"] == lead["id"])
+        self.assertTrue(row["name"].startswith("'="))                # a formula from a web form stays text
+        self.assertEqual(row["mobile"], "'+91 90005 00001")
+        self.assertNotIn("automationState", rows[0])
+        full = _json.loads(archive.read("crm-data.json"))
+        self.assertIn(lead["id"], {l["id"] for l in full["leads"]})
+        self.assertNotIn(b"Password", archive.read("team.csv"))
+        audit = self.call(self.owner, "GET", "/api/audit-logs").json()
+        entries = audit if isinstance(audit, list) else audit.get("items", [])
+        self.assertTrue(any(e.get("action") == "Data Exported" for e in entries))
+        for email in ("priya.sharma@blueprint.invalid", "meena.rao@blueprint.invalid"):
+            self.assertEqual(self.call(self.sign_in(email), "GET", "/api/export").status_code, 403)
+
+    @slide(41, "Uploaded documents can be included in the export")
+    def test_export_with_documents(self):
+        import io as _io, zipfile as _zip
+        lead = self.call(self.owner, "POST", "/api/leads", json={"firstName": "Docs", "mobile": "+91 90005 00002",
+                                                                   "product": "Car Insurance"}).json()
+        pdf = b"%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n"
+        up = self.call(self.owner, "POST", "/api/documents", params={"associatedId": lead["id"], "associatedType": "Lead",
+                       "category": "RC", "filename": "rc.pdf"}, content=pdf, headers={"Content-Type": "application/pdf"})
+        self.assertEqual(up.status_code, 200, up.text)
+        archive = _zip.ZipFile(_io.BytesIO(self.call(self.owner, "GET", "/api/export", params={"includeFiles": "true"}).content))
+        files = [n for n in archive.namelist() if n.startswith("documents/")]
+        self.assertEqual(len(files), 1)
+        self.assertEqual(archive.read(files[0]), pdf)

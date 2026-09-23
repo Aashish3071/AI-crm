@@ -8,6 +8,18 @@ The build follows the client's own requirement document, *Insurance Telecalling 
 
 An alternative plan, [CLIENT_NON_AI_LAUNCH_PLAN.md](uat/CLIENT_NON_AI_LAUNCH_PLAN.md), proposes shipping every non-AI module before launch. It was written in a separate session and is **not** the plan being followed; it is kept for reference.
 
+### Data export and handover — 23 September 2026
+
+**Export all data** (Settings & Data → Backups, Owner only) downloads a ZIP with a spreadsheet for every kind of record — leads, customers, policies, renewals, calls, quotations, follow-ups, notes, messages, calendar, team, targets, incentive statements and the audit log — plus one complete file for moving to another system, and optionally every uploaded document. The spreadsheets open correctly in Excel, including ₹ and Indian names. Text a stranger typed into a web form can't run as a spreadsheet formula. Passwords are never included, and every export is recorded in the audit log.
+
+**Restore** now has a button next to each backup. A safety copy of the current data is saved first, so a mistaken restore can be undone. The Backups tab also shows when reminders and renewals last ran and any error.
+
+**Handover documents** are in [`docs/`](docs/): an [Owner's Guide](docs/OWNER_GUIDE.md) (where each thing on slide 42 is controlled and the month-end routine), a [Telecaller's Guide](docs/TELECALLER_GUIDE.md), an [Operations Runbook](docs/OPERATIONS.md) (install, configuration, scheduler, backups, restore, updates, troubleshooting) and a [Developer Handover](docs/DEVELOPER_HANDOVER.md) (code map, data flow, visibility rules, where each slide lives, tests, conventions). `.env.example` now lists every setting the code reads.
+
+The repository no longer tracks iCloud conflict copies (`README 2.md`, `ARCHITECTURE 2.md`, and `crm_identity 2.json`, a test account's sign-in file) or the outdated `Read.md`.
+
+Verification: 277 automated tests pass, 108 of them against the client's blueprint, and all 7 browser tests.
+
 ### Clean-up — 23 September 2026
 
 - **Target achieved:** a telecaller is now notified once, the moment they reach 100% of their monthly target, and their manager sees it too. Their incentive estimate already updated with every sale. The last row of the automation table is now marked as built in.
@@ -268,6 +280,11 @@ Calendar appointments can be linked to leads, customers, policies, renewals, dea
 | `crm_store.py` | PostgreSQL transactional record/link adapter and scheduler lock |
 | `crm_storage.py` | Local-development and S3-compatible document adapter |
 | `crm_worker.py` | Durable reminder, escalation and scheduled-message worker |
+| `crm_metrics.py` | The single definition of every measure, target, incentive and funnel figure |
+| `crm_automation.py` | Automation engine: triggers, conditions, actions, guardrails and assignment methods |
+| `crm_telephony.py` | Telephony provider interface (manual calling today) |
+| `crm_test_isolation.py`, `conftest.py` | Keep every test on temporary storage |
+| `docs/` | Handover: owner's guide, telecaller's guide, operations runbook, developer handover |
 | `migrations/001_tenant_record_store.sql` | PostgreSQL record, relationship and identity constraints |
 | `migrate_to_postgres.py` | Guarded legacy JSON-to-PostgreSQL migration |
 | `web/` | Accessible responsive single-page CRM |
@@ -277,7 +294,7 @@ Calendar appointments can be linked to leads, customers, policies, renewals, dea
 | `Dockerfile`, `docker-compose.yml` | Repeatable production runtime |
 | `tests/test_browser_flows.py`, `requirements-test.txt` | Isolated Playwright browser acceptance suite |
 
-The older Node/Frappe/voice files remain outside the CRM production image. They are retained only as source material for a later integration phase and do not run in this release.
+`pipecat_agent.py`, `test_lmstudio_pipeline.py` and `requirements.txt` belong to the separate AI voice-calling prototype. It is not part of the CRM and does not run in this release.
 
 ## Local development
 
@@ -323,7 +340,7 @@ Set `CRM_E2E_BASE_URL` only when intentionally testing a disposable deployed env
 ## Production deployment
 
 1. Copy `.env.example` to `.env` and replace every placeholder. Use a secret manager in the hosted environment; do not commit `.env`.
-2. Set a real HTTPS `PUBLIC_BASE_URL`, provider OAuth application IDs/secrets, a Fernet `CREDENTIAL_ENCRYPTION_KEY`, independent `SESSION_SECRET`, `OAUTH_STATE_SECRET` and `AUDIT_SIGNING_KEY`.
+2. Set provider OAuth application IDs/secrets, a Fernet `CREDENTIAL_ENCRYPTION_KEY`, and independent `SESSION_SECRET`, `OAUTH_STATE_SECRET` and `AUDIT_SIGNING_KEY`. Callback and webhook addresses are built from the incoming request, so the HTTPS proxy must forward the original host and scheme. [docs/OPERATIONS.md](docs/OPERATIONS.md) explains every setting.
 3. Validate and start the stack:
 
 ```bash
