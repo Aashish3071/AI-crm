@@ -1112,8 +1112,12 @@ class TestTier3CrossFeatureCombinations(BaseE2ETestCase):
     @tier(3, "C-REN-01", gate=2)
     def test_combo_policy_renewal_competing_quotes_and_idempotent_issuance(self):
         """Cross-feature: Active policy -> renewal generation -> competing quotes -> quote selection -> idempotent completion."""
+        # Dates are relative to today: a fixed expiry falls out of the renewal window once it passes.
+        today = datetime.now().date()
+        expiry = today + timedelta(days=30)
+        validity = (today + timedelta(days=20)).isoformat()
         cust = self.create_customer()
-        pol = self.create_policy(cust["id"], status="Active", expiryDate="2026-10-15", premium=100000)
+        pol = self.create_policy(cust["id"], status="Active", expiryDate=expiry.isoformat(), premium=100000)
 
         # Generate renewals
         gen = self.client.post("/api/renewals/generate?days=365").json()
@@ -1121,10 +1125,10 @@ class TestTier3CrossFeatureCombinations(BaseE2ETestCase):
 
         # Competing quotes
         q1 = self.client.post("/api/quotations", json={
-            "renewalId": renewal["id"], "insurer": "HDFC Ergo", "premium": 95000, "validityDate": "2026-10-14"
+            "renewalId": renewal["id"], "insurer": "HDFC Ergo", "premium": 95000, "validityDate": validity
         }).json()
         q2 = self.client.post("/api/quotations", json={
-            "renewalId": renewal["id"], "insurer": "Tata AIG", "premium": 92000, "validityDate": "2026-10-14"
+            "renewalId": renewal["id"], "insurer": "Tata AIG", "premium": 92000, "validityDate": validity
         }).json()
 
         # Select Best Quote
@@ -1132,8 +1136,8 @@ class TestTier3CrossFeatureCombinations(BaseE2ETestCase):
 
         payload = {
             "policyNumber": "BP-NEXT-COMBO",
-            "startDate": "2026-10-16",
-            "expiryDate": "2027-10-15",
+            "startDate": (expiry + timedelta(days=1)).isoformat(),
+            "expiryDate": (expiry + timedelta(days=366)).isoformat(),
             "documentChecklist": dict.fromkeys(["proposalForm", "kyc", "payment", "schedule"], True),
         }
 
