@@ -8,6 +8,17 @@ The build follows the client's own requirement document, *Insurance Telecalling 
 
 An alternative plan, [CLIENT_NON_AI_LAUNCH_PLAN.md](uat/CLIENT_NON_AI_LAUNCH_PLAN.md), proposes shipping every non-AI module before launch. It was written in a separate session and is **not** the plan being followed; it is kept for reference.
 
+### AI customization, phase 0 — 29 October 2026
+
+Groundwork for letting each agency shape the CRM to its own business, following the [AI customization plan](docs/AI_CUSTOMIZATION_PLAN.md). Agreed: insurance agencies first, and companies will be able to change their lead stages.
+
+- **The reporting assistant now answers only from what you may see.** It used to read the whole company's leads, policies, renewals and customers, so a telecaller could ask about a colleague's customers. It now sees exactly what the person asking sees on every other screen.
+- **AI runs through one place, with a daily limit.** Set `OPENROUTER_API_KEY` and `AI_MODEL` — while testing, one of OpenRouter's free models. Without a model the assistant says so and uses its built-in answers rather than quietly picking a paid one. Each company gets `AI_DAILY_LIMIT` requests a day (50 unless set). If a free model is busy, the assistant says so. Free models may keep what they are sent, so test with demo data.
+- **Custom fields and stages: the rules are written.** `crm_schema.py` defines the thirteen kinds of field an agency will be able to add and checks every value typed, imported or received. It also defines the four stage categories that will let an agency rename or add stages without breaking calls, follow-ups or reports. Nothing on screen changes yet; the fields appear in Phase 1.
+- **Fixes:** the container image now includes every CRM module (it left out three the server needs to start), a renewal test no longer depends on a date that has passed, and `requirements-test.txt` now installs pytest.
+
+Verification: 318 automated tests pass, including 41 new ones for custom fields and the assistant. The browser tests could not be checked in this build environment: it cannot reach the Tailwind stylesheet the screens load from `cdn.tailwindcss.com`, so 28 of 29 fail with or without these changes. None of the screens changed.
+
 ### Data export and handover — 23 September 2026
 
 **Export all data** (Settings & Data → Backups, Owner only) downloads a ZIP with a spreadsheet for every kind of record — leads, customers, policies, renewals, calls, quotations, follow-ups, notes, messages, calendar, team, targets, incentive statements and the audit log — plus one complete file for moving to another system, and optionally every uploaded document. The spreadsheets open correctly in Excel, including ₹ and Indian names. Text a stranger typed into a web form can't run as a spreadsheet formula. Passwords are never included, and every export is recorded in the audit log.

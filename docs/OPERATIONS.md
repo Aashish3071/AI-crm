@@ -65,7 +65,7 @@ docker compose ps
 | `ENABLE_REMINDER_SCHEDULER` | `1` runs the scheduler inside the web server (single machine); `0` when `crm_worker.py` runs |
 | `SCHEDULER_INTERVAL_SECONDS` | How often the worker runs (default 60) |
 | `META_CLIENT_ID` / `META_CLIENT_SECRET`, `GOOGLE_…`, `LINKEDIN_…` | Only needed to connect advertising lead forms |
-| `OPENROUTER_API_KEY`, `ADVISOR_MODEL` | Only for the optional reporting assistant |
+| `OPENROUTER_API_KEY`, `AI_MODEL`, `AI_DAILY_LIMIT` | Only for the optional AI features. `AI_MODEL` is an OpenRouter model id (free ones end in `:free`); without it the assistant uses its built-in answers. `AI_DAILY_LIMIT` caps requests per company per day (default 50). `ADVISOR_MODEL` is read if `AI_MODEL` is empty. |
 | `AUTH_DISABLED` | `1` switches sign-in off. **Development only — never on a real server.** |
 
 Generate secrets with:

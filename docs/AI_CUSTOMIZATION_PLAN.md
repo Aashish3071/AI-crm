@@ -1,6 +1,6 @@
 # AI Customization — Plan
 
-Status: proposal, not built. Written 29 October 2026 after a full read of the codebase.
+Status: Phase 0 under way (29 October 2026). Decisions D1–D3 taken — see §5.
 
 ## 1. The goal in one sentence
 
@@ -141,8 +141,9 @@ Principles:
 - **Owner/Admin only**, rate-limited, every prompt and resulting change set audited.
 - **Works without AI.** Every operation also has a normal settings screen. If no AI key is configured
   the CRM is still fully customizable — same principle the advisor already follows.
-- **Provider:** call the model through one adapter (today the advisor uses OpenRouter). Use tool-use /
-  structured output so the response is machine-validated rather than parsed from prose.
+- **Provider:** every call goes through `crm_ai.py` (OpenRouter; free models while testing). The model
+  is asked for a JSON change set, which the server validates; native tool calling is used where the
+  model supports it, but nothing depends on it, because many free models don't.
 
 Later AI uses, in the same "propose → approve" shape: *"build me a report of bike leads by source"*,
 *"suggest automations from how my team actually works"*, *"map this spreadsheet's columns"*, and a
@@ -158,6 +159,17 @@ Each phase ships on its own, keeps all existing tests green, and adds blueprint-
   behaviour. Customization touches every area; doing it in a 9,000-line file is where regressions hide.
 - Introduce `crm_schema.py` with the field-type catalogue and validators, fully unit-tested.
 - Decide D1–D5 below.
+
+Progress, 29 October 2026:
+
+- [x] D1–D3 decided (§5). D4 and D5 remain open but don't block Phase 1.
+- [x] `crm_schema.py`: field types, definition and value checks, stage categories; 28 tests.
+- [x] `crm_ai.py`: one adapter for OpenRouter with a per-company daily cap. The advisor now sees only
+  the asker's records (it previously read the whole company's).
+- [x] Route-module pattern set (`crm_routes/`); the advisor is the first area moved out.
+- [ ] Move the remaining areas, leaf areas first (export, reports, leaderboard, calendar), then the
+  ones `save_db()` depends on (commission, automation, notifications), which need their shared helpers
+  extracted from `pipecat_server.py` first.
 
 ### Phase 1 — Custom fields (≈2–3 weeks) · *first visible value*
 
@@ -196,9 +208,9 @@ Each phase ships on its own, keeps all existing tests green, and adds blueprint-
 
 | # | Decision | Recommendation |
 | --- | --- | --- |
-| D1 | Who are "the actual users"? Only this insurance client, other insurance agencies, or any small business? | Insurance agencies first (car/health/bike/life/travel). The data model in §3 is industry-neutral, so other industries stay possible without committing to them now. |
-| D2 | Can a company change the lead statuses? | Yes, via stage categories (§3.1). Today's lock exists only because code tests labels. |
-| D3 | Which AI provider and who pays for usage? | One adapter; Claude via tool use. Add a per-company monthly usage cap — the current advisor has none (the old Frappe app did). |
+| D1 | Who are "the actual users"? | **Decided:** insurance agencies first (car/health/bike/life/travel). The data model in §3 stays industry-neutral. |
+| D2 | Can a company change the lead statuses? | **Decided:** yes, via stage categories (§3.1). |
+| D3 | Which AI provider and who pays for usage? | **Decided for testing:** OpenRouter's free models, through one adapter (`crm_ai.py`) with a per-company daily cap. Free models are rate-limited, often lack native tool calling, and may keep what they are sent — so the builder asks for JSON and validates it, and testing uses demo data. Revisit before go-live. |
 | D4 | Does the existing client want this now, or does it follow their blueprint scope? | Ship Phase 1 to them as a settings feature; it doesn't conflict with the blueprint and removes "car/health fields to be confirmed" from the open-questions list. |
 | D5 | Self-serve signup for new companies? | Not until Phase 2; `/api/auth/bootstrap` works for onboarding by hand meanwhile. |
 
