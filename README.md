@@ -17,6 +17,8 @@ An alternative plan, [CLIENT_NON_AI_LAUNCH_PLAN.md](uat/CLIENT_NON_AI_LAUNCH_PLA
 - **Undo is careful.** It is refused when someone has changed the settings since, or when leads already use a field or stage it added; hiding is the safe way back then.
 - **AI is off until a key is set** (`OPENROUTER_API_KEY` and `AI_MODEL`). The screen says so and points to the settings screens.
 
+**Setup files.** The same screen downloads the company's setup — fields, stages, products, lead sources and automation rules, never records or people — and starts another company from one. Importing shows what it will add, as a change set you apply or undo; whatever the company already has is left alone.
+
 For trying a model: `tools/run_builder_evals.py` scores it against 15 realistic, vague and hostile requests.
 
 ### Your own lead stages — 29 October 2026

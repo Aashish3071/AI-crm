@@ -228,3 +228,31 @@ def undo_change_set(id: str):
     core.audit(db, "Customization Undone", "Change Set", id, {"operations": len(change_set["operations"])})
     core.save_db(db)
     return change_set
+
+
+# ─── Setup templates (plan, phase 4) ─────────────────────────────────────────
+@router.get("/api/builder/template")
+def download_template():
+    """The company's setup as a file: fields, stages, products, sources and rules — no records,
+    no people. Rules that assign leads to named people stay behind."""
+    db = core.load_db()
+    template = crm_builder.export_template(_config(db), db.get("automationRules", []))
+    core.audit(db, "Setup Exported", "Change Set", "template", {"fields": sum(len(v) for v in template["customFields"].values())})
+    core.save_db(db)
+    return template
+
+
+@router.post("/api/builder/template")
+def import_template(payload: Dict[str, Any]):
+    """Start from another company's setup: what it has and this company lacks becomes a change
+    set, previewed and applied like any other."""
+    db = core.load_db()
+    try:
+        operations = crm_builder.template_operations(_config(db), payload.get("template"),
+                                                     [r.get("name", "") for r in db.get("automationRules", [])])
+    except crm_builder.BuilderError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    if not operations:
+        raise HTTPException(status_code=409, detail="This company already has everything in that setup")
+    change_set = _new_change_set(db, operations, "template", "", "Start from a setup file")
+    return _store_change_set(db, change_set)

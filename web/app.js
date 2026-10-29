@@ -5489,6 +5489,12 @@ async function renderBuilderPane(focusId = null) {
                 <textarea id="builder-request" rows="3" maxlength="2000" class="corp-input mt-1" placeholder="e.g. Add a stage after Interested for the car inspection, and make leads over 2000cc hot" ${ai.modelConfigured ? '' : 'disabled'}></textarea></label>
             <button id="builder-propose" class="px-4 py-2 bg-slate-900 text-white rounded font-semibold" ${ai.modelConfigured ? '' : 'disabled'}>Propose changes</button>
         </form>
+        <div class="flex flex-wrap items-center gap-2 border-t border-slateBorder pt-3">
+            <span class="text-slate-600">Setup files carry your fields, stages, products, sources and rules — never records — to another company.</span>
+            <button type="button" class="px-3 py-1.5 border border-slate-300 rounded font-semibold" onclick="downloadSetupFile()">Download this setup</button>
+            <label class="px-3 py-1.5 border border-slate-300 rounded font-semibold cursor-pointer">Start from a setup file
+                <input id="builder-template-file" type="file" accept=".json,application/json" class="sr-only" onchange="importSetupFile(this)"></label>
+        </div>
         ${focus ? changeSetCard(focus, latestApplied) : ''}
         ${sets.filter(c => c.id !== focusId).length ? `<div><h4 class="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Earlier changes</h4>
             <div class="space-y-2">${sets.filter(c => c.id !== focusId).map(c => changeSetCard(c, latestApplied, true)).join('')}</div></div>` : ''}
@@ -5500,7 +5506,7 @@ function changeSetCard(c, latestApplied, compact = false) {
     return `<div class="border border-slateBorder rounded p-3 space-y-2" data-testid="change-set">
         <div class="flex items-start justify-between gap-2">
             <div class="min-w-0"><div class="font-semibold text-slate-900">${esc(c.summary || c.request || 'Change set')}</div>
-                <div class="text-[11px] text-slate-500">${esc(CHANGE_SET_STATUS[c.status] || c.status)} · ${esc(c.source === 'ai' ? 'proposed by AI' : 'written by hand')} · ${esc(formatShortDate(c.createdAt))}</div></div>
+                <div class="text-[11px] text-slate-500">${esc(CHANGE_SET_STATUS[c.status] || c.status)} · ${esc({ ai: 'proposed by AI', template: 'from a setup file' }[c.source] || 'written by hand')} · ${esc(formatShortDate(c.createdAt))}</div></div>
             <div class="flex gap-1.5 shrink-0">
                 ${c.status === 'proposed' && c.ready ? `<button class="px-3 py-1.5 bg-slate-900 text-white rounded font-semibold" onclick="changeSetAction('${c.id}', 'apply')">Apply</button>` : ''}
                 ${c.status === 'applied' && c.id === latestApplied ? `<button class="px-3 py-1.5 border border-slate-300 rounded font-semibold" onclick="changeSetAction('${c.id}', 'undo')">Undo</button>` : ''}
@@ -5537,4 +5543,27 @@ async function changeSetAction(id, action) {
         showToast(action === 'apply' ? 'Changes applied' : 'Changes undone');
         await renderBuilderPane(id);
     } catch (err) { showToast(err.message || 'Could not change the CRM.'); await renderBuilderPane(id); }
+}
+
+async function downloadSetupFile() {
+    try {
+        const template = await apiJson('/api/builder/template');
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(new Blob([JSON.stringify(template, null, 1)], { type: 'application/json' }));
+        link.download = 'insurecrm-setup.json';
+        link.click();
+        URL.revokeObjectURL(link.href);
+    } catch (err) { showToast(err.message || 'Could not download the setup.'); }
+}
+
+async function importSetupFile(input) {
+    const file = input.files?.[0];
+    if (!file) return;
+    try {
+        const template = JSON.parse(await file.text());
+        const proposal = await apiJson('/api/builder/template', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ template }) });
+        await renderBuilderPane(proposal.id);
+    } catch (err) { showToast(err instanceof SyntaxError ? 'That file isn’t a setup file.' : (err.message || 'Could not read the setup.')); }
+    input.value = '';
 }

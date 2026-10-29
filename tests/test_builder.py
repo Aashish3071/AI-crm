@@ -201,3 +201,38 @@ class Evaluations(BuilderCase):
                     self.assertTrue(proposal["ready"], proposal["results"])
                 for op in case.get("mustNotUse", []):
                     self.assertNotIn(op, crm_builder.OPERATIONS)
+
+
+class Templates(BuilderCase):
+    def test_a_setup_travels_without_records_or_people(self):
+        self.act(self.propose(BIKE), "apply")
+        self.call(self.owner, "POST", "/api/automations", json={
+            "name": "Share leads", "enabled": True, "trigger": {"type": "lead.created"},
+            "actions": [{"type": "assign", "params": {"assignees": ["Priya Sharma"], "method": "rotate"}}]})
+        self.call(self.owner, "POST", "/api/leads", json={"firstName": "Secret", "mobile": "+91 90000 30303"})
+        template = self.call(self.owner, "GET", "/api/builder/template").json()
+        self.assertEqual(template["kind"], "insurecrm-setup")
+        self.assertEqual([f["key"] for f in template["customFields"]["lead"]], ["engine_cc"])
+        self.assertIn("Inspection", [s["name"] for s in template["stages"]])
+        self.assertEqual([r["name"] for r in template["automations"]], ["Big bikes are hot"])
+        self.assertNotIn("Secret", json.dumps(template))
+        self.assertNotIn("Priya", json.dumps(template))
+
+    def test_importing_adds_what_is_missing_and_can_be_undone(self):
+        applied = self.act(self.propose(BIKE), "apply")
+        template = self.call(self.owner, "GET", "/api/builder/template").json()
+        self.act(applied, "undo")
+        res = self.call(self.owner, "POST", "/api/builder/template", json={"template": template})
+        self.assertEqual(res.status_code, 200, res.text)
+        imported = res.json()
+        self.assertEqual((imported["source"], imported["ready"]), ("template", True))
+        self.act(imported, "apply")
+        self.assertEqual(self.fields(), ["engine_cc"])
+        self.assertEqual(self.stages()[self.stages().index("Interested") + 1], "Inspection")
+        again = self.call(self.owner, "POST", "/api/builder/template", json={"template": template})
+        self.assertEqual(again.status_code, 409)
+
+    def test_a_file_that_is_not_a_setup_is_refused(self):
+        for bad in ({"kind": "something"}, {"kind": "insurecrm-setup", "version": 99}, "text"):
+            res = self.call(self.owner, "POST", "/api/builder/template", json={"template": bad})
+            self.assertEqual(res.status_code, 422, bad)

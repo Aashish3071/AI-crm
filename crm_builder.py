@@ -286,3 +286,56 @@ def parse_reply(text: Optional[str]) -> Dict[str, Any]:
     questions = [str(q) for q in data.get("questions") or [] if str(q).strip()]
     return {"summary": str(data.get("summary") or "").strip()[:600], "operations": operations if isinstance(operations, list) else [],
             "questions": questions[:5]}
+
+
+# ─── Setup templates (plan, phase 4) ─────────────────────────────────────────
+TEMPLATE_VERSION = 1
+
+
+def export_template(config: Dict[str, Any], rules: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """A company's setup without its records or people, to start another company from."""
+    strip = ("createdAt", "createdBy", "updatedAt")
+    return {"kind": "insurecrm-setup", "version": TEMPLATE_VERSION,
+            "customFields": {obj: [{k: v for k, v in f.items() if k not in strip} for f in fields]
+                             for obj, fields in config["customFields"].items()},
+            "stages": [{k: s[k] for k in ("name", "category", "label", "hidden", "system") if s.get(k)} for s in config["pipeline"]],
+            "products": list(config["products"]), "leadSources": list(config["leadSources"]),
+            # Rules that assign leads name people, who belong to one company; they stay behind.
+            "automations": [{k: r[k] for k in ("name", "trigger", "conditions", "actions", "limits") if k in r}
+                            for r in rules if not any(a.get("type") == "assign" for a in r.get("actions") or [])]}
+
+
+def template_operations(config: Dict[str, Any], template: Any, existing_rules: List[str] = ()) -> List[Dict[str, Any]]:
+    """A template as a change set: what it has that this company doesn't. Anything already
+    present by name or key is left alone, so importing twice changes nothing."""
+    if not isinstance(template, dict) or template.get("kind") != "insurecrm-setup":
+        raise BuilderError("That isn't an InsureCRM setup file")
+    if template.get("version") != TEMPLATE_VERSION:
+        raise BuilderError("That setup file is from a different version of InsureCRM")
+    ops: List[Dict[str, Any]] = []
+    have = {p.lower() for p in config["products"]}
+    ops += [{"op": "add_product", "params": {"name": p}} for p in template.get("products") or [] if str(p).lower() not in have]
+    have = {s.lower() for s in config["leadSources"]}
+    ops += [{"op": "add_lead_source", "params": {"name": s}} for s in template.get("leadSources") or [] if str(s).lower() not in have]
+    for obj, fields in (template.get("customFields") or {}).items():
+        existing = {f["key"] for f in config["customFields"].get(obj, [])}
+        ops += [{"op": "add_field", "params": {"object": obj, **f}} for f in fields or [] if f.get("key") not in existing]
+    stages = {s["name"].lower(): s for s in config["pipeline"]}
+    previous = None
+    for stage in template.get("stages") or []:
+        mine = stages.get(str(stage.get("name", "")).lower())
+        if stage.get("system"):
+            if mine and stage.get("label") and stage["label"] != mine.get("label"):
+                ops.append({"op": "relabel_stage", "params": {"name": stage["name"], "label": stage["label"]}})
+            if mine and stage.get("hidden") and not mine.get("hidden"):
+                ops.append({"op": "hide_stage", "params": {"name": stage["name"]}})
+        elif not mine:
+            ops.append({"op": "add_stage", "params": {"name": stage["name"], "category": stage.get("category"),
+                                                      **({"after": previous} if previous else {})}})
+            if stage.get("hidden"):
+                ops.append({"op": "hide_stage", "params": {"name": stage["name"]}})
+        previous = stage.get("name")
+    names = {str(name).lower() for name in existing_rules}
+    ops += [{"op": "add_automation", "params": rule} for rule in template.get("automations") or []
+            if str(rule.get("name", "")).lower() not in names]
+    return ops
