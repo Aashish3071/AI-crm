@@ -37,7 +37,8 @@ def get_reports(start: Optional[str] = None, end: Optional[str] = None, person: 
             lost[reason] = lost.get(reason, 0) + 1
     return {"period": {"start": first, "end": last}, "filters": {"person": person, "product": product, "source": source},
             "cohortSize": len(leads), "undatedLeads": undated,
-            "funnel": metrics.funnel(leads), "sources": metrics.by_source(leads, db.get("policies", []), core.money_value),
+            "funnel": metrics.funnel(leads, core.custom_stage_ranks()),
+            "sources": metrics.by_source(leads, db.get("policies", []), core.money_value, core.custom_stage_ranks()),
             "lostReasons": sorted(({"reason": k, "count": v} for k, v in lost.items()), key=lambda r: r["count"], reverse=True),
             "options": {"people": people, "products": core._products(db),
                         "sources": sorted({l.get("source") or "Not recorded" for l in visible})}}

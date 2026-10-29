@@ -10,6 +10,7 @@ import hashlib
 import json
 import uuid
 import contextvars
+import collections.abc
 import concurrent.futures
 from datetime import datetime, date, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -109,18 +110,100 @@ _AUTH_FAILURES: Dict[str, List[float]] = {}
 
 # Blueprint 13-stage telecalling lifecycle + legacy compatibility stages
 # ─── Lead lifecycle (client blueprint, slide 11) ───
-# The thirteen statuses are fixed by the client's process; the call-outcome engine and
-# reports depend on them, so they are not a per-company setting.
-LEAD_STATUSES = [
+# The thirteen system statuses come from the client's process: the call-outcome engine moves
+# leads between them and reports count them, so they can be relabelled, reordered or hidden
+# from pickers but not removed or renamed. A company may add its own stages beside them
+# (Settings → Lead stages, crm_routes/pipeline.py), each in a category — being worked,
+# parked, or finished without a sale — that decides how it behaves.
+SYSTEM_STATUSES = [
     "New", "Assigned", "Contacted", "Interested", "Quote Sent", "Follow-up",
     "Documents Pending", "Policy Sold", "Not Interested", "Call Later",
     "Wrong Number", "Unreachable", "Lost",
 ]
+SYSTEM_STAGE_CATEGORIES = {s["name"]: s["category"] for s in crm_schema.DEFAULT_LEAD_PIPELINE}
+
+# The current company's pipeline, set whenever its data is loaded or saved (_use_pipeline).
+# The status collections below are live views over it, so a workflow asking
+# "status in NO_NEXT_ACTION" treats a company's own parked or lost stage exactly like a
+# system one — it tests the category, never a name.
+_company_pipeline: contextvars.ContextVar[tuple] = contextvars.ContextVar("company_pipeline", default=())
+
+
+def company_pipeline() -> List[Dict[str, Any]]:
+    """The current company's stages in order: system ones (with any label or hiding) and its own."""
+    return list(_company_pipeline.get()) or [dict(s, system=True) for s in crm_schema.DEFAULT_LEAD_PIPELINE]
+
+
+def _use_pipeline(db: Dict[str, Any]) -> None:
+    _company_pipeline.set(tuple(normalized_pipeline(((db.get("settings") or {}).get("crm") or {}).get("pipeline"))))
+
+
+def normalized_pipeline(stored: Any) -> List[Dict[str, Any]]:
+    """Stored stages made whole: every system stage present once with its fixed category,
+    in the company's order, with missing ones added where they belong by default."""
+    stages, seen = [], set()
+    for stage in stored or []:
+        if not isinstance(stage, dict) or not stage.get("name") or stage["name"] in seen:
+            continue
+        name = stage["name"]
+        system = name in SYSTEM_STAGE_CATEGORIES
+        stages.append({"name": name, "category": SYSTEM_STAGE_CATEGORIES.get(name, stage.get("category", "working")),
+                       "system": system, **{k: stage[k] for k in ("label", "hidden") if stage.get(k)}})
+        seen.add(name)
+    for index, name in enumerate(SYSTEM_STATUSES):
+        if name not in seen:
+            before = SYSTEM_STATUSES[index - 1] if index else None
+            at = next((i + 1 for i, s in enumerate(stages) if s["name"] == before), 0 if index == 0 else len(stages))
+            stages.insert(at, {"name": name, "category": SYSTEM_STAGE_CATEGORIES[name], "system": True})
+            seen.add(name)
+    return stages
+
+
+class _StageList(collections.abc.Sequence):
+    """Every status name the current company uses, in its order."""
+    def _names(self) -> List[str]:
+        return [s["name"] for s in company_pipeline()]
+    def __getitem__(self, index): return self._names()[index]
+    def __len__(self): return len(self._names())
+    def __eq__(self, other): return list(self) == list(other) if isinstance(other, (list, tuple, _StageList)) else NotImplemented
+    __hash__ = None
+    def __repr__(self): return repr(self._names())
+
+
+class _StageSet(collections.abc.Set):
+    """System statuses plus the current company's stages of the given categories."""
+    def __init__(self, system: set, categories: set):
+        self._system, self._categories = frozenset(system), frozenset(categories)
+    def _names(self) -> set:
+        return set(self._system) | {s["name"] for s in company_pipeline()
+                                    if not s.get("system") and s["category"] in self._categories}
+    def __contains__(self, name): return name in self._names()
+    def __iter__(self): return iter(self._names())
+    def __len__(self): return len(self._names())
+    @classmethod
+    def _from_iterable(cls, items): return set(items)
+    def __repr__(self): return repr(self._names())
+
+
+LEAD_STATUSES = _StageList()
 STAGES = LEAD_STATUSES
-SOLD_STATUSES = {"Policy Sold"}
-CLOSED_STATUSES = {"Policy Sold", "Not Interested", "Lost"}       # the enquiry is finished
-REASON_REQUIRED = {"Not Interested", "Lost"}
-NO_NEXT_ACTION = CLOSED_STATUSES | {"Wrong Number"}               # nothing further to schedule
+SOLD_STATUSES = {"Policy Sold"}                                    # only the system sale: it opens the policy
+CLOSED_STATUSES = _StageSet({"Policy Sold", "Not Interested", "Lost"}, {"lost"})   # the enquiry is finished
+REASON_REQUIRED = _StageSet({"Not Interested", "Lost"}, {"lost"})
+NO_NEXT_ACTION = _StageSet({"Policy Sold", "Not Interested", "Lost", "Wrong Number"}, {"lost", "parked"})
+
+
+def custom_stage_ranks() -> Dict[str, int]:
+    """Funnel position of each company stage: that of the nearest system stage before it."""
+    ranks, current = {}, 0
+    for stage in company_pipeline():
+        if stage.get("system"):
+            current = metrics.furthest_stage({"status": stage["name"]})
+        else:
+            ranks[stage["name"]] = current
+    return ranks
+
+
 # Earlier versions used a six-stage commercial pipeline.
 LEGACY_STATUSES = {"Won": "Policy Sold", "Quotation Sent": "Quote Sent", "Risk / Underwriting": "Documents Pending"}
 
@@ -514,7 +597,7 @@ def get_initial_db() -> Dict[str, Any]:
                 "autoAssignMethod": "Round-Robin"
             },
             "crm": {
-                "leadStages": STAGES,
+                "leadStages": list(SYSTEM_STATUSES),
                 "insuranceProducts": list(DEFAULT_PRODUCTS),
                 "insurers": [],
                 "reminderEscalationDays": 1
@@ -539,11 +622,12 @@ def _ensure_db_shape(db: Dict[str, Any]) -> Dict[str, Any]:
         db.setdefault(collection, [])
     db.setdefault("settings", {})
     db["settings"].setdefault("crm", {
-        "leadStages": STAGES,
+        "leadStages": list(SYSTEM_STATUSES),
         "insuranceProducts": list(DEFAULT_PRODUCTS),
         "insurers": [],
         "reminderEscalationDays": 1
     })
+    _use_pipeline(db)
     db["settings"]["crm"].setdefault("companyTimezone", "Asia/Kolkata")
     db["settings"]["crm"].setdefault("upcomingReminderMinutes", 1440)
     crm = db["settings"]["crm"]
@@ -594,6 +678,7 @@ def load_db() -> Dict[str, Any]:
     return db
 
 def save_db(db: Dict[str, Any]):
+    _use_pipeline(db)
     _normalize_leads(db)
     _expire_quotes(db)
     _reconcile_ownership(db)
@@ -3315,6 +3400,7 @@ from crm_routes import auth as _auth_routes  # noqa: E402
 from crm_routes import calls as _calls_routes  # noqa: E402
 from crm_routes import advisor as _advisor_routes  # noqa: E402
 from crm_routes import schema as _schema_routes  # noqa: E402
+from crm_routes import pipeline as _pipeline_routes  # noqa: E402
 
 app.include_router(_advisor_routes.router)
 app.include_router(_calls_routes.router)
@@ -3345,3 +3431,4 @@ app.include_router(_deals_and_contacts_routes.router)
 app.include_router(_admin_routes.router)
 app.include_router(_backups_routes.router)
 app.include_router(_schema_routes.router)
+app.include_router(_pipeline_routes.router)

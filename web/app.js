@@ -27,7 +27,7 @@ async function loadLeadOptions() {
     const filter = document.getElementById('leads-status-filter');
     if (filter) {
         const chosen = filter.value;
-        filter.innerHTML = '<option value="">All statuses</option>' + STAGES.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+        filter.innerHTML = '<option value="">All statuses</option>' + STAGES.map(s => `<option value="${esc(s)}">${esc(statusLabel(s))}</option>`).join('');
         filter.value = STAGES.includes(chosen) ? chosen : '';
     }
     return leadOptions;
@@ -37,6 +37,12 @@ async function loadLeadOptions() {
 const isOpenLead = lead => !leadOptions.noNextAction.includes(lead.status);
 const needsNextAction = status => !leadOptions.noNextAction.includes(status);
 const needsReason = status => leadOptions.reasonRequired.includes(status);
+// A company can relabel a stage (Settings → Lead stages); the stored status keeps its name.
+const statusLabel = status => leadOptions.stageLabels?.[status] || status;
+const pickableStatuses = current => (leadOptions.pickableStatuses || STAGES).concat(
+    current && !(leadOptions.pickableStatuses || STAGES).includes(current) ? [current] : []);
+const stageOptionsHtml = selected => pickableStatuses(selected).map(s =>
+    `<option value="${esc(s)}" ${s === selected ? 'selected' : ''}>${esc(statusLabel(s))}</option>`).join('');
 
 // The broker roster comes from the users table, so adding or renaming a team member
 // flows through every owner dropdown instead of needing a code change.
@@ -1191,7 +1197,7 @@ function renderLeadsTable(leads) {
                 <td class="px-4 py-2.5 border-r border-slateBorder">${priorityBadge(l)}</td>
                 <td class="px-4 py-2.5 border-r border-slateBorder" onclick="event.stopPropagation()">
                     <button onclick="openStageTransitionModal('${l.id}', '${l.status}')" class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition-all ${stagePillClass(l.status)}" title="Click to transition stage">
-                        <span>${esc(l.status)}</span>
+                        <span>${esc(statusLabel(l.status))}</span>
                         <svg class="w-2.5 h-2.5 opacity-60 ml-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
                     </button>
                 </td>
@@ -1289,11 +1295,12 @@ function renderLeadsKanban(leads) {
     const boardEl = document.getElementById('leads-kanban-board');
     boardEl.innerHTML = STAGES.map(stg => {
         const stageLeads = (leads || []).filter(l => (l.status || 'New').toLowerCase() === stg.toLowerCase());
+        if (!pickableStatuses().includes(stg) && !stageLeads.length) return '';      // a hidden stage with nobody in it
         return `
             <div class="w-64 kanban-col flex flex-col max-h-full flex-shrink-0">
                 <div class="p-3 border-b border-slateBorder flex items-center justify-between bg-white rounded-t-lg">
                     <div class="flex items-center gap-2">
-                        <span class="font-semibold text-slate-900 text-xs">${stg}</span>
+                        <span class="font-semibold text-slate-900 text-xs">${esc(statusLabel(stg))}</span>
                         <span class="text-[10px] font-mono font-semibold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">${stageLeads.length}</span>
                     </div>
                     <button onclick="openCreateModal()" class="text-slate-400 hover:text-slate-800 text-xs font-bold" title="Add lead">+</button>
@@ -1382,7 +1389,7 @@ async function openStageTransitionModal(leadId, targetStage, { fresh = false } =
     document.getElementById('stage-modal-lead-id').value = lead.id;
     document.getElementById('stage-modal-lead-name').textContent = [lead.name, lead.product].filter(Boolean).join(' · ');
     document.getElementById('stage-modal-old-stage').textContent = lead.status;
-    document.getElementById('stage-modal-new-stage').innerHTML = optionsHtml(STAGES, target);
+    document.getElementById('stage-modal-new-stage').innerHTML = stageOptionsHtml(target);
     document.getElementById('next-action-suggestions').innerHTML = NEXT_ACTIONS.map(a => `<option value="${esc(a)}"></option>`).join('');
     document.getElementById('close-reason-suggestions').innerHTML = (leadOptions.closeReasons || []).map(r => `<option value="${esc(r)}"></option>`).join('');
     const keepCurrent = target === lead.status && lead.nextAction && !lead.nextActionCompleted;
@@ -1441,7 +1448,7 @@ async function handleStageTransitionSubmit(e) {
 function nextActionCard(l) {
     const open = needsNextAction(l.status);
     if (!open) return `<div class="p-3 rounded-lg border border-slate-200 bg-slate-50/70 text-xs text-slate-600">
-        ${esc(l.status)} — nothing further is scheduled.${l.lostReason && needsReason(l.status) ? ` Reason: ${esc(l.lostReason)}` : ''}</div>`;
+        ${esc(statusLabel(l.status))} — nothing further is scheduled.${l.lostReason && needsReason(l.status) ? ` Reason: ${esc(l.lostReason)}` : ''}</div>`;
     // A finished follow-up with nothing after it is exactly how customers get forgotten.
     if (!l.nextAction || l.nextActionCompleted) return `
         <div class="p-3 rounded-lg border border-amber-300 bg-amber-50 space-y-2 text-xs">
@@ -1511,7 +1518,7 @@ async function openLeadDrawer(leadId) {
                     ${priorityBadge(l)}
                 </div>
                 <div class="flex flex-wrap gap-1">
-                    ${STAGES.map(stg => `<button onclick="openStageTransitionModal('${l.id}', '${esc(stg)}')" class="stage-step ${l.status === stg ? 'active' : ''} text-[10px] py-1 px-2">${esc(stg)}</button>`).join('')}
+                    ${pickableStatuses(l.status).map(stg => `<button onclick="openStageTransitionModal('${l.id}', '${esc(stg)}')" class="stage-step ${l.status === stg ? 'active' : ''} text-[10px] py-1 px-2">${esc(statusLabel(stg))}</button>`).join('')}
                 </div>
             </div>
 
@@ -2468,7 +2475,7 @@ function renderCallCustomer(data) {
     const l = data.lead, docs = data.documentStatus || { missing: [] };
     const row = (k, v) => v ? `<dt>${k}</dt><dd>${esc(String(v))}</dd>` : '';
     document.getElementById('call-customer').innerHTML = `
-        <div class="flex flex-wrap items-center gap-2">${priorityBadge(l)}<span class="auto-pill off">${esc(l.status)}</span>
+        <div class="flex flex-wrap items-center gap-2">${priorityBadge(l)}<span class="auto-pill off">${esc(statusLabel(l.status))}</span>
             ${l.nextAction ? `<span class="text-slate-500">Planned: <b class="text-slate-800">${esc(l.nextAction)}</b></span>` : ''}</div>
         <dl class="call-kv">
             ${row('Mobile', l.mobile)}${row('Product', l.product || l.policyType)}${row('City', l.city)}
@@ -2605,7 +2612,7 @@ function telecallerBoard(d) {
             <h3>Today's priority leads</h3>
             ${d.priorityLeads.length ? `<div class="overflow-x-auto"><table class="w-full text-left perf-table min-w-[640px]"><thead><tr><th>Customer</th><th>Product</th><th>Priority</th><th>Status</th><th>Next action</th><th></th></tr></thead><tbody>
             ${d.priorityLeads.map(l => `<tr><td><button class="font-semibold hover:underline" onclick="openLeadDrawer('${l.id}')">${esc(l.name)}</button></td>
-                <td>${esc(l.product || '—')}</td><td>${priorityBadge(l)}</td><td><span class="inline-block px-2 py-0.5 rounded text-[11px] ${stagePillClass(l.status)}">${esc(l.status)}</span></td>
+                <td>${esc(l.product || '—')}</td><td>${priorityBadge(l)}</td><td><span class="inline-block px-2 py-0.5 rounded text-[11px] ${stagePillClass(l.status)}">${esc(statusLabel(l.status))}</span></td>
                 <td>${esc(l.nextAction || '—')}${l.nextActionDate ? `<span class="perf-sub">${esc(l.nextActionDate)}${l.nextActionTime ? ' ' + esc(l.nextActionTime) : ''}</span>` : ''}</td>
                 <td class="text-right">${callButton(l.id)}</td></tr>`).join('')}</tbody></table></div>`
             : '<p class="text-xs text-slate-400">No open leads assigned to you.</p>'}
@@ -3878,6 +3885,8 @@ async function switchSettingTab(tab) {
                         </div>`}
                 </div>
             </div>`;
+    } else if (tab === 'stages') {
+        await renderStagesPane();
     } else if (tab === 'fields') {
         await Promise.all([loadLeadOptions(), loadCustomFields()]);
         if (!stillCurrent()) return;
@@ -3892,10 +3901,8 @@ async function switchSettingTab(tab) {
                 <h3 class="font-semibold text-slate-900 text-sm">CRM configuration</h3>
                 <p class="text-xs text-slate-500 mt-0.5">The dropdown choices your team sees while working. Change them here to match how your brokerage actually sells — one value per line.</p>
             </div>
-            <label class="block text-xs font-medium text-slate-700">Pipeline stages
-                <span class="block text-[11px] font-normal text-slate-500 mb-1">The columns on the Kanban board and the stages in the transition modal.</span>
-                <textarea id="config-stages" rows="4" class="corp-input">${esc((c.leadStages || []).join('\n'))}</textarea>
-            </label>
+            <p class="text-xs text-slate-600">Lead stages — the Kanban columns and the stages a lead moves through — are set under
+                <button type="button" class="underline font-semibold" onclick="switchSettingTab('stages')">Lead stages</button>.</p>
             <label class="block text-xs font-medium text-slate-700">Policy categories
                 <span class="block text-[11px] font-normal text-slate-500 mb-1">Offered when adding a lead or issuing a policy — your product lines.</span>
                 <textarea id="config-products" rows="4" class="corp-input">${esc((c.insuranceProducts || []).join('\n'))}</textarea>
@@ -4129,7 +4136,7 @@ async function restoreTemplate(id){await apiJson(`/api/communication-templates/$
 async function deleteTemplatePermanently(id){if(!confirm('Permanently delete this archived template? This cannot be undone.'))return;await apiJson(`/api/communication-templates/${id}?permanent=true`,{method:'DELETE'});showToast('Archived template permanently deleted');await switchSettingTab('templates')}
 function createTeamUser(){openInsuranceForm('Add CRM user',[['name','Full name','text',true],['email','Work email','email',true],['role','Role',ROLE_PICKER,true],['title','Job title (optional)','text',false],['temporaryPassword','Temporary password','password',true]],async values=>{await apiJson('/api/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(values)});await loadBrokerRoster();switchSettingTab('team')})}
 async function deactivateTeamUser(id){if(!confirm('Deactivate this login? Historical ownership is retained and open work must be reassigned.'))return;await apiJson(`/api/users/${id}`,{method:'DELETE'});showToast('User deactivated');await switchSettingTab('team')}
-async function saveCrmConfiguration(e){e.preventDefault();const lines=id=>document.getElementById(id).value.split('\n').map(x=>x.trim()).filter(Boolean);await apiJson('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({crm:{leadStages:lines('config-stages'),insuranceProducts:lines('config-products'),insurers:lines('config-insurers'),companyTimezone:document.getElementById('config-timezone').value,upcomingReminderMinutes:Number(document.getElementById('config-reminder-minutes').value)}})});showToast('CRM configuration saved')}
+async function saveCrmConfiguration(e){e.preventDefault();const lines=id=>document.getElementById(id).value.split('\n').map(x=>x.trim()).filter(Boolean);await apiJson('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({crm:{insuranceProducts:lines('config-products'),insurers:lines('config-insurers'),companyTimezone:document.getElementById('config-timezone').value,upcomingReminderMinutes:Number(document.getElementById('config-reminder-minutes').value)}})});showToast('CRM configuration saved')}
 async function restoreLead(id){await apiJson(`/api/archived-leads/${id}/restore`,{method:'POST'});await switchSettingTab('archive');showToast('Lead restored')}
 async function restoreOperationalRecord(id){await apiJson(`/api/archived-records/${id}/restore`,{method:'POST'});await switchSettingTab('archive');showToast('Record restored')}
 // Restore replaces every record with the backup's. The server first saves a safety copy of the
@@ -5343,4 +5350,94 @@ async function moveCustomField(key, step) {
             body: JSON.stringify({ keys }) });
         await loadCustomFields(); renderCustomFieldsPane();
     } catch (err) { showToast(err.message || 'Could not reorder the fields.'); }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// LEAD STAGES (Settings → Lead stages; crm_routes/pipeline.py)
+// ═══════════════════════════════════════════════════════════════════
+// The thirteen system stages keep their names — calls, quotations and reports move leads
+// between them — but can be relabelled, reordered or hidden. A company's own stages behave
+// like the system stages of their kind; the server refuses changes that would strand leads.
+let pipelineView = null;
+
+async function renderStagesPane() {
+    const pane = document.getElementById('setting-pane-content');
+    pipelineView = await apiJson('/api/pipeline');
+    const kinds = Object.fromEntries(pipelineView.categories.map(c => [c.category, c.label]));
+    const stages = pipelineView.stages;
+    pane.innerHTML = `<div class="space-y-4">
+        <div><h3 class="font-semibold text-slate-900 text-sm">Lead stages</h3>
+            <p class="text-xs text-slate-500 mt-0.5">The stages a lead moves through, in board order. Built-in stages can take your own label or be hidden from the pickers; the CRM still uses them for calls, quotations and reports. Your own stages work like the built-in ones of the same kind: being worked needs a next action, parked needs none, finished without a sale needs a reason.</p></div>
+        <div class="space-y-1.5">${stages.map((s, i) => `
+            <div class="flex items-center justify-between gap-3 border border-slateBorder rounded px-3 py-2 ${s.hidden ? 'opacity-60' : ''}">
+                <div class="min-w-0 text-xs">
+                    <span class="font-semibold text-slate-900">${esc(s.label || s.name)}</span>
+                    ${s.label ? `<span class="text-slate-400"> (${esc(s.name)})</span>` : ''}
+                    <span class="text-[10px] text-slate-500 ml-1">${esc(kinds[s.category] || s.category)} · ${s.system ? 'built in' : 'yours'} · ${s.leadCount} lead${s.leadCount === 1 ? '' : 's'}${s.hidden ? ' · hidden' : ''}</span>
+                </div>
+                <div class="flex items-center gap-1 shrink-0" data-requires="admin">
+                    <button class="fu-btn" aria-label="Move ${esc(s.name)} up" ${i === 0 ? 'disabled' : ''} onclick="moveStage(${i}, -1)">↑</button>
+                    <button class="fu-btn" aria-label="Move ${esc(s.name)} down" ${i === stages.length - 1 ? 'disabled' : ''} onclick="moveStage(${i}, 1)">↓</button>
+                    <button class="fu-btn" onclick="editStage(${i})">${s.system ? 'Label' : 'Edit'}</button>
+                    <button class="fu-btn" onclick="toggleStageHidden(${i})">${s.hidden ? 'Show' : 'Hide'}</button>
+                    ${s.system ? '' : `<button class="fu-btn" onclick="deleteStage(${i})">Delete</button>`}
+                </div>
+            </div>`).join('')}</div>
+        <form onsubmit="addStage(event)" class="border border-slateBorder rounded p-3 grid grid-cols-1 sm:grid-cols-[1fr_12rem_12rem_auto] gap-2 items-end text-xs" data-requires="admin">
+            <label class="block font-medium text-slate-700">New stage<input id="stage-new-name" required maxlength="40" class="corp-input mt-1" placeholder="e.g. Site inspection"></label>
+            <label class="block font-medium text-slate-700">Kind<select id="stage-new-category" class="corp-input mt-1">${pipelineView.customCategories.map(c => `<option value="${c}">${esc(kinds[c])}</option>`).join('')}</select></label>
+            <label class="block font-medium text-slate-700">After<select id="stage-new-after" class="corp-input mt-1"><option value="">With its kind</option>${stages.map(s => `<option value="${esc(s.name)}">${esc(s.label || s.name)}</option>`).join('')}</select></label>
+            <button class="px-3 py-2 bg-slate-900 text-white rounded font-semibold">Add stage</button>
+        </form>
+    </div>`;
+    applyRoleVisibility();
+}
+
+async function stageRequest(url, method, body, done) {
+    try {
+        await apiJson(url, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+        await loadLeadOptions();
+        await renderStagesPane();
+        if (done) showToast(done);
+    } catch (err) { showToast(err.message || 'Could not change the stages.'); }
+}
+
+function addStage(event) {
+    event.preventDefault();
+    const after = document.getElementById('stage-new-after').value;
+    stageRequest('/api/pipeline/stages', 'POST', { name: document.getElementById('stage-new-name').value.trim(),
+        category: document.getElementById('stage-new-category').value, ...(after ? { after } : {}) }, 'Stage added');
+}
+
+function moveStage(index, step) {
+    const names = pipelineView.stages.map(s => s.name);
+    const other = index + step;
+    if (other < 0 || other >= names.length) return;
+    [names[index], names[other]] = [names[other], names[index]];
+    stageRequest('/api/pipeline/order', 'PUT', { names });
+}
+
+function toggleStageHidden(index) {
+    const s = pipelineView.stages[index];
+    stageRequest(`/api/pipeline/stages/${encodeURIComponent(s.name)}`, 'PUT', { hidden: !s.hidden });
+}
+
+function deleteStage(index) {
+    const s = pipelineView.stages[index];
+    if (!confirm(`Delete the stage “${s.name}”?`)) return;
+    stageRequest(`/api/pipeline/stages/${encodeURIComponent(s.name)}`, 'DELETE', null, 'Stage deleted');
+}
+
+function editStage(index) {
+    const s = pipelineView.stages[index];
+    const kinds = pipelineView.categories.filter(c => pipelineView.customCategories.includes(c.category))
+        .map(c => `${c.category}::${c.label}`).join('|');
+    const fields = s.system ? [['label', 'Label shown on screen (blank for the built-in name)', 'text', false]]
+        : [['name', 'Name', 'text', true], ['category', 'Kind', 'selectpairs:' + kinds, true]];
+    openInsuranceForm(s.system ? `Label for “${s.name}”` : `Edit “${s.name}”`, fields, async values => {
+        await apiJson(`/api/pipeline/stages/${encodeURIComponent(s.name)}`, { method: 'PUT',
+            headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(values) });
+        await loadLeadOptions();
+        await renderStagesPane();
+    }, { label: s.label || '', name: s.name, category: s.category });
 }

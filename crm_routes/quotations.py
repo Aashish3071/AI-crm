@@ -36,7 +36,7 @@ def _quote_moves_lead(db: Dict[str, Any], quote: Dict[str, Any], status: str):
     lead = next((l for l in db.get("leads", []) if l.get("id") == quote.get("leadId")), None)
     if not lead or not core.is_open_lead(lead):
         return
-    rank = metrics.furthest_stage({"status": core.canonical_status(lead.get("status"))})
+    rank = metrics.furthest_stage({"status": core.canonical_status(lead.get("status"))}, core.custom_stage_ranks())
     if status == "Sent" and rank <= metrics.FUNNEL.index("Quote Sent"):
         due = core._parse_flexible_date(quote.get("followUpDate") or "") or core._company_today(db, 2)
         core._set_lead_next(db, lead, "Quote Sent", f"Follow up on the {quote.get('insurer')} quotation with {lead.get('name')}", due)

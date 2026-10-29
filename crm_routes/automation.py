@@ -125,7 +125,7 @@ def automation_options():
     return {"triggers": automation.TRIGGERS, "actions": automation.ACTIONS, "fields": fields,
             "operators": automation.OPERATORS, "methods": automation.ROUTING_METHODS,
             "notifyTargets": automation.NOTIFY_TARGETS, "weekdays": automation.WEEKDAYS, "people": _people(db),
-            "statuses": core.LEAD_STATUSES, "outcomes": list(core.CALL_OUTCOMES), "tokens": core.TEMPLATE_TOKENS + ["customerName", "missingDocuments"],
+            "statuses": list(core.LEAD_STATUSES), "outcomes": list(core.CALL_OUTCOMES), "tokens": core.TEMPLATE_TOKENS + ["customerName", "missingDocuments"],
             "whatsappTemplates": [{"id": t["id"], "name": t.get("name"), "body": t.get("body", "")}
                                   for t in db.get("whatsappTemplates", []) if t.get("status") == "Approved"],
             "maxDepth": automation.MAX_DEPTH, "defaultMaxPerHour": automation.DEFAULT_MAX_PER_HOUR}

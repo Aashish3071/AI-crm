@@ -197,7 +197,11 @@ class LeadModel(BaseModel):
 def get_lead_options():
     """The lead vocabulary in one place, so screens never keep a copy that drifts."""
     db = core.load_db()
-    return {"statuses": core.LEAD_STATUSES, "closedStatuses": sorted(core.CLOSED_STATUSES),
+    pipeline = core.company_pipeline()
+    return {"statuses": list(core.LEAD_STATUSES), "closedStatuses": sorted(core.CLOSED_STATUSES),
+            # How each stage reads on screen, and which ones are offered when choosing a stage.
+            "stageLabels": {s["name"]: s["label"] for s in pipeline if s.get("label")},
+            "pickableStatuses": [s["name"] for s in pipeline if not s.get("hidden")],
             "noNextAction": sorted(core.NO_NEXT_ACTION), "reasonRequired": sorted(core.REASON_REQUIRED),
             "products": core._products(db), "sources": core._lead_sources(db), "closeReasons": core.CLOSE_REASONS,
             "fuelTypes": core.FUEL_TYPES, "ncbLevels": core.NCB_LEVELS, "healthPlanTypes": core.HEALTH_PLAN_TYPES,

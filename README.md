@@ -8,6 +8,18 @@ The build follows the client's own requirement document, *Insurance Telecalling 
 
 An alternative plan, [CLIENT_NON_AI_LAUNCH_PLAN.md](uat/CLIENT_NON_AI_LAUNCH_PLAN.md), proposes shipping every non-AI module before launch. It was written in a separate session and is **not** the plan being followed; it is kept for reference.
 
+### Your own lead stages — 29 October 2026
+
+Under **Settings → Lead stages** an owner can now shape the stages a lead moves through:
+
+- **Add stages** of three kinds. *Being worked* needs a next action, like Interested. *Parked* is still open but has nothing scheduled, like Wrong Number. *Finished without a sale* needs a reason and closes the follow-ups, like Lost. A "Site inspection" or "Negotiating" stage behaves like the built-in stages of its kind everywhere: the stage dialog, follow-ups, open-lead counts, lost reasons, automations and the funnel. In the funnel it counts as the step before it.
+- **Relabel built-in stages** ("Interested" → "Hot"), reorder the board, or hide stages you don't use from the pickers. The built-in thirteen keep their names underneath, because calls, quotations and reports move leads between them.
+- **Safe changes.** Renaming your own stage moves its leads and automation rules with it. A stage still in use can't be deleted or change kind, and the message says how many leads or rules use it.
+
+The CRM configuration tab no longer shows a stages box that was never saved.
+
+Verification: 369 automated tests pass, 16 of them for lead stages, including one that keeps each company's stages to itself.
+
 ### Custom fields on leads — 29 October 2026
 
 An owner can now add their own details to every lead — engine CC, chassis number, a referral code — under **Settings → Custom fields**. A field is short or long text, a number, an amount, a date, a date and time, yes/no, one choice or several, a phone, an email, a link to another record or a document. It can sit in its own section of the lead form, be required, carry help text, and apply to some products only (a bike field only on bike leads).

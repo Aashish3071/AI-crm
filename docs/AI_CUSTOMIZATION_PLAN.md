@@ -198,6 +198,14 @@ webhook lead sources map payload fields to lead custom fields. Not done: convert
 - Car and health rebuilt as configured templates (proof that the model is complete).
 - Form layout editor (sections, order) and saved list/kanban views per role.
 
+Phase 2 progress, 29 October 2026: company lead stages are done (Settings → Lead stages) — system
+stages relabel, reorder and hide; company stages in three categories; workflows test categories
+through live status sets; renames carry leads and rules. Decided against per-product pipelines for
+now: one company pipeline with product-limited custom fields covers what the client's products need,
+and a second pipeline would split every report. Car and health stay built-in product templates
+(their registration and member validation is richer than a generic field); new products use custom
+fields limited to that product.
+
 ### Phase 3 — AI builder (≈2–3 weeks)
 
 - Operation catalogue + server-side validator + diff/preview + apply/undo.

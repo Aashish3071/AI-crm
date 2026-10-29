@@ -277,6 +277,29 @@ class CommercialCrmBrowserFlows(unittest.TestCase):
         expect(profile.get_by_text("PAN", exact=True)).to_be_visible()
         expect(profile.get_by_text("ABCDE1234F", exact=True)).to_be_visible()
 
+    def test_lead_stages_added_and_relabelled_in_settings(self):
+        page = self.page
+        page.goto(f"{self.base_url}/", wait_until="networkidle")
+        page.locator('button[onclick="openSettingsModal()"]').click()
+        page.locator('[data-setting-tab="stages"]').click()
+        pane = page.locator("#setting-pane-content")
+        pane.locator("#stage-new-name").fill("Site Inspection")
+        pane.get_by_role("button", name="Add stage", exact=True).click()
+        stage_names = pane.locator("span.font-semibold")
+        expect(stage_names.filter(has_text="Site Inspection")).to_have_count(1)
+        row = pane.locator("div.border").filter(has_text="Interested").filter(has_text="built in").first
+        row.get_by_role("button", name="Label", exact=True).click()
+        form = page.locator("#insurance-dynamic-form")
+        form.locator('[name="label"]').fill("Hot")
+        form.get_by_role("button", name="Save", exact=True).click()
+        expect(stage_names.filter(has_text="Hot")).to_have_count(1)
+        page.locator("#settings-modal button", has_text="✕").first.click()
+        page.locator("#app-sidebar").get_by_role("button", name="Leads", exact=True).click()
+        options = page.locator("#leads-status-filter option").all_inner_texts()
+        self.assertIn("Hot", options)
+        self.assertIn("Site Inspection", options)
+        self.assertNotIn("Interested", options)
+
 
 if __name__ == "__main__":
     unittest.main()

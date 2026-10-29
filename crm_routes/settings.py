@@ -31,9 +31,9 @@ def update_settings(updates: Dict[str, Any]):
     if reminder_minutes is not None and (not isinstance(reminder_minutes, (int, float)) or reminder_minutes < 15 or reminder_minutes > 10080):
         raise HTTPException(status_code=422, detail="Upcoming reminder must be between 15 minutes and 7 days")
     crm_updates = updates.get("crm") if isinstance(updates.get("crm"), dict) else {}
-    if "leadStages" in crm_updates and list(crm_updates["leadStages"] or []) != core.LEAD_STATUSES:
-        raise HTTPException(status_code=422, detail="Lead statuses follow the telecalling process and cannot be "
-                            "changed here: call outcomes, follow-ups and reports depend on them.")
+    if ("leadStages" in crm_updates and list(crm_updates["leadStages"] or []) != list(core.LEAD_STATUSES)) or "pipeline" in crm_updates:
+        raise HTTPException(status_code=422, detail="Lead stages are changed under Settings → Lead stages, where each "
+                            "change is checked against the call outcomes, follow-ups and reports that depend on it.")
     for key, label in (("insuranceProducts", "product"), ("leadSources", "lead source")):
         if key in crm_updates:
             values = crm_updates[key]

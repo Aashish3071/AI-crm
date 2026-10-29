@@ -304,9 +304,10 @@ _FUNNEL_RANK = {"New": 0, "Assigned": 0, "Unreachable": 0, "Wrong Number": 0,
                 "Interested": 2, "Quote Sent": 3, "Follow-up": 4, "Documents Pending": 5, "Policy Sold": 6}
 
 
-def furthest_stage(lead: Dict[str, Any]) -> int:
+def furthest_stage(lead: Dict[str, Any], ranks: Optional[Dict[str, int]] = None) -> int:
+    """``ranks`` places a company's own stages; each counts as the main-path stage before it."""
     statuses = [step.get("status") for step in lead.get("statusHistory") or []] + [lead.get("status")]
-    return max((_FUNNEL_RANK.get(s, 0) for s in statuses if s), default=0)
+    return max((_FUNNEL_RANK.get(s, (ranks or {}).get(s, 0)) for s in statuses if s), default=0)
 
 
 def cohort(leads: Iterable[Dict[str, Any]], start: str, end: str, tz, person: str = "", product: str = "",
@@ -328,8 +329,8 @@ def cohort(leads: Iterable[Dict[str, Any]], start: str, end: str, tz, person: st
     return chosen
 
 
-def funnel(leads: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    reached = [furthest_stage(l) for l in leads]
+def funnel(leads: List[Dict[str, Any]], ranks: Optional[Dict[str, int]] = None) -> List[Dict[str, Any]]:
+    reached = [furthest_stage(l, ranks) for l in leads]
     stages, previous = [], None
     for rank, name in enumerate(FUNNEL):
         count = sum(1 for r in reached if r >= rank)
@@ -339,7 +340,8 @@ def funnel(leads: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return stages
 
 
-def by_source(leads: List[Dict[str, Any]], policies: Iterable[Dict[str, Any]], money: Callable[[Any], float]) -> List[Dict[str, Any]]:
+def by_source(leads: List[Dict[str, Any]], policies: Iterable[Dict[str, Any]], money: Callable[[Any], float],
+              ranks: Optional[Dict[str, int]] = None) -> List[Dict[str, Any]]:
     """Slide 32: which source produces the best customers, not just the most leads."""
     premium_by_lead: Dict[str, float] = {}
     for policy in policies:
@@ -350,7 +352,7 @@ def by_source(leads: List[Dict[str, Any]], policies: Iterable[Dict[str, Any]], m
         groups.setdefault(lead.get("source") or "Not recorded", []).append(lead)
     rows = []
     for source, members in groups.items():
-        reached = [furthest_stage(l) for l in members]
+        reached = [furthest_stage(l, ranks) for l in members]
         sold = sum(1 for r in reached if r >= 6)
         premium = round(sum(premium_by_lead.get(l.get("id"), 0) for l in members), 2)
         rows.append({"source": source, "leads": len(members),
