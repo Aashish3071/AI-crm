@@ -362,3 +362,25 @@ def by_source(leads: List[Dict[str, Any]], policies: Iterable[Dict[str, Any]], m
                      "conversionRate": _pct(sold, len(members)), "policies": sold, "premium": premium,
                      "premiumPerLead": round(premium / len(members), 2) if members else None})
     return sorted(rows, key=lambda r: (r["premium"], r["leads"]), reverse=True)
+
+
+def breakdown(leads: List[Dict[str, Any]], key: str, field_type: str, options: List[str],
+              sold: Callable[[Dict[str, Any]], bool]) -> List[Dict[str, Any]]:
+    """Leads by the value of one of the company's own fields (a choice, several choices or
+    yes/no): how many, how many were sold, and conversion. A lead with several choices counts
+    under each; one with no value is "Not recorded"."""
+    values = ["Yes", "No"] if field_type == "boolean" else list(options)
+    groups: Dict[str, List[Dict[str, Any]]] = {v: [] for v in values + ["Not recorded"]}
+    for lead in leads:
+        raw = (lead.get("custom") or {}).get(key)
+        if raw is None or raw == [] or raw == "":
+            chosen = ["Not recorded"]
+        elif field_type == "boolean":
+            chosen = ["Yes" if raw else "No"]
+        else:
+            chosen = [v for v in (raw if isinstance(raw, list) else [raw]) if v in groups] or ["Not recorded"]
+        for value in chosen:
+            groups[value].append(lead)
+    return [{"value": value, "leads": len(members), "sold": sum(1 for l in members if sold(l)),
+             "conversionRate": _pct(sum(1 for l in members if sold(l)), len(members))}
+            for value, members in groups.items() if members or value != "Not recorded"]

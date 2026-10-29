@@ -304,6 +304,25 @@ class Automation(CustomFieldCase):
         self.assertEqual(stored["conditions"][0]["definition"]["label"], "Engine size")
 
 
+class ReportsByField(CustomFieldCase):
+    def test_leads_and_sales_by_a_choice(self):
+        self.define({**FUEL, "type": "multi_choice"})
+        self.define({"key": "vip", "label": "VIP", "type": "boolean"})
+        self.lead("Petrol One", custom={"fuel": ["Petrol"], "vip": True})
+        hybrid = self.lead("Hybrid", custom={"fuel": ["Petrol", "EV"]})
+        self.lead("Nothing")
+        with self.company_db() as db:
+            next(l for l in db["leads"] if l["id"] == hybrid["id"])["status"] = "Policy Sold"
+        rows = {r["value"]: r for r in self.call(self.owner, "GET", "/api/reports", params={"field": "fuel"}).json()["byField"]["rows"]}
+        self.assertEqual((rows["Petrol"]["leads"], rows["Petrol"]["sold"], rows["Petrol"]["conversionRate"]), (2, 1, 50.0))
+        self.assertEqual((rows["EV"]["leads"], rows["Diesel"]["leads"], rows["Not recorded"]["leads"]), (1, 0, 1))
+        vip = {r["value"]: r["leads"] for r in self.call(self.owner, "GET", "/api/reports", params={"field": "vip"}).json()["byField"]["rows"]}
+        self.assertEqual(vip, {"Yes": 1, "No": 0, "Not recorded": 2})
+        options = self.call(self.owner, "GET", "/api/reports").json()["options"]["fields"]
+        self.assertEqual([f["key"] for f in options], ["fuel", "vip"])
+        self.assertEqual(self.call(self.owner, "GET", "/api/reports", params={"field": "nope"}).status_code, 422)
+
+
 class ImportExportMerge(CustomFieldCase):
     def setUp(self):
         super().setUp()

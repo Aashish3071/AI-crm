@@ -45,6 +45,8 @@ An owner can now add their own details to every lead — engine CC, chassis numb
 - **Export.** The leads spreadsheet has a column for each field.
 - **Safe changes.** A field is never deleted, only hidden, and its values stay. Removing a choice that leads still use is refused with how many use it. Switching from one choice to several keeps every value. Every change is in the audit log.
 
+**Reports by your fields.** The Reports screen can break the period's leads down by any of your choice or yes/no fields — leads, sales and conversion for each value ("Fuel: Petrol, EV…").
+
 Telecallers and managers fill the fields in; only the owner defines them, and can limit who may change a field ("Discount approved": managers only) — others see its value but can't change it. **Customers and policies** have their own custom fields too (PAN, add-on covers…), on their forms, in Customer 360° and in the export; a policy field can be limited to some products. An **advertising or website lead source** can send a form field straight into a lead's custom field; a value that can't be read is kept on the lead as an extra detail and noted in the source's event log, so no enquiry is lost.
 
 Verification: 348 automated tests pass, 30 of them for custom fields. A new browser test, from defining a field in Settings to seeing its value on the lead card, passes here with a stand-in for the Tailwind stylesheet (see the note below on browser tests).

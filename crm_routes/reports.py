@@ -13,7 +13,8 @@ router = APIRouter()
 
 
 @router.get("/api/reports")
-def get_reports(start: Optional[str] = None, end: Optional[str] = None, person: str = "", product: str = "", source: str = ""):
+def get_reports(start: Optional[str] = None, end: Optional[str] = None, person: str = "", product: str = "", source: str = "",
+                field: str = ""):
     """One cohort — the leads that arrived in the period — seen as a funnel, by source and by why
     leads were lost, so the three views always describe the same leads."""
     db = core.load_db()
@@ -29,6 +30,15 @@ def get_reports(start: Optional[str] = None, end: Optional[str] = None, person: 
         raise HTTPException(status_code=404, detail="That person isn't on your team")
     visible = core.scoped(db.get("leads", []), owners)
     leads = metrics.cohort(visible, first, last, tz, person, product, source)
+    # The company's own fields a report can be broken down by: choices and yes/no.
+    groupable = [d for d in core.custom_field_defs(db) if d["type"] in ("choice", "multi_choice", "boolean") and not d.get("hidden")]
+    by_field = None
+    if field:
+        defn = next((d for d in groupable if d["key"] == field), None)
+        if not defn:
+            raise HTTPException(status_code=422, detail="Reports break down by a choice or yes/no field")
+        by_field = {"field": defn["key"], "label": defn["label"],
+                    "rows": metrics.breakdown(leads, defn["key"], defn["type"], defn.get("options", []), core.is_sold)}
     undated = len([l for l in visible if not l.get("leadDate")])
     lost: Dict[str, int] = {}
     for lead in leads:
@@ -40,8 +50,10 @@ def get_reports(start: Optional[str] = None, end: Optional[str] = None, person: 
             "funnel": metrics.funnel(leads, core.custom_stage_ranks()),
             "sources": metrics.by_source(leads, db.get("policies", []), core.money_value, core.custom_stage_ranks()),
             "lostReasons": sorted(({"reason": k, "count": v} for k, v in lost.items()), key=lambda r: r["count"], reverse=True),
+            "byField": by_field,
             "options": {"people": people, "products": core._products(db),
-                        "sources": sorted({l.get("source") or "Not recorded" for l in visible})}}
+                        "sources": sorted({l.get("source") or "Not recorded" for l in visible}),
+                        "fields": [{"key": d["key"], "label": d["label"]} for d in groupable]}}
 
 
 @router.get("/api/reports/operations")

@@ -2974,6 +2974,8 @@ async function loadReports() {
     const [start, end] = reportRange();
     const params = new URLSearchParams({ start, end });
     ['person', 'product', 'source'].forEach(k => { const v = document.getElementById(`rep-${k}`).value; if (v) params.set(k, v); });
+    const field = document.getElementById('rep-field')?.value;
+    if (field) params.set('field', field);
     let d;
     try { d = await apiJson(`/api/reports?${params}`); } catch (e) { return showToast(e.message); }
     const fill = (id, label, values) => { const el = document.getElementById(id), keep = el.value;
@@ -3002,6 +3004,15 @@ async function loadReports() {
                 <td class="num">${pct(r.quoteRate)}</td><td class="num">${pct(r.conversionRate)}<span class="perf-sub">${num(r.policies)} sold</span></td><td class="num">${inr(r.premium)}</td><td class="num">${inr(r.premiumPerLead)}</td></tr>`).join('')
                 || '<tr><td colspan="8" class="text-center text-slate-400 py-4">No leads in this period.</td></tr>'}</tbody></table></div>
         </section>
+        ${d.options.fields.length ? `<section class="band">
+            <div class="flex flex-wrap items-center justify-between gap-2"><h3>By your own fields</h3>
+                <select id="rep-field" aria-label="Break down by" onchange="loadReports()" class="text-xs border border-slate-300 rounded px-2 py-1 bg-white">
+                    <option value="">Choose a field…</option>${d.options.fields.map(f => `<option value="${esc(f.key)}" ${d.byField?.field === f.key ? 'selected' : ''}>${esc(f.label)}</option>`).join('')}</select></div>
+            ${d.byField ? `<table class="w-full text-left perf-table mt-2" data-testid="report-by-field"><thead><tr><th>${esc(d.byField.label)}</th><th class="num">Leads</th><th class="num">Sold</th><th class="num">Conversion</th></tr></thead>
+                <tbody>${d.byField.rows.map(r => `<tr><td class="font-semibold">${esc(r.value)}</td><td class="num">${num(r.leads)}</td><td class="num">${num(r.sold)}</td><td class="num">${pct(r.conversionRate)}</td></tr>`).join('')}</tbody></table>
+                <p class="text-[11px] text-slate-500 mt-1">The same leads as the funnel above. A lead with several choices counts under each.</p>`
+              : '<p class="text-xs text-slate-400 mt-1">Pick one of your choice or yes/no fields to see leads and sales by its values.</p>'}
+        </section>` : ''}
         <section class="band">
             <h3>Why leads were lost</h3>
             ${d.lostReasons.length ? `<ul class="text-xs space-y-1">${d.lostReasons.map(r => `<li class="flex justify-between border-b border-slate-100 py-1"><span>${esc(r.reason)}</span><b class="font-mono">${num(r.count)}</b></li>`).join('')}</ul>`
