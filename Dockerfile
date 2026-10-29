@@ -7,6 +7,7 @@ COPY requirements-crm.txt ./
 RUN pip install --no-cache-dir -r requirements-crm.txt
 
 COPY pipecat_server.py crm_*.py migrate_to_postgres.py ./
+COPY crm_routes ./crm_routes
 COPY web ./web
 COPY migrations ./migrations
 

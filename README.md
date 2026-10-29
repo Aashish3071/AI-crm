@@ -8,6 +8,14 @@ The build follows the client's own requirement document, *Insurance Telecalling 
 
 An alternative plan, [CLIENT_NON_AI_LAUNCH_PLAN.md](uat/CLIENT_NON_AI_LAUNCH_PLAN.md), proposes shipping every non-AI module before launch. It was written in a separate session and is **not** the plan being followed; it is kept for reference.
 
+### Server split — 29 October 2026
+
+The API is no longer one 8,758-line file. Each area — leads, calls, customers, policies, renewals, quotations, messaging, lead sources, imports, automation, dashboards and the rest — now has its own module in `crm_routes/` (28 in all). `pipecat_server.py` keeps what every area shares: loading and saving, who may see what, the audit log, the lead rules and the scheduler. It is now 3,307 lines. Nothing a user does changes. Every address, input and response is the same, and a check (`tools/check_split.py`) proves it by comparing the API before and after.
+
+**Fix:** the container image now includes the `crm_routes` folder. Since the assistant moved into it in the previous update, the image built from this branch could not start.
+
+Verification: 318 automated tests pass; the routing and API comparison shows no difference. The browser tests still can't run in this build environment (see below).
+
 ### AI customization, phase 0 — 29 October 2026
 
 Groundwork for letting each agency shape the CRM to its own business, following the [AI customization plan](docs/AI_CUSTOMIZATION_PLAN.md). Agreed: insurance agencies first, and companies will be able to change their lead stages.
@@ -286,7 +294,8 @@ Calendar appointments can be linked to leads, customers, policies, renewals, dea
 
 | Path | Purpose |
 | --- | --- |
-| `pipecat_server.py` | FastAPI CRM domain/API service |
+| `pipecat_server.py` | FastAPI app and shared CRM core: persistence, visibility, audit, lifecycle rules, scheduler |
+| `crm_routes/` | The API, one module per area |
 | `crm_security.py` | Passwords, sessions, CSRF, roles and company identity context |
 | `crm_store.py` | PostgreSQL transactional record/link adapter and scheduler lock |
 | `crm_storage.py` | Local-development and S3-compatible document adapter |
@@ -329,7 +338,7 @@ AUTH_DISABLED=1 .venv/bin/python3 -m uvicorn pipecat_server:app --host 127.0.0.1
 ## Automated verification
 
 ```bash
-.venv/bin/python3 -m py_compile pipecat_server.py crm_security.py crm_store.py crm_storage.py crm_worker.py migrate_to_postgres.py
+.venv/bin/python3 -m py_compile pipecat_server.py crm_*.py crm_routes/*.py migrate_to_postgres.py
 .venv/bin/python3 -m unittest -v test_insurance_operations.py test_security_foundation.py tests.test_workflow_integrity
 PYTHONWARNINGS=ignore .venv/bin/python3 -m pytest tests/test_client_blueprint.py tests/test_blueprint_acceptance.py tests/test_e2e_remediation.py -q
 ```

@@ -167,9 +167,12 @@ Progress, 29 October 2026:
 - [x] `crm_ai.py`: one adapter for OpenRouter with a per-company daily cap. The advisor now sees only
   the asker's records (it previously read the whole company's).
 - [x] Route-module pattern set (`crm_routes/`); the advisor is the first area moved out.
-- [ ] Move the remaining areas, leaf areas first (export, reports, leaderboard, calendar), then the
-  ones `save_db()` depends on (commission, automation, notifications), which need their shared helpers
-  extracted from `pipecat_server.py` first.
+- [x] Server split: the API is in 28 modules under `crm_routes/`; `pipecat_server.py` went from
+  8,758 to 3,307 lines and keeps the shared core. Routing and the OpenAPI description are proven
+  unchanged (`tools/check_split.py`).
+- [ ] Later, as Phase 1 touches them: move the shared core into its own modules (persistence,
+  visibility, lead rules). Tests replace settings on `pipecat_server` directly, so this needs those
+  tests changed first.
 
 ### Phase 1 — Custom fields (≈2–3 weeks) · *first visible value*
 

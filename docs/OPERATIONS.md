@@ -7,7 +7,7 @@ original developer.
 
 | Piece | What it is |
 | --- | --- |
-| `pipecat_server.py` | The CRM: a FastAPI web server that serves the screens (`web/`) and the API |
+| `pipecat_server.py`, `crm_routes/` | The CRM: a FastAPI web server that serves the screens (`web/`) and the API |
 | Scheduler | Opens renewals, sends reminders and escalations, runs timed automations and scheduled messages. It runs inside the web server during development and as `crm_worker.py` in production. |
 | Data | Local JSON files in development (`crm_tenants/<company>.json`), PostgreSQL in production |
 | Documents | `crm_documents/` in development; S3-compatible storage (MinIO) in production |
