@@ -203,6 +203,58 @@ class CommercialCrmBrowserFlows(unittest.TestCase):
         expect(dialog).to_be_visible()
         expect(page.get_by_text("This work changed. Reload and retry.", exact=True)).to_be_visible()
 
+    def test_custom_fields_from_settings_to_the_lead_card(self):
+        page = self.page
+        page.goto(f"{self.base_url}/", wait_until="networkidle")
+        csrf = next(c["value"] for c in page.context.cookies() if c["name"] == "crm_csrf")
+        for field in ({"key": "engine_cc", "label": "Engine CC", "type": "number", "section": "Bike details"},
+                      {"key": "fuel", "label": "Fuel", "type": "choice", "options": ["Petrol", "EV"]}):
+            response = page.request.post(f"{self.base_url}/api/schema/fields/lead", data=field, headers={"X-CSRF-Token": csrf})
+            self.assertTrue(response.ok, response.text())
+
+        # The owner adds a third field on the settings screen.
+        page.locator('button[onclick="openSettingsModal()"]').click()
+        page.locator('[data-setting-tab="fields"]').click()
+        page.get_by_role("button", name="Add field", exact=True).click()
+        page.locator("#cf-label").fill("Chassis number")
+        expect(page.locator("#cf-key")).to_have_value("chassis_number")
+        page.locator("#setting-pane-content").get_by_role("button", name="Add field", exact=True).click()
+        expect(page.locator("#setting-pane-content").get_by_text("Chassis number", exact=True)).to_be_visible()
+        page.locator("#settings-modal button", has_text="✕").first.click()
+
+        page.reload(wait_until="networkidle")
+        page.locator("#app-sidebar").get_by_role("button", name="Leads", exact=True).click()
+        page.get_by_role("button", name="New Lead", exact=True).click()
+        dialog = page.get_by_role("dialog", name="Create lead")
+        expect(dialog.get_by_text("Bike details", exact=True)).to_be_visible()
+        page.locator("#lead-name").fill("Custom Field Rider")
+        page.locator("#lead-mobile").fill("+91 98765 40077")
+        page.locator("#lead-product").select_option("Car Insurance")
+        page.locator("#cf-engine_cc").fill("lots")
+        dialog.get_by_role("button", name="Save lead").click()
+        expect(page.get_by_text("Engine CC must be a number")).to_be_visible()
+        page.locator("#cf-engine_cc").fill("650")
+        page.locator("#cf-fuel").select_option("EV")
+        page.locator("#cf-chassis_number").fill("MA3FJEB1S00999")
+        dialog.get_by_role("button", name="Save lead").click()
+        expect(dialog).to_be_hidden()
+
+        row = page.locator("#leads-table-body tr").filter(has_text="Custom Field Rider")
+        expect(row).to_have_count(1)
+        page.locator("#leads-custom-field").select_option("engine_cc")
+        page.locator("#leads-custom-op").select_option("greater_than")
+        page.locator("#leads-custom-value").fill("700")
+        page.locator("#leads-custom-value").dispatch_event("change")
+        expect(row).to_have_count(0)
+        page.locator("#leads-custom-value").fill("500")
+        page.locator("#leads-custom-value").dispatch_event("change")
+        expect(row).to_have_count(1)
+
+        row.get_by_title("View Account 360°").click()
+        values = page.get_by_role("dialog", name="Custom Field Rider").get_by_test_id("lead-custom-values")
+        for text in ("Engine CC", "650", "EV", "MA3FJEB1S00999"):
+            expect(values.get_by_text(text, exact=True)).to_be_visible()
+
 
 if __name__ == "__main__":
     unittest.main()

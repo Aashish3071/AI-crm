@@ -8,6 +8,20 @@ The build follows the client's own requirement document, *Insurance Telecalling 
 
 An alternative plan, [CLIENT_NON_AI_LAUNCH_PLAN.md](uat/CLIENT_NON_AI_LAUNCH_PLAN.md), proposes shipping every non-AI module before launch. It was written in a separate session and is **not** the plan being followed; it is kept for reference.
 
+### Custom fields on leads — 29 October 2026
+
+An owner can now add their own details to every lead — engine CC, chassis number, a referral code — under **Settings → Custom fields**. A field is short or long text, a number, an amount, a date, a date and time, yes/no, one choice or several, a phone, an email, a link to another record or a document. It can sit in its own section of the lead form, be required, carry help text, and apply to some products only (a bike field only on bike leads).
+
+- **On the lead form and card.** The fields appear in their sections; the card lists what was filled in.
+- **Checked wherever a lead is written.** The form, an edit and a spreadsheet import all check the same way: "1,200" reads as a number, "petrol" as Petrol, and a value that can't be read is refused with the field's name. In an import, a bad cell rejects only its row, with the reason. A spreadsheet column whose heading matches a field's label is matched to it automatically.
+- **Filters, search and automations.** The lead list has a filter for any field ("Engine CC more than 500"), and search finds custom text such as a chassis number. Automation rules can test the fields, comparing numbers as numbers and dates as dates.
+- **Export.** The leads spreadsheet has a column for each field.
+- **Safe changes.** A field is never deleted, only hidden, and its values stay. Removing a choice that leads still use is refused with how many use it. Switching from one choice to several keeps every value. Every change is in the audit log.
+
+Telecallers and managers fill the fields in; only the owner defines them.
+
+Verification: 348 automated tests pass, 30 of them for custom fields. A new browser test, from defining a field in Settings to seeing its value on the lead card, passes here with a stand-in for the Tailwind stylesheet (see the note below on browser tests).
+
 ### Server split — 29 October 2026
 
 The API is no longer one 8,758-line file. Each area — leads, calls, customers, policies, renewals, quotations, messaging, lead sources, imports, automation, dashboards and the rest — now has its own module in `crm_routes/` (28 in all). `pipecat_server.py` keeps what every area shares: loading and saving, who may see what, the audit log, the lead rules and the scheduler. It is now 3,307 lines. Nothing a user does changes. Every address, input and response is the same, and a check (`tools/check_split.py`) proves it by comparing the API before and after.

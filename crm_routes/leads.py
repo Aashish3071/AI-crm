@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
+import crm_schema
 import crm_security
 import pipecat_server as core
 from crm_security import current_actor
@@ -19,8 +20,19 @@ router = APIRouter()
 def get_leads(status: Optional[str] = None, search: Optional[str] = None, assignedTo: Optional[str] = None,
               priority: Optional[str] = None, product: Optional[str] = None,
               filter: Optional[str] = None, page: int = Query(1, ge=1), pageSize: int = Query(50, ge=1, le=200),
-              paginated: bool = False):
+              paginated: bool = False, customField: Optional[str] = None, customOp: str = "is",
+              customValue: Optional[str] = None):
     db = core.load_db()
+    custom_defs = core.custom_field_defs(db)
+    custom_filter = None
+    if customField:
+        custom_filter = next((d for d in custom_defs if d["key"] == customField), None)
+        if not custom_filter:
+            raise HTTPException(status_code=422, detail=f"'{customField}' is not a field")
+        try:
+            crm_schema.check_condition(custom_filter, customOp, customValue)
+        except crm_schema.SchemaError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
     leads = core.scoped(core.live_expiry_inplace(db.get("leads", [])), core.visible_owners(db))
     for l in leads:
         if not l.get("leadPriority"):
@@ -50,8 +62,12 @@ def get_leads(status: Optional[str] = None, search: Optional[str] = None, assign
     elif filter == "cold":
         leads = [l for l in leads if l.get("leadPriority") == "COLD"]
         
+    if custom_filter:
+        leads = [l for l in leads if crm_schema.matches(custom_filter, (l.get("custom") or {}).get(customField),
+                                                         customOp, customValue)]
     if search:
         s = search.lower()
+        searchable = [d for d in custom_defs if d["type"] in ("text", "long_text", "phone", "email")]
         leads = [l for l in leads if (
             s in l.get("name", "").lower() or 
             s in l.get("email", "").lower() or 
@@ -59,7 +75,8 @@ def get_leads(status: Optional[str] = None, search: Optional[str] = None, assign
             s in l.get("mobile", "").lower() or
             s in l.get("policyType", "").lower() or
             s in (l.get("product") or "").lower() or
-            s in (l.get("city") or "").lower()
+            s in (l.get("city") or "").lower() or
+            any(s in str((l.get("custom") or {}).get(d["key"]) or "").lower() for d in searchable)
         )]
     if not paginated:
         return leads
@@ -173,6 +190,7 @@ class LeadModel(BaseModel):
     vehicleDetails: Optional[Dict[str, Any]] = None
     healthDetails: Optional[Dict[str, Any]] = None
     existingPolicy: Optional[Dict[str, Any]] = None
+    custom: Optional[Dict[str, Any]] = None       # the company's own fields, by key (crm_routes/schema.py)
 
 
 @router.get("/api/lead-options")
@@ -273,6 +291,9 @@ def create_lead(item: LeadModel):
         "lostReason": "",
         "assignedByRule": core._last_rule_match["name"],
     }
+    custom = core.checked_custom_values(db, None, item.custom, creating=True, product=product)
+    if custom:
+        new_lead["custom"] = custom
     db.setdefault("leads", []).insert(0, new_lead)
 
     if org_name != "Private Individual" and not any(o.get("name", "").lower() == org_name.lower()
@@ -453,6 +474,9 @@ def merge_leads(target_id: str, duplicate_id: str):
                     item[field] = target_id
     for key, value in duplicate.items():
         if not target.get(key) and value: target[key] = value
+    if duplicate.get("custom"):
+        # Field by field, like the rest: the target's own values win, the duplicate fills gaps.
+        target["custom"] = {**duplicate["custom"], **(target.get("custom") or {})}
     duplicate["mergedIntoLeadId"] = target_id
     db["leads"] = [x for x in db.get("leads", []) if x.get("id") != duplicate_id]
     duplicate.update({"archived":True, "archivedReason":f"Merged into {target_id}", "archivedAt":datetime.utcnow().isoformat()+"Z"}); db.setdefault("archivedLeads", []).insert(0, duplicate)

@@ -64,9 +64,9 @@ class BlueprintBrowserAcceptance(unittest.TestCase):
         expect(modal).to_be_visible()
         sections = modal.locator("[data-setting-tab]").evaluate_all(
             "buttons => buttons.map(button => button.dataset.settingTab)")
-        # Assignment rules now live on the Automation screen.
+        # Assignment rules now live on the Automation screen; custom fields have their own section.
         self.assertEqual(set(sections), {"import", "profile", "users", "hierarchy", "team", "templates", "watemplates",
-                                         "configuration", "archive", "reports"})
+                                         "fields", "configuration", "archive", "reports"})
         for section in sections:
             with self.subTest(section=section):
                 modal.locator(f'[data-setting-tab="{section}"]').click()

@@ -132,6 +132,7 @@ class Values(unittest.TestCase):
         options = ["Petrol", "Diesel", "CNG"]
         self.assertEqual(self.read("petrol", type="choice", options=options), "Petrol")
         self.assertEqual(self.read("cng, Petrol, cng", type="multi_choice", options=options), ["CNG", "Petrol"])
+        self.assertEqual(self.read("Petrol; CNG", type="multi_choice", options=options), ["Petrol", "CNG"])
         with self.assertRaisesRegex(SchemaError, "not one of"):
             self.read("EV", type="choice", options=options)
 

@@ -50,6 +50,7 @@ import crm_security
 import crm_store
 import crm_automation as automation
 import crm_metrics as metrics
+import crm_schema
 
 app = FastAPI(title="InsureCRM Enterprise Platform")
 
@@ -1307,7 +1308,8 @@ def update_lead(id: str, updates: Dict[str, Any]):
     before = dict(lead)
     allowed = {"firstName", "lastName", "name", "organization", "email", "mobile", "policyType", "premium",
                "expiryDate", "assignedTo", "nextAction", "nextActionDate", "nextActionTime", "priority", "source", "product", "city",
-               "leadPriority", "leadSource", "vehicleDetails", "healthDetails", "existingPolicy", "status", "lostReason"}
+               "leadPriority", "leadSource", "vehicleDetails", "healthDetails", "existingPolicy", "status", "lostReason",
+               "custom"}
     changes = {k: v for k, v in updates.items() if k in allowed}
 
     if "assignedTo" in changes and changes["assignedTo"] != lead.get("assignedTo"):
@@ -1321,6 +1323,9 @@ def update_lead(id: str, updates: Dict[str, Any]):
     for field in _DETAIL_MODELS:
         if field in changes:
             changes[field] = _checked_details(field, changes[field], lead.get(field))
+    if "custom" in changes:
+        changes["custom"] = checked_custom_values(db, lead.get("custom"), changes["custom"],
+                                                  product=changes.get("product", lead.get("product") or lead.get("policyType")))
     if "nextActionTime" in changes:
         changes["nextActionTime"] = _checked_time(changes["nextActionTime"])
     if changes.get("expiryDate"):
@@ -2548,6 +2553,45 @@ def contact_visible(contact: Dict[str, Any], ids: Optional[set], orgs: Optional[
     org = (contact.get("organization") or "").strip().lower()
     return org not in _SHARED_ORGANIZATIONS and org in orgs
 
+# ─── Custom fields (docs/AI_CUSTOMIZATION_PLAN.md, phase 1) ──────────
+# A company adds its own lead fields in Settings. Definitions are kept in
+# settings.customFields.<object>, values on each record under "custom". crm_schema owns
+# the rules; every path that writes a lead — the form, an edit, an import — goes through
+# checked_custom_values, so a value is checked the same way wherever it comes from.
+
+def custom_field_defs(db: Dict[str, Any], obj: str = "lead") -> List[Dict[str, Any]]:
+    return [dict(d) for d in (((db.get("settings") or {}).get("customFields") or {}).get(obj) or [])]
+
+
+def checked_custom_values(db: Dict[str, Any], existing: Optional[Dict[str, Any]], values: Optional[Dict[str, Any]],
+                          creating: bool = False, product: Optional[str] = None, obj: str = "lead") -> Dict[str, Any]:
+    """The record's custom values with ``values`` merged in, or a 422 naming each problem."""
+    merged, errors = crm_schema.clean_custom(custom_field_defs(db, obj), values, existing,
+                                             creating=creating, product=product)
+    if errors:
+        raise HTTPException(status_code=422, detail="; ".join(errors.values()))
+    return merged
+
+
+def custom_rule_fields(db: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
+    """Custom fields as automation-rule fields, each carrying its definition for typed matching."""
+    operators = {t["type"]: t["operators"] for t in crm_schema.type_catalogue()}
+    return {"lead": [{"field": f"custom.{d['key']}", "label": d["label"], "custom": True, "type": d["type"],
+                      "operators": operators[d["type"]], "options": d.get("options", []),
+                      "numeric": d["type"] in ("number", "currency"), "hidden": d.get("hidden", False),
+                      "definition": d} for d in custom_field_defs(db, "lead")]}
+
+
+def refresh_rule_definitions(db: Dict[str, Any], obj: str, definition: Dict[str, Any]) -> None:
+    """A rule's copy of a field's definition follows every change to the field."""
+    if obj != "lead":
+        return
+    for rule in db.get("automationRules", []):
+        for condition in rule.get("conditions") or []:
+            if condition.get("field") == f"custom.{definition['key']}":
+                condition["definition"] = definition
+
+
 # ─── Automation (client blueprint, slide 33) ────────────────────────
 # The engine, its guardrails and its vocabulary live in crm_automation.py. This section
 # connects it to the CRM: what each action does, where each timed trigger looks and how
@@ -2557,6 +2601,8 @@ def contact_visible(contact: Dict[str, Any], ids: Optional[set], orgs: Optional[
 
 
 def _automation_field(record: Dict[str, Any], field: str) -> Any:
+    if field.startswith("custom."):
+        return (record.get("custom") or {}).get(field[len("custom."):])
     if field == "daysToExpiry":
         return _days_until(record.get("expiryDate") or "") if record.get("expiryDate") else ""
     if field == "premium":
@@ -2567,7 +2613,7 @@ def _automation_field(record: Dict[str, Any], field: str) -> Any:
     return record.get(field, "")
 
 
-automation.configure(_automation_field, money_value)
+automation.configure(_automation_field, money_value, crm_schema.matches)
 
 
 def _condition_matches(lead: Dict[str, Any], condition: Dict[str, Any]) -> bool:
@@ -3262,6 +3308,7 @@ from crm_routes import search as _search_routes  # noqa: E402
 from crm_routes import auth as _auth_routes  # noqa: E402
 from crm_routes import calls as _calls_routes  # noqa: E402
 from crm_routes import advisor as _advisor_routes  # noqa: E402
+from crm_routes import schema as _schema_routes  # noqa: E402
 
 app.include_router(_advisor_routes.router)
 app.include_router(_calls_routes.router)
@@ -3291,3 +3338,4 @@ app.include_router(_tasks_routes.router)
 app.include_router(_deals_and_contacts_routes.router)
 app.include_router(_admin_routes.router)
 app.include_router(_backups_routes.router)
+app.include_router(_schema_routes.router)

@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 import crm_automation as automation
+import crm_schema
 import crm_security
 import pipecat_server as core
 from crm_security import current_actor
@@ -106,15 +107,22 @@ def _people(db: Dict[str, Any]) -> List[str]:
 
 def _validated(db: Dict[str, Any], data: Dict[str, Any]) -> Dict[str, Any]:
     try:
-        return automation.validate_rule(data, _people(db), core.LEAD_STATUSES, list(core.CALL_OUTCOMES))
-    except automation.RuleError as exc:
+        rule = automation.validate_rule(data, _people(db), core.LEAD_STATUSES, list(core.CALL_OUTCOMES),
+                                        extra_fields=core.custom_rule_fields(db))
+        for condition in rule["conditions"]:
+            if condition.get("definition"):
+                crm_schema.check_condition(condition["definition"], condition["operator"], condition["value"])
+        return rule
+    except (automation.RuleError, crm_schema.SchemaError) as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
 
 @router.get("/api/automations/options")
 def automation_options():
     db = core.load_db()
-    return {"triggers": automation.TRIGGERS, "actions": automation.ACTIONS, "fields": automation.FIELDS,
+    custom = [f for f in core.custom_rule_fields(db)["lead"] if not f["hidden"]]
+    fields = {**automation.FIELDS, "lead": automation.FIELDS["lead"] + custom}
+    return {"triggers": automation.TRIGGERS, "actions": automation.ACTIONS, "fields": fields,
             "operators": automation.OPERATORS, "methods": automation.ROUTING_METHODS,
             "notifyTargets": automation.NOTIFY_TARGETS, "weekdays": automation.WEEKDAYS, "people": _people(db),
             "statuses": core.LEAD_STATUSES, "outcomes": list(core.CALL_OUTCOMES), "tokens": core.TEMPLATE_TOKENS + ["customerName", "missingDocuments"],

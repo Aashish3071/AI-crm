@@ -12,6 +12,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel
 
+import crm_schema
 import pipecat_server as core
 
 router = APIRouter()
@@ -149,8 +150,9 @@ def _normalise_header(value: Any) -> str:
     return " ".join(str(value or "").strip().lower().replace("_", " ").replace(".", " ").split())
 
 
-def _suggest_field(header: str, taken: set) -> Optional[str]:
-    """Match a spreadsheet column to a CRM field: exact alias first, then containment."""
+def _suggest_field(header: str, taken: set, custom_labels: Optional[Dict[str, str]] = None) -> Optional[str]:
+    """Match a spreadsheet column to a CRM field: exact alias first, then a custom field's
+    exact label, then containment."""
     clean = _normalise_header(header)
     if not clean:
         return None
@@ -159,6 +161,9 @@ def _suggest_field(header: str, taken: set) -> Optional[str]:
             continue
         if clean in spec["aliases"] or clean == spec["field"].lower():
             return spec["field"]
+    for label, target in (custom_labels or {}).items():
+        if clean == label and target not in taken:
+            return target
     for spec in core.IMPORT_FIELDS:
         if spec["field"] in taken:
             continue
@@ -244,10 +249,13 @@ async def analyze_import(request: Request, filename: str = "upload.csv"):
     parsed = _parse_spreadsheet(content, filename)
     headers, rows = parsed["headers"], parsed["rows"]
 
+    db = core.load_db()
+    custom_fields = [d for d in core.custom_field_defs(db) if not d.get("hidden")]
+    custom_labels = {_normalise_header(d["label"]): f"custom.{d['key']}" for d in custom_fields}
     taken: set = set()
     columns = []
     for index, header in enumerate(headers):
-        suggestion = _suggest_field(header, taken)
+        suggestion = _suggest_field(header, taken, custom_labels)
         if suggestion:
             taken.add(suggestion)
         samples = [r[index] for r in rows[:5] if index < len(r) and r[index]][:3]
@@ -261,7 +269,6 @@ async def analyze_import(request: Request, filename: str = "upload.csv"):
         "headers": headers, "rows": rows, "createdAt": datetime.utcnow().isoformat() + "Z",
         "importedCount": 0, "updatedCount": 0, "skippedCount": 0, "errors": [], "createdLeadIds": []
     }
-    db = core.load_db()
     db.setdefault("importBatches", []).insert(0, batch)
     # Staged files are working data, not history: keep the most recent few only.
     db["importBatches"] = db["importBatches"][:25]
@@ -270,7 +277,9 @@ async def analyze_import(request: Request, filename: str = "upload.csv"):
 
     return {"importId": batch["id"], "filename": batch["filename"], "rowCount": len(rows),
             "columns": columns, "previewRows": rows[:8],
-            "availableFields": [{"field": f["field"], "label": f["label"], "required": f["required"]} for f in core.IMPORT_FIELDS]}
+            "availableFields": [{"field": f["field"], "label": f["label"], "required": f["required"]} for f in core.IMPORT_FIELDS]
+                               + [{"field": f"custom.{d['key']}", "label": d["label"], "required": bool(d.get("required")),
+                                   "custom": True} for d in custom_fields]}
 
 
 class ImportCommit(BaseModel):
@@ -291,6 +300,10 @@ def commit_import(import_id: str, payload: ImportCommit):
     mapping = {int(k): v for k, v in payload.mapping.items() if v and v != "__skip__"}
     if "name" not in mapping.values():
         raise HTTPException(status_code=422, detail="Map a column to Client name before importing.")
+    custom_defs = core.custom_field_defs(db)
+    unknown = [t for t in mapping.values() if t.startswith("custom.") and t[len("custom."):] not in {d["key"] for d in custom_defs}]
+    if unknown:
+        raise HTTPException(status_code=422, detail=f"Not a custom field: {', '.join(sorted(set(unknown)))}")
 
     defaults = payload.defaults or {}
     strategy = payload.deduplicationStrategy or "skip"
@@ -304,12 +317,16 @@ def commit_import(import_id: str, payload: ImportCommit):
 
     for row_number, row in enumerate(rows, start=2):   # row 1 is the header
         values: Dict[str, str] = {}
-        custom: Dict[str, str] = {}
+        custom: Dict[str, str] = {}                # unmapped columns, kept as they were typed
+        typed: Dict[str, str] = {}                 # columns mapped to the company's own fields
         for index, target in mapping.items():
             cell = row[index] if index < len(row) else ""
             if target == "__custom__":
                 if cell:
                     custom[headers[index] if index < len(headers) else f"Column {index+1}"] = cell
+            elif target.startswith("custom."):
+                if cell:
+                    typed[target[len("custom."):]] = cell
             elif cell:
                 values[target] = cell
 
@@ -335,6 +352,13 @@ def commit_import(import_id: str, payload: ImportCommit):
             skipped += 1
             continue
         if existing and strategy == "update":
+            merged, problems = crm_schema.clean_custom(custom_defs, typed, existing.get("custom"),
+                                                       product=existing.get("product") or existing.get("policyType"))
+            if problems:
+                errors.append({"row": row_number, "message": "; ".join(problems.values()), "data": dict(zip(headers, row))})
+                continue
+            if typed:
+                existing["custom"] = merged
             for field, value in values.items():
                 if field != "name" and value:
                     existing[field] = value
@@ -346,6 +370,12 @@ def commit_import(import_id: str, payload: ImportCommit):
             existing["lastModified"] = now_str
             existing["importBatchId"] = import_id
             updated += 1
+            continue
+
+        typed_custom, problems = crm_schema.clean_custom(custom_defs, typed, None, creating=True,
+                                                         product=values.get("policyType") or defaults.get("policyType"))
+        if problems:
+            errors.append({"row": row_number, "message": "; ".join(problems.values()), "data": dict(zip(headers, row))})
             continue
 
         stage = values.get("status") if values.get("status") in core.STAGES else (defaults.get("status") or "New")
@@ -377,6 +407,7 @@ def commit_import(import_id: str, payload: ImportCommit):
             "nextActionCompleted": False, "source": f"Spreadsheet import ({batch.get('filename')})",
             "assignedTo": owner, "lastModified": now_str, "lostReason": "",
             "customFields": custom, "importBatchId": import_id, "importedRow": row_number,
+            **({"custom": typed_custom} if typed_custom else {}),
             "assignedByRule": core._last_rule_match["name"]
         }
         task_id = f"T_{uuid.uuid4().hex[:8]}"

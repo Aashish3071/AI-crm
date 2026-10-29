@@ -88,7 +88,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function startApplication() {
     if (applicationStarted) return;
     applicationStarted = true;
-    await Promise.all([loadBrokerRoster(), loadLeadOptions()]);
+    await Promise.all([loadBrokerRoster(), loadLeadOptions(), loadCustomFields()]);
     applyRoleVisibility();
     switchView('dashboard');
     refreshNotificationBadge();
@@ -1081,6 +1081,7 @@ async function loadLeads() {
         if (owner) params.set('assignedTo', owner);
         if (search) params.set('search', search);
         if (activeQuickFilter) params.set('filter', activeQuickFilter);
+        customFilterParams(params);
         params.set('paginated', 'true');
         params.set('page', String(leadPage));
         params.set('pageSize', leadViewMode === 'kanban' ? '200' : '25');
@@ -1487,6 +1488,7 @@ async function openLeadDrawer(leadId) {
         if (!res.ok) return;
         const data = await res.json();
         const l = data.lead;
+        if (!customSchemaLoaded) await loadCustomFields();
         const notes = data.notes || [];
         const docStatus = data.documentStatus || { required: [], missing: [] };
         const documents = await apiJson(`/api/documents?associatedId=${encodeURIComponent(leadId)}`);
@@ -1533,7 +1535,7 @@ async function openLeadDrawer(leadId) {
                     ${detailCell('Enquiry received', l.leadDate ? formatShortDate(l.leadDate) : (l.leadDateUnknown ? 'Not recorded' : ''))}
                     ${detailCell('Policy number', l.policyNumber, true)}
                 </div>
-                ${vehicleSummary(l.vehicleDetails)}${healthSummary(l.healthDetails)}
+                ${vehicleSummary(l.vehicleDetails)}${healthSummary(l.healthDetails)}${customFieldsSummary(l)}
             </div>
 
             ${Object.keys(l.customFields || {}).length ? `
@@ -2313,7 +2315,8 @@ function renderRuleBuilder() {
         <div class="auto-block"><h4>If <span class="normal-case font-normal tracking-normal">— every condition must match; none means always</span></h4>
             ${d.conditions.map((c, i) => `<div class="auto-row">
                 ${selectHtml(`conditions.${i}.field`, fields.map(f => [f.field, f.label]), c.field)}
-                ${selectHtml(`conditions.${i}.operator`, o.operators.map(x => [x.op, x.label]), c.operator)}
+                ${selectHtml(`conditions.${i}.operator`, o.operators.filter(x => !fields.find(f => f.field === c.field)?.operators
+                    || fields.find(f => f.field === c.field).operators.includes(x.op)).map(x => [x.op, x.label]), c.operator)}
                 ${c.operator === 'is_empty' ? '<span></span>' : inputHtml(`conditions.${i}.value`, c.value)}
                 <button type="button" class="fu-btn" onclick="removeDraftItem('conditions', ${i})" aria-label="Remove condition">✕</button></div>`).join('')}
             <button type="button" class="fu-btn justify-self-start" onclick="addDraftCondition()">+ Add condition</button></div>
@@ -3126,7 +3129,8 @@ const optionsHtml = (values, selected = '', blank = '') =>
     values.map(v => `<option value="${esc(String(v))}" ${String(v) === String(selected ?? '') ? 'selected' : ''}>${esc(String(v))}</option>`).join('');
 
 async function prepareLeadForm() {
-    await loadLeadOptions();
+    await Promise.all([loadLeadOptions(), loadCustomFields()]);
+    document.getElementById('lead-custom-fields').innerHTML = '';
     const o = leadOptions;
     document.getElementById('lead-product').innerHTML = optionsHtml(o.products, '', 'Choose product');
     document.getElementById('lead-source').innerHTML = optionsHtml(o.sources, '', 'Not recorded');
@@ -3146,6 +3150,7 @@ function showProductDetails(product) {
     const p = (product || '').toLowerCase();
     document.getElementById('lead-car-details').classList.toggle('hidden', !p.includes('car'));
     document.getElementById('lead-health-details').classList.toggle('hidden', !p.includes('health'));
+    renderLeadCustomFields(product);
 }
 
 async function openCreateModal() {
@@ -3156,6 +3161,7 @@ async function openCreateModal() {
     document.getElementById('lead-form-submit').textContent = 'Save lead';
     document.getElementById('lead-next-action').value = 'First call';
     document.getElementById('lead-next-action-date').value = isoDay(0);
+    leadCustomValues = {};
     showProductDetails('');
     document.getElementById('create-modal')?.classList.remove('hidden');
     document.getElementById('lead-name').focus();
@@ -3177,6 +3183,7 @@ async function openEditLead(id) {
         'health-plan': h.planType, 'health-sum': h.sumInsured, 'health-conditions': h.preExistingConditions,
         'health-members': (h.members || []).map(m => `${m.relation} ${m.age}`).join(', ') };
     Object.entries(values).forEach(([key, value]) => { const el = document.getElementById(key); if (el) el.value = value ?? ''; });
+    leadCustomValues = { ...(l.custom || {}) };
     showProductDetails(l.product);
     const open = needsNextAction(l.status);
     document.getElementById('lead-next-action').closest('.grid').classList.toggle('hidden', !open);
@@ -3228,6 +3235,8 @@ async function handleCreateLeadSubmit(e) {
         payload.healthDetails = compact({ planType: val('health-plan'), sumInsured: val('health-sum') ? Number(val('health-sum')) : null,
             members: parseMembers(val('health-members')), preExistingConditions: val('health-conditions') });
     }
+    const custom = collectLeadCustomValues();
+    if (Object.keys(custom).length) payload.custom = custom;
     if (editingLeadId) delete payload.notes;
     try {
         await apiJson(editingLeadId ? `/api/leads/${editingLeadId}` : '/api/leads', {
@@ -3865,6 +3874,11 @@ async function switchSettingTab(tab) {
                         </div>`}
                 </div>
             </div>`;
+    } else if (tab === 'fields') {
+        await Promise.all([loadLeadOptions(), loadCustomFields()]);
+        if (!stillCurrent()) return;
+        customFieldEditing = null;
+        renderCustomFieldsPane();
     } else if (tab === 'configuration') {
         const settings = await apiJson('/api/settings');
         if (!stillCurrent()) return;
@@ -5053,4 +5067,263 @@ function timeAgo(isoDate) {
     if (!isoDate) return '-';
     const d = new Date(isoDate);
     return d.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CUSTOM FIELDS (docs/AI_CUSTOMIZATION_PLAN.md, phase 1)
+// ═══════════════════════════════════════════════════════════════════
+// The company's own lead fields. Definitions come from /api/schema and the server checks
+// every value, so these screens only draw the inputs and send what was typed.
+let customSchema = { fieldTypes: [], objects: { lead: [] } };
+let customSchemaLoaded = false;
+let leadCustomValues = {};          // the lead being edited, so changing product keeps its values
+
+async function loadCustomFields() {
+    try { customSchema = await apiJson('/api/schema'); customSchemaLoaded = true; }
+    catch (e) { /* keep the last definitions */ }
+    renderCustomFilterOptions();
+    return leadCustomFields();
+}
+
+const leadCustomFields = () => customSchema.objects?.lead || [];
+const fieldApplies = (f, product) => !f.products?.length
+    || f.products.map(p => p.toLowerCase()).includes((product || '').toLowerCase());
+const fieldTypeLabel = type => (customSchema.fieldTypes.find(t => t.type === type) || {}).label || type;
+const CUSTOM_OPERATOR_LABELS = { contains: 'contains', is: 'is', is_not: 'is not', greater_than: 'more than',
+    less_than: 'less than', is_empty: 'is empty' };
+
+function customValueText(f, v) {
+    if (v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length)) return '';
+    if (f.type === 'boolean') return v ? 'Yes' : 'No';
+    if (f.type === 'multi_choice') return v.join(', ');
+    if (f.type === 'currency') return '₹ ' + Number(v).toLocaleString('en-IN');
+    if (f.type === 'date') return formatShortDate(v);
+    return String(v);
+}
+
+function customInputHtml(f, value) {
+    const mark = f.required ? ' *' : '';
+    const help = f.help ? `<span class="block font-normal text-[11px] text-slate-400 mt-0.5">${esc(f.help)}</span>` : '';
+    const attrs = `id="cf-${esc(f.key)}" data-custom-key="${esc(f.key)}" class="corp-input mt-1"`;
+    const v = value ?? '';
+    if (f.type === 'multi_choice') {
+        return `<fieldset class="block font-medium text-slate-700 sm:col-span-2" data-custom-key="${esc(f.key)}" data-custom-multi="1">
+            <legend>${esc(f.label)}${mark}</legend><div class="flex flex-wrap gap-x-3 gap-y-1 mt-1">
+            ${(f.options || []).map(o => `<label class="font-normal flex items-center gap-1"><input type="checkbox" value="${esc(o)}" ${(value || []).includes(o) ? 'checked' : ''}> ${esc(o)}</label>`).join('')}
+            </div>${help}</fieldset>`;
+    }
+    const input = {
+        long_text: () => `<textarea ${attrs} rows="2">${esc(v)}</textarea>`,
+        number: () => `<input type="text" inputmode="decimal" ${attrs} value="${esc(v)}">`,
+        currency: () => `<input type="text" inputmode="decimal" ${attrs} value="${esc(v)}">`,
+        date: () => `<input type="date" ${attrs} value="${esc(v)}">`,
+        datetime: () => `<input type="datetime-local" ${attrs} value="${esc(String(v).slice(0, 16))}">`,
+        boolean: () => `<select ${attrs}>${optionsHtml(['Yes', 'No'], value === true ? 'Yes' : value === false ? 'No' : '', '—')}</select>`,
+        choice: () => `<select ${attrs}>${optionsHtml(f.options || [], v, '—')}</select>`,
+        phone: () => `<input type="tel" ${attrs} value="${esc(v)}">`,
+        email: () => `<input type="email" ${attrs} value="${esc(v)}">`,
+    }[f.type] || (() => `<input type="text" ${attrs} value="${esc(v)}">`);
+    return `<label class="block font-medium text-slate-700${f.type === 'long_text' ? ' sm:col-span-2' : ''}">${esc(f.label)}${mark}${input()}${help}</label>`;
+}
+
+// Values as typed: the server reads "1,200", "yes", "a; b" and so on, and says what it can't.
+function collectLeadCustomValues() {
+    const values = {};
+    document.querySelectorAll('#lead-custom-fields [data-custom-key]').forEach(el => {
+        values[el.dataset.customKey] = el.dataset.customMulti
+            ? [...el.querySelectorAll('input:checked')].map(box => box.value) : el.value.trim();
+    });
+    return values;
+}
+
+function renderLeadCustomFields(product) {
+    const box = document.getElementById('lead-custom-fields');
+    if (!box) return;
+    leadCustomValues = { ...leadCustomValues, ...collectLeadCustomValues() };
+    const fields = leadCustomFields().filter(f => !f.hidden && fieldApplies(f, product));
+    const sections = [];
+    fields.forEach(f => {
+        const name = f.section || 'More details';
+        const group = sections.find(s => s.name === name) || (sections.push({ name, fields: [] }), sections[sections.length - 1]);
+        group.fields.push(f);
+    });
+    box.innerHTML = sections.map(s => `<div class="border border-slateBorder rounded-md">
+        <div class="px-3 py-2 font-semibold text-slate-700">${esc(s.name)}</div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-3 pt-1">${s.fields.map(f => customInputHtml(f, leadCustomValues[f.key])).join('')}</div>
+    </div>`).join('');
+}
+
+function customFieldsSummary(lead) {
+    const filled = leadCustomFields().filter(f => !f.hidden && customValueText(f, (lead.custom || {})[f.key]));
+    if (!filled.length) return '';
+    return `<div class="pt-2 border-t border-slate-100 grid grid-cols-2 gap-x-3 gap-y-2" data-testid="lead-custom-values">
+        ${filled.map(f => detailCell(esc(f.label), customValueText(f, lead.custom[f.key]))).join('')}</div>`;
+}
+
+// ── Lead list: filter by one of the company's fields ──
+function renderCustomFilterOptions() {
+    const select = document.getElementById('leads-custom-field');
+    if (!select) return;
+    const fields = leadCustomFields().filter(f => !f.hidden && f.type !== 'file');
+    const chosen = select.value;
+    select.innerHTML = '<option value="">More filters…</option>' + fields.map(f => `<option value="${esc(f.key)}">${esc(f.label)}</option>`).join('');
+    select.value = fields.some(f => f.key === chosen) ? chosen : '';
+    document.getElementById('leads-custom-filter')?.classList.toggle('hidden', !fields.length);
+    onCustomFilterFieldChange(false);
+}
+
+function onCustomFilterFieldChange(reload = true) {
+    const key = document.getElementById('leads-custom-field')?.value;
+    const f = leadCustomFields().find(x => x.key === key);
+    const op = document.getElementById('leads-custom-op'), value = document.getElementById('leads-custom-value');
+    if (!op || !value) return;
+    const ops = f ? (customSchema.fieldTypes.find(t => t.type === f.type)?.operators || []) : [];
+    const previous = op.value;
+    op.innerHTML = ops.map(o => `<option value="${o}">${CUSTOM_OPERATOR_LABELS[o] || o}</option>`).join('');
+    op.value = ops.includes(previous) ? previous : (ops[0] || '');
+    op.classList.toggle('hidden', !f);
+    value.classList.toggle('hidden', !f || op.value === 'is_empty');
+    document.getElementById('leads-custom-options').innerHTML = (f?.options || []).map(o => `<option value="${esc(o)}"></option>`).join('');
+    if (reload) { leadPage = 1; loadLeads(); }
+}
+
+function customFilterParams(params) {
+    const key = document.getElementById('leads-custom-field')?.value;
+    const op = document.getElementById('leads-custom-op')?.value;
+    const value = document.getElementById('leads-custom-value')?.value.trim() || '';
+    if (key && op && (op === 'is_empty' || value)) {
+        params.set('customField', key); params.set('customOp', op);
+        if (op !== 'is_empty') params.set('customValue', value);
+    }
+}
+
+// ── Settings → Custom fields ──
+const COMPATIBLE_TYPES = { text: ['text', 'long_text'], long_text: ['long_text', 'text'], choice: ['choice', 'multi_choice'] };
+let customFieldEditing = null;      // null: list; '': new field; key: editing that field
+
+function fieldKeyFromLabel(label) {
+    const key = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40);
+    return /^[a-z]/.test(key) ? key : `f_${key}`.slice(0, 40);
+}
+
+function renderCustomFieldsPane() {
+    const pane = document.getElementById('setting-pane-content');
+    const fields = leadCustomFields();
+    const owner = roleKey() === 'admin';
+    if (customFieldEditing !== null && owner) { pane.innerHTML = customFieldForm(fields.find(f => f.key === customFieldEditing)); return; }
+    pane.innerHTML = `<div class="space-y-4">
+        <div class="flex items-start justify-between gap-3">
+            <div><h3 class="font-semibold text-slate-900 text-sm">Custom fields</h3>
+            <p class="text-xs text-slate-500 mt-0.5">Your own details on every lead — engine CC, chassis number, a referral code — on the lead form and card, in filters, automations, imports and exports. A field you no longer need is hidden, never deleted, so its values stay.</p></div>
+            <button data-requires="admin" onclick="editCustomField('')" class="px-3 py-1.5 bg-slate-900 text-white rounded text-xs font-semibold shrink-0">Add field</button>
+        </div>
+        <div class="space-y-2">${fields.map((f, i) => `
+            <div class="flex items-center justify-between gap-3 border border-slateBorder rounded p-3 ${f.hidden ? 'opacity-60' : ''}">
+                <div class="min-w-0">
+                    <div class="text-xs font-semibold text-slate-900">${esc(f.label)}
+                        ${f.required ? '<span class="text-[10px] text-rose-700 font-semibold ml-1">required</span>' : ''}
+                        ${f.hidden ? '<span class="text-[10px] text-slate-500 ml-1">hidden</span>' : ''}</div>
+                    <div class="text-[11px] text-slate-500">${esc(fieldTypeLabel(f.type))}${f.options?.length ? ` · ${esc(f.options.join(', '))}` : ''}${f.section ? ` · in “${esc(f.section)}”` : ''}${f.products?.length ? ` · only ${esc(f.products.join(', '))}` : ''}</div>
+                </div>
+                <div class="flex items-center gap-1 shrink-0" data-requires="admin">
+                    <button class="fu-btn" aria-label="Move ${esc(f.label)} up" ${i === 0 ? 'disabled' : ''} onclick="moveCustomField('${esc(f.key)}', -1)">↑</button>
+                    <button class="fu-btn" aria-label="Move ${esc(f.label)} down" ${i === fields.length - 1 ? 'disabled' : ''} onclick="moveCustomField('${esc(f.key)}', 1)">↓</button>
+                    <button class="fu-btn" onclick="editCustomField('${esc(f.key)}')">Edit</button>
+                    <button class="fu-btn" onclick="toggleCustomFieldHidden('${esc(f.key)}')">${f.hidden ? 'Show' : 'Hide'}</button>
+                </div>
+            </div>`).join('') || '<p class="text-xs text-slate-400">No custom fields yet.</p>'}</div>
+    </div>`;
+    applyRoleVisibility();
+}
+
+function customFieldForm(f) {
+    const editing = !!f;
+    const type = f?.type || 'text';
+    const types = editing ? (COMPATIBLE_TYPES[type] || [type]) : customSchema.fieldTypes.map(t => t.type);
+    const products = leadOptions.products || [];
+    return `<form onsubmit="saveCustomField(event)" class="space-y-3 text-xs">
+        <h3 class="font-semibold text-slate-900 text-sm">${editing ? `Edit “${esc(f.label)}”` : 'New field'}</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label class="block font-medium text-slate-700">Label *<input id="cf-label" required maxlength="60" class="corp-input mt-1" value="${esc(f?.label || '')}"
+                ${editing ? '' : `oninput="document.getElementById('cf-key').value = fieldKeyFromLabel(this.value)"`}></label>
+            <label class="block font-medium text-slate-700">Key<input id="cf-key" class="corp-input mt-1 font-mono" value="${esc(f?.key || '')}" ${editing ? 'disabled' : ''}>
+                <span class="block font-normal text-[11px] text-slate-400 mt-0.5">${editing ? 'Values are filed under it, so it never changes.' : 'Used in imports and the API. It can’t be changed later.'}</span></label>
+            <label class="block font-medium text-slate-700">Kind of field
+                <select id="cf-type" class="corp-input mt-1" onchange="showCustomTypeOptions(this.value)">${types.map(t => `<option value="${t}" ${t === type ? 'selected' : ''}>${esc(fieldTypeLabel(t))}</option>`).join('')}</select></label>
+            <label class="block font-medium text-slate-700">Section<input id="cf-section" maxlength="60" class="corp-input mt-1" placeholder="More details" value="${esc(f?.section || '')}"></label>
+        </div>
+        <label class="block font-medium text-slate-700" data-cf-for="choice multi_choice">Choices, one per line
+            <textarea id="cf-options" rows="4" class="corp-input mt-1">${esc((f?.options || []).join('\n'))}</textarea></label>
+        <div class="grid grid-cols-2 gap-3" data-cf-for="number currency">
+            <label class="block font-medium text-slate-700">Lowest allowed<input id="cf-min" inputmode="decimal" class="corp-input mt-1" value="${esc(f?.min ?? '')}"></label>
+            <label class="block font-medium text-slate-700">Highest allowed<input id="cf-max" inputmode="decimal" class="corp-input mt-1" value="${esc(f?.max ?? '')}"></label>
+        </div>
+        <label class="block font-medium text-slate-700" data-cf-for="lookup">Links to
+            <select id="cf-target" class="corp-input mt-1" ${editing ? 'disabled' : ''}>${optionsHtml(customSchema.lookupTargets || [], f?.target || '')}</select></label>
+        <label class="block font-medium text-slate-700">Help text<input id="cf-help" maxlength="200" class="corp-input mt-1" value="${esc(f?.help || '')}"></label>
+        <fieldset class="block font-medium text-slate-700"><legend>Only for these products <span class="font-normal text-slate-400">— none ticked means every product</span></legend>
+            <div class="flex flex-wrap gap-x-3 gap-y-1 mt-1">${products.map(p => `<label class="font-normal flex items-center gap-1"><input type="checkbox" class="cf-product" value="${esc(p)}" ${(f?.products || []).includes(p) ? 'checked' : ''}> ${esc(p)}</label>`).join('')}</div></fieldset>
+        <label class="flex items-center gap-2 font-medium text-slate-700"><input id="cf-required" type="checkbox" ${f?.required ? 'checked' : ''}> Required when a lead is added</label>
+        <div class="flex gap-2 pt-1">
+            <button class="px-4 py-2 bg-slate-900 text-white rounded font-semibold">${editing ? 'Save changes' : 'Add field'}</button>
+            <button type="button" class="px-3 py-2 border border-slate-300 rounded" onclick="editCustomField(null)">Cancel</button>
+        </div>
+    </form>`;
+}
+
+function showCustomTypeOptions(type) {
+    document.querySelectorAll('[data-cf-for]').forEach(el => el.classList.toggle('hidden', !el.dataset.cfFor.split(' ').includes(type)));
+}
+
+function editCustomField(key) {
+    customFieldEditing = key;
+    renderCustomFieldsPane();
+    if (key !== null) showCustomTypeOptions(document.getElementById('cf-type')?.value);
+}
+
+async function saveCustomField(event) {
+    event.preventDefault();
+    const val = id => document.getElementById(id)?.value.trim() ?? '';
+    const type = val('cf-type');
+    const number = text => text === '' ? null : Number(text.replace(/,/g, ''));
+    const body = { label: val('cf-label'), type, section: val('cf-section'), help: val('cf-help'),
+        required: document.getElementById('cf-required').checked,
+        products: [...document.querySelectorAll('.cf-product:checked')].map(box => box.value) };
+    if (['choice', 'multi_choice'].includes(type)) body.options = val('cf-options').split('\n').map(o => o.trim()).filter(Boolean);
+    if (['number', 'currency'].includes(type)) { body.min = number(val('cf-min')); body.max = number(val('cf-max')); }
+    if (type === 'lookup' && !customFieldEditing) body.target = val('cf-target');
+    try {
+        if (customFieldEditing) {
+            await apiJson(`/api/schema/fields/lead/${encodeURIComponent(customFieldEditing)}`, { method: 'PUT',
+                headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        } else {
+            await apiJson('/api/schema/fields/lead', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...body, key: val('cf-key') || fieldKeyFromLabel(body.label) }) });
+        }
+        showToast(customFieldEditing ? 'Field updated' : 'Field added');
+        customFieldEditing = null;
+        await loadCustomFields();
+        renderCustomFieldsPane();
+    } catch (err) { showToast(err.message || 'Could not save the field.'); }
+}
+
+async function toggleCustomFieldHidden(key) {
+    const f = leadCustomFields().find(x => x.key === key);
+    try {
+        await apiJson(`/api/schema/fields/lead/${encodeURIComponent(key)}`, { method: 'PUT',
+            headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hidden: !f.hidden }) });
+        await loadCustomFields(); renderCustomFieldsPane();
+    } catch (err) { showToast(err.message || 'Could not change the field.'); }
+}
+
+async function moveCustomField(key, step) {
+    const keys = leadCustomFields().map(f => f.key);
+    const i = keys.indexOf(key), j = i + step;
+    if (i < 0 || j < 0 || j >= keys.length) return;
+    [keys[i], keys[j]] = [keys[j], keys[i]];
+    try {
+        await apiJson('/api/schema/fields/lead/order', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ keys }) });
+        await loadCustomFields(); renderCustomFieldsPane();
+    } catch (err) { showToast(err.message || 'Could not reorder the fields.'); }
 }

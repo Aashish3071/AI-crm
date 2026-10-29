@@ -20,6 +20,9 @@ def get_settings():
 @router.put("/api/settings")
 def update_settings(updates: Dict[str, Any]):
     db = core.load_db(); before = json.loads(json.dumps(db.get("settings", {})))
+    if "customFields" in updates:
+        # Field definitions are checked one change at a time; a raw overwrite would skip that.
+        raise HTTPException(status_code=422, detail="Custom fields are changed under Settings → Custom fields.")
     timezone_name = (updates.get("crm") or {}).get("companyTimezone") if isinstance(updates.get("crm"), dict) else None
     if timezone_name:
         try: ZoneInfo(str(timezone_name))

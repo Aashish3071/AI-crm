@@ -13,6 +13,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 
+import crm_schema
 import crm_storage
 import pipecat_server as core
 from crm_security import current_company_id
@@ -68,6 +69,22 @@ def _csv_bytes(records: List[Dict[str, Any]]) -> bytes:
     return out.getvalue().encode("utf-8-sig")          # the BOM makes Excel read ₹ and Indian names correctly
 
 
+def _lead_rows(db: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Leads with one column per custom field, titled with its label, instead of one JSON cell.
+    Hidden fields are included: an export is the company's whole record."""
+    defs = core.custom_field_defs(db, "lead")
+    rows = []
+    for lead in db.get("leads") or []:
+        if not isinstance(lead, dict):
+            continue
+        row = {k: v for k, v in lead.items() if k != "custom"}
+        for d in defs:
+            column = d["label"] if d["label"] not in row else f"{d['label']} (custom)"
+            row[column] = crm_schema.display_value(d, (lead.get("custom") or {}).get(d["key"]))
+        rows.append(row)
+    return rows
+
+
 def _target_rows(db: Dict[str, Any]) -> List[Dict[str, Any]]:
     return [{"month": month, "person": person, **measures}
             for month, people in sorted((db.get("targets") or {}).items()) for person, measures in sorted(people.items())]
@@ -78,7 +95,7 @@ def export_data(includeFiles: bool = False):
     core._require_admin("Only the Owner / Admin can export the company's data.")
     db = core.load_db()
     now = datetime.now(core._calendar_timezone(db))
-    sheets = [(label, db.get(key) or [], about) for key, label, about in EXPORT_SHEETS]
+    sheets = [(label, _lead_rows(db) if key == "leads" else db.get(key) or [], about) for key, label, about in EXPORT_SHEETS]
     sheets.append(("targets", _target_rows(db), "Monthly targets by person"))
     counts = {label: len(rows) for label, rows, _ in sheets}
     missing_files = 0

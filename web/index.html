@@ -228,6 +228,14 @@
                             <option value="">All telecallers</option>
                         </select>
 
+                        <!-- Filter on one of the company's own fields; shown once any exist -->
+                        <span id="leads-custom-filter" class="flex items-center gap-1 hidden">
+                            <select id="leads-custom-field" aria-label="Filter by a custom field" onchange="onCustomFilterFieldChange()" class="text-xs border border-slate-300 rounded px-2 py-1 bg-white focus:outline-none cursor-pointer"></select>
+                            <select id="leads-custom-op" aria-label="Comparison" onchange="onCustomFilterFieldChange()" class="text-xs border border-slate-300 rounded px-2 py-1 bg-white focus:outline-none cursor-pointer hidden"></select>
+                            <input id="leads-custom-value" aria-label="Value" list="leads-custom-options" onchange="leadPage = 1; loadLeads()" placeholder="value" class="text-xs border border-slate-300 rounded px-2 py-1 bg-white focus:outline-none w-28 hidden">
+                            <datalist id="leads-custom-options"></datalist>
+                        </span>
+
                         <div class="h-4 w-px bg-slate-200 mx-1"></div>
 
                         <!-- Quick Filter Action Pills -->
@@ -931,6 +939,9 @@
                     </div>
                 </details>
 
+                <!-- The company's own fields (Settings → Custom fields), drawn from /api/schema -->
+                <div id="lead-custom-fields" class="space-y-2.5"></div>
+
                 <div class="grid grid-cols-2 sm:grid-cols-[1fr_9rem_6.5rem] gap-2.5">
                     <label class="block font-medium text-slate-700 col-span-2 sm:col-span-1">Next action *
                         <input type="text" id="lead-next-action" list="next-action-suggestions" value="First call" class="corp-input mt-1"></label>
@@ -1012,6 +1023,7 @@
                     <button data-setting-tab="team" onclick="switchSettingTab('team')" class="setting-tab-btn w-full text-left px-2.5 py-1.5 rounded font-medium text-slate-600 hover:bg-slate-100">Team Allocation</button>
                     <button data-setting-tab="templates" onclick="switchSettingTab('templates')" class="setting-tab-btn w-full text-left px-2.5 py-1.5 rounded font-medium text-slate-600 hover:bg-slate-100">Message Templates</button>
                     <button data-setting-tab="watemplates" onclick="switchSettingTab('watemplates')" class="setting-tab-btn w-full text-left px-2.5 py-1.5 rounded font-medium text-slate-600 hover:bg-slate-100">WhatsApp Templates</button>
+                    <button data-setting-tab="fields" onclick="switchSettingTab('fields')" class="setting-tab-btn w-full text-left px-2.5 py-1.5 rounded font-medium text-slate-600 hover:bg-slate-100">Custom Fields</button>
                     <button data-setting-tab="configuration" onclick="switchSettingTab('configuration')" class="setting-tab-btn w-full text-left px-2.5 py-1.5 rounded font-medium text-slate-600 hover:bg-slate-100">CRM Configuration</button>
                     <button data-setting-tab="archive" onclick="switchSettingTab('archive')" class="setting-tab-btn w-full text-left px-2.5 py-1.5 rounded font-medium text-slate-600 hover:bg-slate-100">Archive & Restore</button>
                     <button data-setting-tab="reports" onclick="switchSettingTab('reports')" class="setting-tab-btn w-full text-left px-2.5 py-1.5 rounded font-medium text-slate-600 hover:bg-slate-100">Backups</button>

@@ -19,7 +19,7 @@ field can never overwrite one the calls, renewals or commission code relies on.
 | datetime | ISO 8601 text | ISO date-time |
 | boolean | bool | true/false, yes/no, 1/0 |
 | choice | one option, as defined | an option, any letter case |
-| multi_choice | list of options | a list, or "a, b" from a spreadsheet |
+| multi_choice | list of options | a list, or "a, b" / "a; b" from a spreadsheet |
 | phone | "+digits" or "digits" (7–15 digits) | spaces, dashes, brackets ignored |
 | email | lower-case address | name@domain.tld |
 | lookup | record id | the id of a record of the field's target type |
@@ -36,6 +36,8 @@ from decimal import Decimal, InvalidOperation
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 OBJECTS = ("lead", "customer", "policy")
+# Objects whose custom fields the CRM reads and writes so far (plan, phase 1). The others follow.
+ENABLED_OBJECTS = ("lead",)
 LOOKUP_TARGETS = ("lead", "customer", "policy", "renewal", "quotation", "task")
 
 KEY_RE = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
@@ -183,7 +185,8 @@ def _choice(defn: Dict[str, Any], value: Any) -> str:
 
 
 def _multi_choice(defn: Dict[str, Any], value: Any) -> List[str]:
-    items = value.split(",") if isinstance(value, str) else value
+    # "a, b" from a form or spreadsheet; "a; b" is how the export writes them, so it reads back.
+    items = re.split(r"[,;]", value) if isinstance(value, str) else value
     if not isinstance(items, (list, tuple)):
         raise SchemaError("must be a list of choices")
     chosen = [_option(defn, item) for item in items if not _empty(item)]
@@ -371,7 +374,7 @@ def clean_custom(defs: Iterable[Dict[str, Any]], values: Optional[Dict[str, Any]
     for key, value in (values or {}).items():
         defn = by_key.get(key)
         if defn is None:
-            errors[key] = "is not a field"
+            errors[key] = f"'{key}' is not a field"
             continue
         if defn.get("hidden"):
             errors[key] = f"{defn['label']} is hidden and can't be changed"
@@ -392,6 +395,79 @@ def clean_custom(defs: Iterable[Dict[str, Any]], values: Optional[Dict[str, Any]
         if (creating or touched) and _empty(merged.get(defn["key"])) and defn["key"] not in errors:
             errors[defn["key"]] = f"{defn['label']} is required"
     return merged, errors
+
+
+# ─── Comparing values (list filters and automation conditions) ───────────────
+def _comparable(defn: Dict[str, Any], value: Any):
+    """A value in a form that orders correctly for its type, or None if it can't be read."""
+    try:
+        cleaned = read_value(defn, value)
+    except SchemaError:
+        return None
+    if cleaned is None:
+        return None
+    if defn["type"] in ("number", "currency"):
+        return Decimal(str(cleaned))
+    if defn["type"] == "datetime":
+        moment = datetime.fromisoformat(cleaned)
+        return moment.replace(tzinfo=None) if moment.tzinfo is None else moment.astimezone().replace(tzinfo=None)
+    if isinstance(cleaned, str):
+        return cleaned.lower()
+    return cleaned
+
+
+def check_condition(defn: Dict[str, Any], operator: str, value: Any) -> None:
+    """A filter or rule must use an operator the field's type offers, and a value it can read."""
+    if operator not in FIELD_TYPES[defn["type"]]["operators"]:
+        raise SchemaError(f"{defn['label']} can't be compared with '{operator}'")
+    if operator == "is_empty" or (operator == "contains" and defn["type"] in ("text", "long_text", "phone", "email")):
+        return
+    # A multi-choice field is compared with one of its options; bounds limit values, not comparisons.
+    probe = {**defn, "type": "choice" if defn["type"] == "multi_choice" else defn["type"], "min": None, "max": None}
+    try:
+        cleaned = read_value(probe, value)
+    except SchemaError as exc:
+        raise SchemaError(f"{defn['label']} {exc}")
+    if cleaned is None:
+        raise SchemaError(f"Give a value to compare {defn['label']} with")
+
+
+def matches(defn: Dict[str, Any], stored: Any, operator: str, expected: Any) -> bool:
+    """Does a stored custom value satisfy ``operator expected``? Typed: numbers compare as
+    numbers, dates as dates, a multi-choice field "contains" one of its options."""
+    if operator == "is_empty":
+        return _empty(stored)
+    if _empty(stored) or operator not in FIELD_TYPES[defn["type"]]["operators"]:
+        return False
+    kind = defn["type"]
+    if kind == "multi_choice":
+        wanted = str(expected).strip().lower()
+        return any(str(item).lower() == wanted for item in stored)
+    if kind in ("text", "long_text", "email") or (kind == "phone" and operator == "contains"):
+        left, right = str(stored).strip().lower(), str(expected).strip().lower()
+        if kind == "phone":
+            left, right = re.sub(r"\D", "", left), re.sub(r"\D", "", right)
+        return {"contains": right in left, "is": left == right, "is_not": left != right}[operator]
+    probe = {**defn, "min": None, "max": None}
+    left, right = _comparable(probe, stored), _comparable(probe, expected)
+    if left is None or right is None:
+        return False
+    try:
+        return {"is": left == right, "is_not": left != right,
+                "greater_than": left > right, "less_than": left < right}[operator]
+    except TypeError:
+        return False
+
+
+def display_value(defn: Dict[str, Any], stored: Any) -> Any:
+    """How a value reads in a spreadsheet column or on a card."""
+    if _empty(stored):
+        return ""
+    if defn["type"] == "boolean":
+        return "Yes" if stored else "No"
+    if defn["type"] == "multi_choice":
+        return "; ".join(str(item) for item in stored)
+    return stored
 
 
 # ─── Stage categories (decision D2) ──────────────────────────────────────────

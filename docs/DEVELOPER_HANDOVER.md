@@ -12,7 +12,7 @@ CRM Blueprint*, is the scope authority. Code comments and tests cite its slide n
 | `crm_security.py` | Passwords, sessions, CSRF, the four roles (`ROLES`, `normalized_role`), which roles may read or change which API paths (`may_read_path`, `may_mutate_path`), company context |
 | `crm_metrics.py` | The single definition of every measure (calls, connect rate, conversion, premium, on-time rate…), targets, awards, incentive lines and the sales funnel. Its docstring is the reference table. Pure functions, no I/O. |
 | `crm_automation.py` | The automation engine: triggers, conditions, actions, guardrails (depth limit, idempotency keys, hourly caps, pause) and assignment methods. Pure logic; the server registers the executors. |
-| `crm_schema.py` | Custom field types, field-definition and value validation, and lead stage categories, for the [AI customization plan](AI_CUSTOMIZATION_PLAN.md). Pure functions; not yet wired into the server. |
+| `crm_schema.py` | Custom field types, field-definition and value validation, typed comparison (`matches`) and lead stage categories, for the [AI customization plan](AI_CUSTOMIZATION_PLAN.md). Pure functions. Lead custom fields use it on every write; `crm_routes/schema.py` edits the definitions. |
 | `crm_ai.py` | The only way to reach a language model: OpenRouter, model from `AI_MODEL`, per-company daily cap and per-company error reporting |
 | `crm_routes/` | The API, one `APIRouter` per area (28 modules: `leads`, `calls`, `customers`, `policies`, `renewals`, `quotations`, `messaging`, `channels`, `imports`, `automation`, `dashboards`, …), each with the helpers only it uses. A module reaches shared helpers as `core.name` (`import pipecat_server as core`) at call time, so tests that swap the server's settings, or patch a helper such as `server._dispatch`, apply to it too. `pipecat_server` includes each router at the end of the file. |
 | `tools/split_server.py`, `tools/check_split.py` | Move an area out of `pipecat_server.py` by route path, and prove a change left routing and the OpenAPI description identical. Run the check after any change that moves routes. |
@@ -84,7 +84,7 @@ Search for `slide(` in the tests to list every requirement proven, with its slid
 .venv/bin/python3 -m playwright install chromium
 PYTHONWARNINGS=ignore .venv/bin/python3 -m pytest tests/test_client_blueprint.py tests/test_blueprint_acceptance.py \
     tests/test_e2e_remediation.py tests/test_workflow_integrity.py test_insurance_operations.py test_security_foundation.py \
-    tests/test_crm_schema.py tests/test_ai_advisor.py -q
+    tests/test_crm_schema.py tests/test_ai_advisor.py tests/test_custom_fields.py -q
 PYTHONWARNINGS=ignore .venv/bin/python3 -m pytest tests/test_browser_flows.py tests/test_blueprint_browser.py -q
 ```
 

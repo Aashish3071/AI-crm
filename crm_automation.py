@@ -124,6 +124,8 @@ _actions: Dict[str, Callable[..., str]] = {}
 _time_sources: Dict[str, Callable[..., Iterable[Tuple[Dict[str, Any], str]]]] = {}
 _field_reader: Callable[[Dict[str, Any], str], Any] = lambda record, field: record.get(field, "")
 _number: Callable[[Any], float] = lambda value: float(value or 0)
+# Compares a company-defined (custom) field by its type; see configure().
+_typed_matcher: Optional[Callable[[Dict[str, Any], Any, str, Any], bool]] = None
 
 
 def register_action(action_type: str, executor: Callable[..., str]):
@@ -136,9 +138,12 @@ def register_time_source(trigger: str, source: Callable[..., Iterable[Tuple[Dict
     _time_sources[trigger] = source
 
 
-def configure(field_reader: Callable[[Dict[str, Any], str], Any], number: Callable[[Any], float]):
-    global _field_reader, _number
-    _field_reader, _number = field_reader, number
+def configure(field_reader: Callable[[Dict[str, Any], str], Any], number: Callable[[Any], float],
+              typed_matcher: Optional[Callable[[Dict[str, Any], Any, str, Any], bool]] = None):
+    """typed_matcher(definition, stored, operator, expected) compares a custom field; a
+    condition on one carries a copy of the field's definition."""
+    global _field_reader, _number, _typed_matcher
+    _field_reader, _number, _typed_matcher = field_reader, number, typed_matcher
 
 
 # ─── Rules ───────────────────────────────────────────────────────────────────
@@ -147,8 +152,12 @@ class RuleError(ValueError):
 
 
 def validate_rule(data: Dict[str, Any], people: Iterable[str], statuses: Iterable[str],
-                  outcomes: Iterable[str] = ()) -> Dict[str, Any]:
-    """Check a rule is complete and every choice in it is one the engine understands."""
+                  outcomes: Iterable[str] = (),
+                  extra_fields: Optional[Dict[str, List[Dict[str, Any]]]] = None) -> Dict[str, Any]:
+    """Check a rule is complete and every choice in it is one the engine understands.
+
+    ``extra_fields`` adds the company's own fields per record type; each carries its
+    ``definition``, which is copied onto the conditions that test it."""
     name = str(data.get("name") or "").strip()
     if not name:
         raise RuleError("Give the rule a name")
@@ -174,14 +183,17 @@ def validate_rule(data: Dict[str, Any], people: Iterable[str], statuses: Iterabl
         if value not in (None, ""):
             params[p["name"]] = value
     record = spec["record"]
-    known = {f["field"]: f for f in FIELDS.get(record, [])}
+    known = {f["field"]: f for f in FIELDS.get(record, []) + (extra_fields or {}).get(record, [])}
     conditions = []
     for c in data.get("conditions") or []:
         if c.get("field") not in known:
             raise RuleError(f"'{c.get('field')}' can't be checked on a {record}")
         if c.get("operator", "contains") not in {o["op"] for o in OPERATORS}:
             raise RuleError(f"Unknown comparison '{c.get('operator')}'")
-        conditions.append({"field": c["field"], "operator": c.get("operator", "contains"), "value": c.get("value", "")})
+        condition = {"field": c["field"], "operator": c.get("operator", "contains"), "value": c.get("value", "")}
+        if known[c["field"]].get("definition"):
+            condition["definition"] = known[c["field"]]["definition"]
+        conditions.append(condition)
     actions = []
     people = set(people)
     for a in data.get("actions") or []:
@@ -251,6 +263,8 @@ def new_rule(validated: Dict[str, Any], actor: str) -> Dict[str, Any]:
 def condition_matches(record: Dict[str, Any], condition: Dict[str, Any]) -> bool:
     field, operator, expected = condition.get("field", ""), condition.get("operator", "contains"), condition.get("value", "")
     actual = _field_reader(record, field)
+    if condition.get("definition") and _typed_matcher:
+        return _typed_matcher(condition["definition"], actual, operator, expected)
     if operator == "is_empty":
         return actual in (None, "")
     if operator in ("greater_than", "less_than"):

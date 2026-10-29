@@ -183,6 +183,12 @@ Progress, 29 October 2026:
   migrated; export/backup include them.
 - Automation conditions and list filters can use custom fields.
 
+Phase 1 progress, 29 October 2026: custom fields on **leads** are done end to end — Settings screen,
+lead form and card, validation on the form, edits and imports, list filter and search, automation
+conditions, export, merge. Still to do in Phase 1: the same for customers and policies (the module
+is ready: `crm_schema.ENABLED_OBJECTS`), webhook lead sources mapping to custom fields, and moving the
+old untyped `customFields` from imports into typed fields.
+
 ### Phase 2 — Products, pipelines and layouts (≈3–4 weeks)
 
 - Products as configuration: each product has its own detail section and its own pipeline.
