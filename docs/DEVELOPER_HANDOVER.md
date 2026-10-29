@@ -85,7 +85,7 @@ Search for `slide(` in the tests to list every requirement proven, with its slid
 .venv/bin/python3 -m playwright install chromium
 PYTHONWARNINGS=ignore .venv/bin/python3 -m pytest tests/test_client_blueprint.py tests/test_blueprint_acceptance.py \
     tests/test_e2e_remediation.py tests/test_workflow_integrity.py test_insurance_operations.py test_security_foundation.py \
-    tests/test_crm_schema.py tests/test_ai_advisor.py tests/test_custom_fields.py tests/test_pipeline.py tests/test_saved_views.py tests/test_builder.py -q
+    tests/test_crm_schema.py tests/test_ai_advisor.py tests/test_custom_fields.py tests/test_pipeline.py tests/test_saved_views.py tests/test_builder.py tests/test_records.py -q
 PYTHONWARNINGS=ignore .venv/bin/python3 -m pytest tests/test_browser_flows.py tests/test_blueprint_browser.py -q
 ```
 

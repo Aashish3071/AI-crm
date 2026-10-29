@@ -38,6 +38,16 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 OBJECTS = ("lead", "customer", "policy")
 # Objects whose custom fields the CRM reads and writes so far (plan, phase 1). The others follow.
 ENABLED_OBJECTS = ("lead", "customer", "policy")
+# A company's own record types (e.g. a vehicle inspection attached to a lead) have keys like
+# these, and never one of the CRM's own record or collection names.
+RECORD_TYPE_KEY_RE = re.compile(r"^[a-z][a-z0-9_]{1,29}$")
+RESERVED_RECORD_TYPES = frozenset(OBJECTS) | {"renewal", "quotation", "task", "note", "deal", "contact", "organization",
+                                              "document", "user", "call", "communication", "calendar", "record", "custom"}
+RECORD_PARENTS = ("lead", "customer", "policy")
+# What every record of a company record type carries besides its fields.
+RECORD_SYSTEM_FIELDS = frozenset({"id", "type", "parentType", "parentId", "custom", "createdAt", "createdBy",
+                                  "updatedAt", "updatedBy"})
+
 # Records whose product decides which product-limited fields apply. Customers have no product.
 PRODUCT_FIELD = {"lead": "product", "policy": "policyType"}
 LOOKUP_TARGETS = ("lead", "customer", "policy", "renewal", "quotation", "task")
@@ -255,8 +265,9 @@ def type_catalogue() -> List[Dict[str, Any]]:
 
 # ─── Field definitions ───────────────────────────────────────────────────────
 def check_field(obj: str, defn: Dict[str, Any], existing: Iterable[Dict[str, Any]] = ()) -> Dict[str, Any]:
-    """Validate a field definition against the object's other fields; return it cleaned."""
-    if obj not in OBJECTS:
+    """Validate a field definition against the object's other fields; return it cleaned.
+    ``obj`` is a built-in record type or the key of one of the company's own."""
+    if obj not in OBJECTS and (not RECORD_TYPE_KEY_RE.match(obj) or obj in RESERVED_RECORD_TYPES):
         raise SchemaError(f"Fields can't be added to '{obj}'")
     if not isinstance(defn, dict):
         raise SchemaError("A field definition must be an object")
@@ -267,7 +278,7 @@ def check_field(obj: str, defn: Dict[str, Any], existing: Iterable[Dict[str, Any
     key = str(defn.get("key") or "").strip()
     if not KEY_RE.match(key):
         raise SchemaError("A field key starts with a letter and uses only lower-case letters, digits and _ (up to 40)")
-    if _squash(key) in {_squash(name) for name in SYSTEM_FIELDS[obj]}:
+    if _squash(key) in {_squash(name) for name in SYSTEM_FIELDS.get(obj, RECORD_SYSTEM_FIELDS)}:
         raise SchemaError(f"'{key}' is a built-in {obj} field")
     if any(_squash(f.get("key", "")) == _squash(key) for f in others):
         raise SchemaError(f"A {obj} field called '{key}' already exists")
@@ -332,6 +343,24 @@ def check_field(obj: str, defn: Dict[str, Any], existing: Iterable[Dict[str, Any
             raise SchemaError("Products must be a list of product names")
         clean["products"] = list(dict.fromkeys(p.strip() for p in products))
     return clean
+
+
+def check_record_type(definition: Any, existing: Iterable[Dict[str, Any]] = ()) -> Dict[str, Any]:
+    """A company record type: a key, a label and the record it hangs from."""
+    if not isinstance(definition, dict):
+        raise SchemaError("A record type needs a name and what it is attached to")
+    label = str(definition.get("label") or "").strip()
+    if not label or len(label) > LABEL_MAX:
+        raise SchemaError(f"A record type needs a name of up to {LABEL_MAX} characters")
+    key = str(definition.get("key") or re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_")[:30]).strip()
+    if not RECORD_TYPE_KEY_RE.match(key) or key in RESERVED_RECORD_TYPES:
+        raise SchemaError(f"'{key}' can't be used as a record type's key")
+    others = list(existing)
+    if any(t["key"] == key for t in others) or any(t["label"].lower() == label.lower() for t in others):
+        raise SchemaError(f"There is already a record type called '{label}'")
+    if definition.get("parent") not in RECORD_PARENTS:
+        raise SchemaError(f"A record type is attached to a {', a '.join(RECORD_PARENTS)}")
+    return {"key": key, "label": label, "parent": definition["parent"], "hidden": bool(definition.get("hidden", False))}
 
 
 def check_field_change(obj: str, before: Dict[str, Any], after: Dict[str, Any],

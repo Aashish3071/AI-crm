@@ -42,6 +42,9 @@ CATALOGUE: List[Dict[str, Any]] = [
      "params": {"object": "lead | customer | policy", "key": "the field's key", "changes": "object of those attributes"}},
     {"op": "add_choice", "about": "Add one or more choices to a choice or multi_choice field",
      "params": {"object": "lead | customer | policy", "key": "the field's key", "options": "list of new choices"}},
+    {"op": "add_record_type", "about": "Add a kind of record kept on each lead, customer or policy, e.g. a vehicle inspection; "
+                                       "then add_field with its key as the object",
+     "params": {"label": "text", "parent": "lead | customer | policy", "key": "optional, lower_snake_case"}},
     {"op": "add_stage", "about": "Add a lead stage",
      "params": {"name": "text", "category": "working | parked | lost", "after": "optional: an existing stage's name"}},
     {"op": "relabel_stage", "about": "Show a stage under another name (its stored name stays)",
@@ -63,7 +66,10 @@ class BuilderError(ValueError):
 def config_from(settings: Dict[str, Any], pipeline: List[Dict[str, Any]]) -> Dict[str, Any]:
     """The part of a company's settings a change set may touch."""
     crm = settings.get("crm") or {}
-    return {"customFields": {obj: list((settings.get("customFields") or {}).get(obj) or []) for obj in crm_schema.ENABLED_OBJECTS},
+    record_types = [dict(t) for t in settings.get("customObjects") or []]
+    objects = [*crm_schema.ENABLED_OBJECTS, *(t["key"] for t in record_types)]
+    return {"customFields": {obj: list((settings.get("customFields") or {}).get(obj) or []) for obj in objects},
+            "recordTypes": record_types,
             "pipeline": [dict(s) for s in pipeline],
             "products": list(crm.get("insuranceProducts") or []),
             "leadSources": list(crm.get("leadSources") or []),
@@ -89,10 +95,10 @@ def _field_words(field: Dict[str, Any], obj: str) -> str:
     return words
 
 
-def _object(params: Dict[str, Any]) -> str:
+def _object(config: Dict[str, Any], params: Dict[str, Any]) -> str:
     obj = params.get("object", "lead")
-    if obj not in crm_schema.ENABLED_OBJECTS:
-        raise BuilderError(f"Fields can be added to {', '.join(crm_schema.ENABLED_OBJECTS)}, not '{obj}'")
+    if obj not in config["customFields"]:
+        raise BuilderError(f"Fields can be added to {', '.join(config['customFields'])}, not '{obj}'")
     return obj
 
 
@@ -137,7 +143,7 @@ def apply_operation(config: Dict[str, Any], operation: Dict[str, Any],
     op, p = operation["op"], operation.get("params") or {}
     try:
         if op == "add_field":
-            obj = _object(p)
+            obj = _object(config, p)
             definition = {k: p[k] for k in ("key", "label", "type", "options", "section", "help", "required",
                                              "products", "min", "max", "target") if k in p}
             definition.setdefault("key", _key_from_label(str(p.get("label") or "")))
@@ -145,7 +151,7 @@ def apply_operation(config: Dict[str, Any], operation: Dict[str, Any],
             config["customFields"][obj].append(field)
             return "Add a " + _field_words(field, obj)
         if op == "change_field":
-            obj = _object(p)
+            obj = _object(config, p)
             before = _find_field(config, obj, p.get("key"))
             changes = p.get("changes") or {}
             refused = sorted(set(changes) - set(ADJUSTABLE))
@@ -157,7 +163,7 @@ def apply_operation(config: Dict[str, Any], operation: Dict[str, Any],
             said = ", ".join(f"{k} → {json.dumps(v, ensure_ascii=False)}" for k, v in changes.items())
             return f"Change {obj} field “{before['label']}”: {said}"
         if op == "add_choice":
-            obj = _object(p)
+            obj = _object(config, p)
             before = _find_field(config, obj, p.get("key"))
             if before["type"] not in ("choice", "multi_choice"):
                 raise BuilderError(f"“{before['label']}” has no choices")
@@ -167,6 +173,12 @@ def apply_operation(config: Dict[str, Any], operation: Dict[str, Any],
             after = crm_schema.check_field_change(obj, before, {"options": before["options"] + new}, config["customFields"][obj])
             config["customFields"][obj] = [after if f["key"] == before["key"] else f for f in config["customFields"][obj]]
             return f"Add {', '.join(new)} to the choices of “{before['label']}”"
+        if op == "add_record_type":
+            record_type = crm_schema.check_record_type({k: p[k] for k in ("label", "parent", "key") if k in p},
+                                                       config["recordTypes"])
+            config["recordTypes"].append(record_type)
+            config["customFields"][record_type["key"]] = []
+            return f"Add a kind of record, “{record_type['label']}”, kept on each {record_type['parent']} (key {record_type['key']})"
         if op == "add_stage":
             name = _stage_name(config, p.get("name"))
             category = p.get("category")
@@ -299,6 +311,7 @@ def export_template(config: Dict[str, Any], rules: List[Dict[str, Any]]) -> Dict
     return {"kind": "insurecrm-setup", "version": TEMPLATE_VERSION,
             "customFields": {obj: [{k: v for k, v in f.items() if k not in strip} for f in fields]
                              for obj, fields in config["customFields"].items()},
+            "recordTypes": [{k: t[k] for k in ("key", "label", "parent") if k in t} for t in config["recordTypes"]],
             "stages": [{k: s[k] for k in ("name", "category", "label", "hidden", "system") if s.get(k)} for s in config["pipeline"]],
             "products": list(config["products"]), "leadSources": list(config["leadSources"]),
             # Rules that assign leads name people, who belong to one company; they stay behind.
@@ -318,6 +331,8 @@ def template_operations(config: Dict[str, Any], template: Any, existing_rules: L
     ops += [{"op": "add_product", "params": {"name": p}} for p in template.get("products") or [] if str(p).lower() not in have]
     have = {s.lower() for s in config["leadSources"]}
     ops += [{"op": "add_lead_source", "params": {"name": s}} for s in template.get("leadSources") or [] if str(s).lower() not in have]
+    have = {t["key"] for t in config["recordTypes"]}
+    ops += [{"op": "add_record_type", "params": t} for t in template.get("recordTypes") or [] if t.get("key") not in have]
     for obj, fields in (template.get("customFields") or {}).items():
         existing = {f["key"] for f in config["customFields"].get(obj, [])}
         ops += [{"op": "add_field", "params": {"object": obj, **f}} for f in fields or [] if f.get("key") not in existing]

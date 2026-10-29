@@ -102,6 +102,14 @@ def export_data(includeFiles: bool = False):
     sheets = [(label, _rows_with_custom(db, key) if key in _CUSTOM_SHEETS else db.get(key) or [], about)
               for key, label, about in EXPORT_SHEETS]
     sheets.append(("targets", _target_rows(db), "Monthly targets by person"))
+    # One spreadsheet per record type the company defined, e.g. vehicle-inspections.csv.
+    for record_type in (db.get("settings") or {}).get("customObjects") or []:
+        defs = core.custom_field_defs(db, record_type["key"])
+        rows = [{"id": r["id"], f"{record_type['parent']}Id": r.get("parentId"), "createdAt": r.get("createdAt"),
+                 "createdBy": r.get("createdBy"),
+                 **{d["label"]: crm_schema.display_value(d, (r.get("custom") or {}).get(d["key"])) for d in defs}}
+                for r in db.get("customRecords", []) if r.get("type") == record_type["key"]]
+        sheets.append((record_type["key"].replace("_", "-"), rows, f"{record_type['label']} records, each attached to a {record_type['parent']}"))
     counts = {label: len(rows) for label, rows, _ in sheets}
     missing_files = 0
     handle = tempfile.NamedTemporaryFile(prefix="crm-export-", suffix=".zip", delete=False)

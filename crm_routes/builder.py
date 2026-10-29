@@ -144,6 +144,7 @@ def create_change_set(payload: Dict[str, Any]):
 def _write_config(db: Dict[str, Any], config: Dict[str, Any]) -> None:
     settings = db.setdefault("settings", {})
     settings["customFields"] = copy.deepcopy(config["customFields"])
+    settings["customObjects"] = copy.deepcopy(config["recordTypes"])
     settings["customFieldsVersion"] = int(settings.get("customFieldsVersion") or 0) + 1
     crm = settings.setdefault("crm", {})
     crm["insuranceProducts"], crm["leadSources"] = list(config["products"]), list(config["leadSources"])
@@ -188,6 +189,11 @@ def _in_use(db: Dict[str, Any], change_set: Dict[str, Any]) -> List[str]:
     """What the change set added that records have started using since."""
     before = change_set["before"]
     uses = []
+    for record_type in (db.get("settings") or {}).get("customObjects") or []:
+        if record_type["key"] not in {t["key"] for t in before.get("recordTypes", [])}:
+            count = sum(1 for r in db.get("customRecords", []) if r.get("type") == record_type["key"])
+            if count:
+                uses.append(f"{count} {record_type['label']} record{'s' if count != 1 else ''} have been added")
     for obj, collection in _RECORDS.items():
         old = {f["key"] for f in before["customFields"].get(obj, [])}
         for field in core.custom_field_defs(db, obj):

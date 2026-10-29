@@ -8,6 +8,10 @@ The build follows the client's own requirement document, *Insurance Telecalling 
 
 An alternative plan, [CLIENT_NON_AI_LAUNCH_PLAN.md](uat/CLIENT_NON_AI_LAUNCH_PLAN.md), proposes shipping every non-AI module before launch. It was written in a separate session and is **not** the plan being followed; it is kept for reference.
 
+### Your own kinds of record — 29 October 2026
+
+An owner can now add a whole new kind of record, kept on each lead or customer: vehicle inspections, family members, claims. Each gets its own fields, set up in Settings → Custom fields under "+ New record type". The lead card and Customer 360° then show a section for each kind, where the team adds, edits and deletes records. They're checked like any other field, and each person sees only the records on leads and customers they can see. Every kind of record gets its own spreadsheet in the export. A deleted record leaves a copy in the audit log. Customize with AI and setup files can create record types too.
+
 ### Customize with AI — 29 October 2026
 
 **Settings → Customize with AI** (owner only): describe what the business needs — "we now sell bike insurance; note the engine CC and make big bikes hot" — and the AI proposes the products, fields, stages, lead sources and automation rules to add. Each step is listed in plain words, and anything that can't be done is marked with the reason. Nothing changes until you press **Apply**, and the latest change can be **undone**.

@@ -3406,6 +3406,7 @@ from crm_routes import advisor as _advisor_routes  # noqa: E402
 from crm_routes import schema as _schema_routes  # noqa: E402
 from crm_routes import pipeline as _pipeline_routes  # noqa: E402
 from crm_routes import builder as _builder_routes  # noqa: E402
+from crm_routes import records as _records_routes  # noqa: E402
 
 app.include_router(_advisor_routes.router)
 app.include_router(_calls_routes.router)
@@ -3438,3 +3439,4 @@ app.include_router(_backups_routes.router)
 app.include_router(_schema_routes.router)
 app.include_router(_pipeline_routes.router)
 app.include_router(_builder_routes.router)
+app.include_router(_records_routes.router)

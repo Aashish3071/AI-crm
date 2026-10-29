@@ -1543,6 +1543,7 @@ async function openLeadDrawer(leadId) {
             ${await callHistoryCard(l.id)}
 
             ${await quotationsCard(l)}
+            ${await customRecordsCards('lead', l.id)}
 
             ${documentsCard(l, documents, docStatus)}
 
@@ -3654,6 +3655,8 @@ async function openCustomer360(id) {
                 + (c.followUps.completed.length ? `<p class="text-[11px] font-semibold text-slate-500 pt-1">Completed (${c.followUps.completed.length})</p>${c.followUps.completed.slice(0, 5).map(t => row(esc(t.title), esc(t.assignedTo || ''), esc(formatShortDate(t.completedAt)))).join('')}` : ''))}
             ${box('Notes', c.notes.length, c.notes.slice(0, 8).map(n => row(esc(n.title || 'Note'), esc(n.content || n.body || '').slice(0, 160), esc(formatShortDate(n.createdAt)))).join('') || none('No notes.'))}
         </div>`;
+        const records = await customRecordsCards('customer', c.id);
+        if (records) root.insertAdjacentHTML('beforeend', `<div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">${records}</div>`);
     } catch (e) { showToast(e.message) }
 }
 
@@ -5274,9 +5277,14 @@ function renderCustomFieldsPane() {
             <p class="text-xs text-slate-500 mt-0.5">Your own details on leads, customers and policies — engine CC, chassis number, PAN, add-on covers — on their forms and cards and in exports; lead fields also work in filters, automations and imports. A field you no longer need is hidden, never deleted, so its values stay.</p></div>
             <button data-requires="admin" onclick="editCustomField('')" class="px-3 py-1.5 bg-slate-900 text-white rounded text-xs font-semibold shrink-0">Add field</button>
         </div>
-        <div class="flex gap-1" role="tablist" aria-label="Record type">${Object.entries(CUSTOM_OBJECT_LABELS).map(([obj, label]) =>
+        <div class="flex flex-wrap gap-1" role="tablist" aria-label="Record type">${customObjectTabs().map(([obj, label]) =>
             `<button role="tab" aria-selected="${obj === customFieldObject}" onclick="customFieldObject='${obj}'; renderCustomFieldsPane()"
-                class="px-2.5 py-1 rounded text-xs font-semibold ${obj === customFieldObject ? 'bg-slate-900 text-white' : 'border border-slate-300 text-slate-600'}">${label}</button>`).join('')}</div>
+                class="px-2.5 py-1 rounded text-xs font-semibold ${obj === customFieldObject ? 'bg-slate-900 text-white' : 'border border-slate-300 text-slate-600'}">${esc(label)}</button>`).join('')}
+            <button data-requires="admin" onclick="newRecordType()" class="px-2.5 py-1 rounded text-xs font-semibold border border-dashed border-slate-400 text-slate-600">+ New record type</button></div>
+        ${recordTypeOf(customFieldObject) ? `<div class="flex flex-wrap items-center gap-2 text-slate-600">
+            <span>${esc(recordTypeOf(customFieldObject).label)} records are added on each ${esc(recordTypeOf(customFieldObject).parent)}'s page${recordTypeOf(customFieldObject).hidden ? ' — hidden: no new records can be added' : ''}.</span>
+            <span data-requires="admin"><button class="fu-btn" onclick="renameRecordType()">Rename</button>
+            <button class="fu-btn" onclick="toggleRecordTypeHidden()">${recordTypeOf(customFieldObject).hidden ? 'Show' : 'Hide'}</button></span></div>` : ''}
         <div class="space-y-2">${fields.map((f, i) => `
             <div class="flex items-center justify-between gap-3 border border-slateBorder rounded p-3 ${f.hidden ? 'opacity-60' : ''}">
                 <div class="min-w-0">
@@ -5302,7 +5310,7 @@ function customFieldForm(f) {
     const types = editing ? (COMPATIBLE_TYPES[type] || [type]) : customSchema.fieldTypes.map(t => t.type);
     const products = leadOptions.products || [];
     return `<form onsubmit="saveCustomField(event)" class="space-y-3 text-xs">
-        <h3 class="font-semibold text-slate-900 text-sm">${editing ? `Edit “${esc(f.label)}”` : `New ${customFieldObject} field`}</h3>
+        <h3 class="font-semibold text-slate-900 text-sm">${editing ? `Edit “${esc(f.label)}”` : `New ${recordTypeOf(customFieldObject)?.label || customFieldObject} field`}</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label class="block font-medium text-slate-700">Label *<input id="cf-label" required maxlength="60" class="corp-input mt-1" value="${esc(f?.label || '')}"
                 ${editing ? '' : `oninput="document.getElementById('cf-key').value = fieldKeyFromLabel(this.value)"`}></label>
@@ -5321,7 +5329,7 @@ function customFieldForm(f) {
         <label class="block font-medium text-slate-700" data-cf-for="lookup">Links to
             <select id="cf-target" class="corp-input mt-1" ${editing ? 'disabled' : ''}>${optionsHtml(customSchema.lookupTargets || [], f?.target || '')}</select></label>
         <label class="block font-medium text-slate-700">Help text<input id="cf-help" maxlength="200" class="corp-input mt-1" value="${esc(f?.help || '')}"></label>
-        <fieldset class="block font-medium text-slate-700 ${customFieldObject === 'customer' ? 'hidden' : ''}"><legend>Only for these products <span class="font-normal text-slate-400">— none ticked means every product</span></legend>
+        <fieldset class="block font-medium text-slate-700 ${['lead', 'policy'].includes(customFieldObject) ? '' : 'hidden'}"><legend>Only for these products <span class="font-normal text-slate-400">— none ticked means every product</span></legend>
             <div class="flex flex-wrap gap-x-3 gap-y-1 mt-1">${products.map(p => `<label class="font-normal flex items-center gap-1"><input type="checkbox" class="cf-product" value="${esc(p)}" ${(f?.products || []).includes(p) ? 'checked' : ''}> ${esc(p)}</label>`).join('')}</div></fieldset>
         <label class="flex items-center gap-2 font-medium text-slate-700"><input id="cf-required" type="checkbox" ${f?.required ? 'checked' : ''}> Required when one is added</label>
         <fieldset class="block font-medium text-slate-700"><legend>Who can change it <span class="font-normal text-slate-400">— none ticked means everyone who can edit the record</span></legend>
@@ -5585,4 +5593,85 @@ async function importSetupFile(input) {
         await renderBuilderPane(proposal.id);
     } catch (err) { showToast(err instanceof SyntaxError ? 'That file isn’t a setup file.' : (err.message || 'Could not read the setup.')); }
     input.value = '';
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// THE COMPANY'S OWN RECORD TYPES (crm_routes/records.py)
+// ═══════════════════════════════════════════════════════════════════
+// e.g. vehicle inspections on a lead. Each type gets its fields under Settings → Custom fields,
+// and a section on the page of the record it hangs from.
+const recordTypeOf = key => (customSchema.recordTypes || []).find(t => t.key === key);
+const customObjectTabs = () => [...Object.entries(CUSTOM_OBJECT_LABELS), ...(customSchema.recordTypes || []).map(t => [t.key, t.label])];
+let customRecordCache = {};
+
+function newRecordType() {
+    openInsuranceForm('New record type', [['label', 'Name, e.g. Vehicle inspection', 'text', true],
+        ['parent', 'Added on each', 'selectpairs:lead::Lead|customer::Customer', true]], async values => {
+        const made = await apiJson('/api/schema/record-types', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(values) });
+        await loadCustomFields();
+        customFieldObject = made.key; customFieldEditing = null;
+        renderCustomFieldsPane();
+    });
+}
+
+function renameRecordType() {
+    const t = recordTypeOf(customFieldObject);
+    openInsuranceForm(`Rename “${t.label}”`, [['label', 'Name', 'text', true]], async values => {
+        await apiJson(`/api/schema/record-types/${t.key}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(values) });
+        await loadCustomFields(); renderCustomFieldsPane();
+    }, { label: t.label });
+}
+
+async function toggleRecordTypeHidden() {
+    const t = recordTypeOf(customFieldObject);
+    try {
+        await apiJson(`/api/schema/record-types/${t.key}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ hidden: !t.hidden }) });
+        await loadCustomFields(); renderCustomFieldsPane();
+    } catch (err) { showToast(err.message); }
+}
+
+// The section on a lead's or customer's page: each record type that hangs from it, with its records.
+async function customRecordsCards(parentType, parentId) {
+    const types = (customSchema.recordTypes || []).filter(t => t.parent === parentType && !t.hidden);
+    if (!types.length) return '';
+    const records = await apiJson(`/api/custom-records?parentId=${encodeURIComponent(parentId)}`).catch(() => []);
+    records.forEach(r => { customRecordCache[r.id] = r; });
+    return types.map(t => {
+        const fields = customFieldsFor(t.key).filter(f => !f.hidden);
+        const mine = records.filter(r => r.type === t.key);
+        return `<div class="border border-slateBorder rounded-lg p-3 bg-white space-y-2 text-xs" data-testid="records-${esc(t.key)}">
+            <div class="flex items-center justify-between gap-2"><span class="text-[11px] font-bold uppercase tracking-wider">${esc(t.label)} (${mine.length})</span>
+                <button class="fu-btn is-primary" onclick="openCustomRecordForm('${esc(t.key)}', '${esc(parentType)}', '${esc(parentId)}')">Add</button></div>
+            ${mine.map(r => `<div class="border-t border-slate-100 pt-2 flex items-start justify-between gap-2">
+                <span class="text-slate-800">${fields.map(f => [f.label, customValueText(f, (r.custom || {})[f.key])]).filter(([, v]) => v)
+                    .map(([label, v]) => `<span class="text-slate-400">${esc(label)}:</span> ${esc(v)}`).join(' · ') || '—'}</span>
+                <span class="flex gap-1 shrink-0"><button class="fu-btn" onclick="openCustomRecordForm('${esc(t.key)}', '${esc(parentType)}', '${esc(parentId)}', '${esc(r.id)}')">Edit</button>
+                <button class="fu-btn" onclick="deleteCustomRecord('${esc(r.id)}', '${esc(parentType)}', '${esc(parentId)}')">Delete</button></span></div>`).join('')
+              || '<p class="text-slate-400">None yet.</p>'}
+        </div>`;
+    }).join('');
+}
+
+function refreshRecordParent(parentType, parentId) {
+    if (parentType === 'lead') openLeadDrawer(parentId);
+    else if (parentType === 'customer') openCustomer360(parentId);
+}
+
+function openCustomRecordForm(type, parentType, parentId, recordId = null) {
+    const t = recordTypeOf(type), record = recordId ? customRecordCache[recordId] : null;
+    openInsuranceForm(`${record ? 'Edit' : 'Add'} ${t.label.toLowerCase()}`, [], async values => {
+        await apiJson(record ? `/api/custom-records/${recordId}` : '/api/custom-records', {
+            method: record ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type, parentId, custom: values.custom || {} }) });
+        refreshRecordParent(parentType, parentId);
+    }, { custom: record?.custom || {} }, { object: type });
+}
+
+async function deleteCustomRecord(id, parentType, parentId) {
+    if (!confirm('Delete this record? A copy stays in the audit log.')) return;
+    try { await apiJson(`/api/custom-records/${id}`, { method: 'DELETE' }); refreshRecordParent(parentType, parentId); }
+    catch (err) { showToast(err.message); }
 }

@@ -322,6 +322,29 @@ class CommercialCrmBrowserFlows(unittest.TestCase):
         card.get_by_role("button", name="Undo", exact=True).click()
         expect(card.get_by_text("Undone", exact=False)).to_be_visible()
 
+    def test_a_custom_record_is_added_from_the_lead_card(self):
+        page = self.page
+        page.goto(f"{self.base_url}/", wait_until="networkidle")
+        csrf = {"X-CSRF-Token": next(c["value"] for c in page.context.cookies() if c["name"] == "crm_csrf")}
+        for url, body in (("/api/schema/record-types", {"label": "Vehicle inspection", "parent": "lead"}),
+                          ("/api/schema/fields/vehicle_inspection", {"key": "condition", "label": "Condition", "type": "choice",
+                                                                    "options": ["Good", "Poor"]}),
+                          ("/api/leads", {"firstName": "Record Card", "mobile": "+91 98765 40099"})):
+            response = page.request.post(f"{self.base_url}{url}", headers=csrf, data=body)
+            self.assertTrue(response.ok, response.text())
+        page.reload(wait_until="networkidle")
+        page.locator("#app-sidebar").get_by_role("button", name="Leads", exact=True).click()
+        page.locator("#leads-table-body tr").filter(has_text="Record Card").get_by_title("View Account 360°").click()
+        section = page.get_by_test_id("records-vehicle_inspection")
+        expect(section.get_by_text("Vehicle inspection (0)", exact=True)).to_be_visible()
+        section.get_by_role("button", name="Add", exact=True).click()
+        form = page.locator("#insurance-dynamic-form")
+        form.locator("#cf-condition").select_option("Poor")
+        form.get_by_role("button", name="Save", exact=True).click()
+        section = page.get_by_test_id("records-vehicle_inspection")
+        expect(section.get_by_text("Vehicle inspection (1)", exact=True)).to_be_visible()
+        expect(section.get_by_text("Poor", exact=False)).to_be_visible()
+
 
 if __name__ == "__main__":
     unittest.main()

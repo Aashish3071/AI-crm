@@ -236,3 +236,28 @@ class Templates(BuilderCase):
         for bad in ({"kind": "something"}, {"kind": "insurecrm-setup", "version": 99}, "text"):
             res = self.call(self.owner, "POST", "/api/builder/template", json={"template": bad})
             self.assertEqual(res.status_code, 422, bad)
+
+
+class RecordTypesInChangeSets(BuilderCase):
+    OPS = [{"op": "add_record_type", "params": {"label": "Vehicle inspection", "parent": "lead"}},
+           {"op": "add_field", "params": {"object": "vehicle_inspection", "label": "Condition", "type": "choice",
+                                          "options": ["Good", "Poor"]}}]
+
+    def test_a_record_type_and_its_fields_in_one_change_set(self):
+        applied = self.act(self.propose(self.OPS), "apply")
+        schema = self.call(self.owner, "GET", "/api/schema").json()
+        self.assertEqual([t["key"] for t in schema["recordTypes"]], ["vehicle_inspection"])
+        self.assertEqual([f["key"] for f in schema["objects"]["vehicle_inspection"]], ["condition"])
+        template = self.call(self.owner, "GET", "/api/builder/template").json()
+        self.assertEqual(template["recordTypes"], [{"key": "vehicle_inspection", "label": "Vehicle inspection", "parent": "lead"}])
+        self.act(applied, "undo")
+        self.assertEqual(self.call(self.owner, "GET", "/api/schema").json()["recordTypes"], [])
+        imported = self.call(self.owner, "POST", "/api/builder/template", json={"template": template}).json()
+        self.assertTrue(imported["ready"], imported["results"])
+
+    def test_undo_is_refused_once_records_exist(self):
+        applied = self.act(self.propose(self.OPS), "apply")
+        lead = self.call(self.owner, "POST", "/api/leads", json={"firstName": "Inspected", "mobile": "+91 90000 50505"}).json()
+        self.call(self.owner, "POST", "/api/custom-records", json={"type": "vehicle_inspection", "parentId": lead["id"],
+                                                                   "custom": {"condition": "Good"}})
+        self.assertIn("1 Vehicle inspection record have been added", self.act(applied, "undo", status=409)["detail"])

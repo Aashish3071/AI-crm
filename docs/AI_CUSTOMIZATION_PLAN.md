@@ -227,6 +227,14 @@ because the AI key is deferred; run `tools/run_builder_evals.py` once one is set
 - AI suggestions: automations, reports, onboarding templates.
 - Config templates: export one company's setup and start another from it.
 
+Phase 4 progress, 29 October 2026: built — setup templates (as builder change sets), "who can change
+this field" (`editableBy`), reports broken down by a custom field, and company record types with
+records on lead and customer pages. Not built, on purpose: per-field *visibility* (records leave
+through too many endpoints for hiding a value to be a promise the CRM can keep) and custom roles
+(the access model is four fixed roles checked by path and by record; a fifth needs that redesigned
+first). Configurable dashboards beyond the by-field report and AI suggestions of automations from
+past activity are the next candidates.
+
 ## 5. Decisions needed before Phase 1
 
 | # | Decision | Recommendation |

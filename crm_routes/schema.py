@@ -21,9 +21,14 @@ from crm_security import current_actor
 router = APIRouter()
 
 
-def _checked_object(obj: str) -> None:
-    if obj not in crm_schema.ENABLED_OBJECTS:
-        raise HTTPException(status_code=404, detail=f"Custom fields aren't available on {obj} records yet")
+def record_types(db: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """The company's own record types (settings.customObjects)."""
+    return [dict(t) for t in (db.get("settings") or {}).get("customObjects") or []]
+
+
+def _checked_object(db: Dict[str, Any], obj: str) -> None:
+    if obj not in crm_schema.ENABLED_OBJECTS and obj not in {t["key"] for t in record_types(db)}:
+        raise HTTPException(status_code=404, detail=f"There are no {obj} records to add fields to")
 
 
 def _store(db: Dict[str, Any], obj: str, fields: List[Dict[str, Any]]) -> None:
@@ -33,7 +38,10 @@ def _store(db: Dict[str, Any], obj: str, fields: List[Dict[str, Any]]) -> None:
 
 
 def _records(db: Dict[str, Any], obj: str) -> List[Dict[str, Any]]:
-    return db.get({"lead": "leads", "customer": "customers", "policy": "policies"}[obj], [])
+    collection = {"lead": "leads", "customer": "customers", "policy": "policies"}.get(obj)
+    if collection:
+        return db.get(collection, [])
+    return [r for r in db.get("customRecords", []) if r.get("type") == obj]
 
 
 def _count(records: List[Dict[str, Any]], key: str, test) -> int:
@@ -43,15 +51,56 @@ def _count(records: List[Dict[str, Any]], key: str, test) -> int:
 @router.get("/api/schema")
 def get_schema():
     db = core.load_db()
+    types = record_types(db)
     return {"fieldTypes": crm_schema.type_catalogue(), "lookupTargets": list(crm_schema.LOOKUP_TARGETS),
-            "objects": {obj: core.custom_field_defs(db, obj) for obj in crm_schema.ENABLED_OBJECTS},
+            "objects": {obj: core.custom_field_defs(db, obj) for obj in [*crm_schema.ENABLED_OBJECTS, *(t["key"] for t in types)]},
+            "recordTypes": types, "recordParents": list(crm_schema.RECORD_PARENTS),
             "version": int((db.get("settings") or {}).get("customFieldsVersion") or 0)}
+
+
+# ── The company's own record types ──
+@router.post("/api/schema/record-types")
+def add_record_type(definition: Dict[str, Any]):
+    db = core.load_db()
+    try:
+        record_type = crm_schema.check_record_type(definition, record_types(db))
+    except crm_schema.SchemaError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    record_type.update({"createdAt": datetime.utcnow().isoformat() + "Z", "createdBy": current_actor("System")})
+    settings = db.setdefault("settings", {})
+    settings["customObjects"] = record_types(db) + [record_type]
+    settings["customFieldsVersion"] = int(settings.get("customFieldsVersion") or 0) + 1
+    core.audit(db, "Record Type Added", "Record Type", record_type["key"], {"after": record_type})
+    core.save_db(db)
+    return record_type
+
+
+@router.put("/api/schema/record-types/{key}")
+def update_record_type(key: str, changes: Dict[str, Any]):
+    """A record type can be renamed or hidden; its key and what it is attached to stay."""
+    db = core.load_db()
+    types = record_types(db)
+    before = next((t for t in types if t["key"] == key), None)
+    if not before:
+        raise HTTPException(status_code=404, detail="Record type not found")
+    if changes.get("parent", before["parent"]) != before["parent"] or changes.get("key", key) != key:
+        raise HTTPException(status_code=422, detail="A record type keeps its key and what it is attached to")
+    try:
+        after = crm_schema.check_record_type({**before, **{k: changes[k] for k in ("label", "hidden") if k in changes}},
+                                             [t for t in types if t["key"] != key])
+    except crm_schema.SchemaError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    after.update({k: before[k] for k in ("createdAt", "createdBy") if k in before})
+    db["settings"]["customObjects"] = [after if t["key"] == key else t for t in types]
+    core.audit(db, "Record Type Changed", "Record Type", key, {"before": before, "after": after})
+    core.save_db(db)
+    return after
 
 
 @router.post("/api/schema/fields/{obj}")
 def add_field(obj: str, definition: Dict[str, Any]):
-    _checked_object(obj)
     db = core.load_db()
+    _checked_object(db, obj)
     fields = core.custom_field_defs(db, obj)
     try:
         field = crm_schema.check_field(obj, definition, fields)
@@ -67,8 +116,8 @@ def add_field(obj: str, definition: Dict[str, Any]):
 # Declared before /{key} so "order" is never read as a field key.
 @router.put("/api/schema/fields/{obj}/order")
 def reorder_fields(obj: str, payload: Dict[str, Any]):
-    _checked_object(obj)
     db = core.load_db()
+    _checked_object(db, obj)
     fields = core.custom_field_defs(db, obj)
     keys = payload.get("keys")
     if not isinstance(keys, list) or sorted(keys) != sorted(f["key"] for f in fields):
@@ -83,8 +132,8 @@ def reorder_fields(obj: str, payload: Dict[str, Any]):
 
 @router.put("/api/schema/fields/{obj}/{key}")
 def update_field(obj: str, key: str, changes: Dict[str, Any]):
-    _checked_object(obj)
     db = core.load_db()
+    _checked_object(db, obj)
     fields = core.custom_field_defs(db, obj)
     before = next((f for f in fields if f["key"] == key), None)
     if not before:
