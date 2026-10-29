@@ -5133,13 +5133,17 @@ function customValueText(f, v) {
     return String(v);
 }
 
+// A field limited to other roles shows its value but can't be changed (the server checks too).
+const mayEditField = f => !f.editableBy?.length || f.editableBy.includes(roleKey());
+
 function customInputHtml(f, value) {
     const mark = f.required ? ' *' : '';
-    const help = f.help ? `<span class="block font-normal text-[11px] text-slate-400 mt-0.5">${esc(f.help)}</span>` : '';
-    const attrs = `id="cf-${esc(f.key)}" data-custom-key="${esc(f.key)}" class="corp-input mt-1"`;
+    const locked = !mayEditField(f);
+    const help = f.help || locked ? `<span class="block font-normal text-[11px] text-slate-400 mt-0.5">${esc(f.help || '')}${locked ? `${f.help ? ' · ' : ''}Only ${esc(f.editableBy.map(r => ROLES[r]).join(' and '))} can change this.` : ''}</span>` : '';
+    const attrs = `id="cf-${esc(f.key)}" data-custom-key="${esc(f.key)}" class="corp-input mt-1"${locked ? ' disabled' : ''}`;
     const v = value ?? '';
     if (f.type === 'multi_choice') {
-        return `<fieldset class="block font-medium text-slate-700 sm:col-span-2" data-custom-key="${esc(f.key)}" data-custom-multi="1">
+        return `<fieldset class="block font-medium text-slate-700 sm:col-span-2" data-custom-key="${esc(f.key)}" data-custom-multi="1"${locked ? ' disabled' : ''}>
             <legend>${esc(f.label)}${mark}</legend><div class="flex flex-wrap gap-x-3 gap-y-1 mt-1">
             ${(f.options || []).map(o => `<label class="font-normal flex items-center gap-1"><input type="checkbox" value="${esc(o)}" ${(value || []).includes(o) ? 'checked' : ''}> ${esc(o)}</label>`).join('')}
             </div>${help}</fieldset>`;
@@ -5162,6 +5166,7 @@ function customInputHtml(f, value) {
 function collectCustomValues(root) {
     const values = {};
     document.querySelectorAll(`${root} [data-custom-key]`).forEach(el => {
+        if (el.disabled) return;                       // a field this person may not change isn't sent
         values[el.dataset.customKey] = el.dataset.customMulti
             ? [...el.querySelectorAll('input:checked')].map(box => box.value) : el.value.trim();
     });
@@ -5267,7 +5272,7 @@ function renderCustomFieldsPane() {
                     <div class="text-xs font-semibold text-slate-900">${esc(f.label)}
                         ${f.required ? '<span class="text-[10px] text-rose-700 font-semibold ml-1">required</span>' : ''}
                         ${f.hidden ? '<span class="text-[10px] text-slate-500 ml-1">hidden</span>' : ''}</div>
-                    <div class="text-[11px] text-slate-500">${esc(fieldTypeLabel(f.type))}${f.options?.length ? ` · ${esc(f.options.join(', '))}` : ''}${f.section ? ` · in “${esc(f.section)}”` : ''}${f.products?.length ? ` · only ${esc(f.products.join(', '))}` : ''}</div>
+                    <div class="text-[11px] text-slate-500">${esc(fieldTypeLabel(f.type))}${f.options?.length ? ` · ${esc(f.options.join(', '))}` : ''}${f.section ? ` · in “${esc(f.section)}”` : ''}${f.products?.length ? ` · only ${esc(f.products.join(', '))}` : ''}${f.editableBy?.length ? ` · changed by ${esc(f.editableBy.map(r => ROLES[r]).join(', '))}` : ''}</div>
                 </div>
                 <div class="flex items-center gap-1 shrink-0" data-requires="admin">
                     <button class="fu-btn" aria-label="Move ${esc(f.label)} up" ${i === 0 ? 'disabled' : ''} onclick="moveCustomField('${esc(f.key)}', -1)">↑</button>
@@ -5308,6 +5313,8 @@ function customFieldForm(f) {
         <fieldset class="block font-medium text-slate-700 ${customFieldObject === 'customer' ? 'hidden' : ''}"><legend>Only for these products <span class="font-normal text-slate-400">— none ticked means every product</span></legend>
             <div class="flex flex-wrap gap-x-3 gap-y-1 mt-1">${products.map(p => `<label class="font-normal flex items-center gap-1"><input type="checkbox" class="cf-product" value="${esc(p)}" ${(f?.products || []).includes(p) ? 'checked' : ''}> ${esc(p)}</label>`).join('')}</div></fieldset>
         <label class="flex items-center gap-2 font-medium text-slate-700"><input id="cf-required" type="checkbox" ${f?.required ? 'checked' : ''}> Required when one is added</label>
+        <fieldset class="block font-medium text-slate-700"><legend>Who can change it <span class="font-normal text-slate-400">— none ticked means everyone who can edit the record</span></legend>
+            <div class="flex flex-wrap gap-x-3 gap-y-1 mt-1">${['admin', 'manager', 'telecaller'].map(r => `<label class="font-normal flex items-center gap-1"><input type="checkbox" class="cf-editor" value="${r}" ${(f?.editableBy || []).includes(r) ? 'checked' : ''}> ${esc(ROLES[r])}</label>`).join('')}</div></fieldset>
         <div class="flex gap-2 pt-1">
             <button class="px-4 py-2 bg-slate-900 text-white rounded font-semibold">${editing ? 'Save changes' : 'Add field'}</button>
             <button type="button" class="px-3 py-2 border border-slate-300 rounded" onclick="editCustomField(null)">Cancel</button>
@@ -5332,7 +5339,8 @@ async function saveCustomField(event) {
     const number = text => text === '' ? null : Number(text.replace(/,/g, ''));
     const body = { label: val('cf-label'), type, section: val('cf-section'), help: val('cf-help'),
         required: document.getElementById('cf-required').checked,
-        products: [...document.querySelectorAll('.cf-product:checked')].map(box => box.value) };
+        products: [...document.querySelectorAll('.cf-product:checked')].map(box => box.value),
+        editableBy: [...document.querySelectorAll('.cf-editor:checked')].map(box => box.value) };
     if (['choice', 'multi_choice'].includes(type)) body.options = val('cf-options').split('\n').map(o => o.trim()).filter(Boolean);
     if (['number', 'currency'].includes(type)) { body.min = number(val('cf-min')); body.max = number(val('cf-max')); }
     if (type === 'lookup' && !customFieldEditing) body.target = val('cf-target');

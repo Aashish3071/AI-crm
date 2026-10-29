@@ -165,6 +165,35 @@ class Values(CustomFieldCase):
         self.assertEqual(res.json()["custom"], {"fuel": "Diesel", "engine_cc": 180})
 
 
+class WhoCanChange(CustomFieldCase):
+    def setUp(self):
+        super().setUp()
+        self.define({"key": "discount_ok", "label": "Discount approved", "type": "boolean", "editableBy": ["admin", "manager"]})
+        self.define(FUEL)
+
+    def put(self, client, lead_id, custom):
+        return self.call(client, "PUT", f"/api/leads/{lead_id}", json={"custom": custom})
+
+    def test_a_telecaller_cannot_change_a_manager_field(self):
+        res = self.call(self.priya, "POST", "/api/leads", json={"firstName": "Own", "mobile": "+91 90000 40404",
+                                                                "custom": {"discount_ok": "yes"}})
+        self.assertEqual(res.status_code, 422)
+        self.assertIn("can only be changed by the Owner / Admin and Managers", res.json()["detail"])
+        lead = self.call(self.priya, "POST", "/api/leads", json={"firstName": "Own", "mobile": "+91 90000 40404"}).json()
+        self.assertEqual(self.put(self.owner, lead["id"], {"discount_ok": "yes"}).status_code, 200)
+        # The form sends every value back; resending the one already there is not a change.
+        res = self.put(self.priya, lead["id"], {"discount_ok": True, "fuel": "EV"})
+        self.assertEqual(res.status_code, 200, res.text)
+        self.assertEqual(res.json()["custom"], {"discount_ok": True, "fuel": "EV"})
+        self.assertEqual(self.put(self.priya, lead["id"], {"discount_ok": "no"}).status_code, 422)
+        self.assertEqual(self.put(self.priya, lead["id"], {"discount_ok": ""}).status_code, 422)
+
+    def test_roles_are_checked(self):
+        res = self.call(self.owner, "POST", "/api/schema/fields/lead",
+                        json={"key": "x", "label": "X", "type": "text", "editableBy": ["readonly"]})
+        self.assertEqual(res.status_code, 422)
+
+
 class Changes(CustomFieldCase):
     def setUp(self):
         super().setUp()

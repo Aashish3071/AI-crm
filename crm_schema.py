@@ -47,6 +47,8 @@ RECORD_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 EMAIL_RE = re.compile(r"^[\w.+-]+@[\w-]+(\.[\w-]+)+$")
 
 MAX_FIELDS_PER_OBJECT = 100
+# Roles that write records (crm_security.ROLES); a field can be limited to some of them.
+EDITING_ROLES = ("admin", "manager", "telecaller")
 MAX_OPTIONS = 100
 LABEL_MAX = 60
 OPTION_MAX = 80
@@ -316,6 +318,12 @@ def check_field(obj: str, defn: Dict[str, Any], existing: Iterable[Dict[str, Any
         if clean.get("min") is not None and clean.get("max") is not None and clean["min"] > clean["max"]:
             raise SchemaError("The minimum is above the maximum")
 
+    editable = defn.get("editableBy")
+    if editable:
+        if not isinstance(editable, list) or any(role not in EDITING_ROLES for role in editable):
+            raise SchemaError(f"Who can change a field is any of: {', '.join(EDITING_ROLES)}")
+        clean["editableBy"] = [role for role in EDITING_ROLES if role in editable]
+
     products = defn.get("products")
     if products and obj not in PRODUCT_FIELD:
         raise SchemaError(f"A {obj} has no product, so its fields can't be limited to products")
@@ -363,12 +371,14 @@ def read_value(defn: Dict[str, Any], value: Any) -> Any:
 
 def clean_custom(defs: Iterable[Dict[str, Any]], values: Optional[Dict[str, Any]],
                  existing: Optional[Dict[str, Any]] = None, creating: bool = False,
-                 product: Optional[str] = None) -> Tuple[Dict[str, Any], Dict[str, str]]:
+                 product: Optional[str] = None, role: Optional[str] = None) -> Tuple[Dict[str, Any], Dict[str, str]]:
     """Merge submitted custom values into a record's existing ones.
 
     Returns ``(custom, errors)``. ``errors`` maps a field key to a message; when it is not
     empty nothing should be saved. Values of fields since hidden or removed are kept as they
     were — data is never dropped because a field was tidied away — but can't be written.
+    ``role`` is the writer's; a field limited to other roles refuses a *change* from them
+    (a form sending back the value already there is not one).
     """
     by_key = {d["key"]: d for d in defs}
     merged = dict(existing or {})
@@ -387,6 +397,11 @@ def clean_custom(defs: Iterable[Dict[str, Any]], values: Optional[Dict[str, Any]
             cleaned = read_value(defn, value)
         except SchemaError as exc:
             errors[key] = f"{defn['label']} {exc}"
+            continue
+        if role and defn.get("editableBy") and role not in defn["editableBy"] and cleaned != merged.get(key):
+            who = " and ".join({"admin": "the Owner / Admin", "manager": "Managers", "telecaller": "Telecallers"}[r]
+                               for r in defn["editableBy"])
+            errors[key] = f"{defn['label']} can only be changed by {who}"
             continue
         if cleaned is None:
             merged.pop(key, None)

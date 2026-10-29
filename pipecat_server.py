@@ -2657,8 +2657,10 @@ def custom_field_defs(db: Dict[str, Any], obj: str = "lead") -> List[Dict[str, A
 def checked_custom_values(db: Dict[str, Any], existing: Optional[Dict[str, Any]], values: Optional[Dict[str, Any]],
                           creating: bool = False, product: Optional[str] = None, obj: str = "lead") -> Dict[str, Any]:
     """The record's custom values with ``values`` merged in, or a 422 naming each problem."""
+    session = None if AUTH_DISABLED else crm_security.current_user()
+    role = crm_security.normalized_role(session.get("role", "")) if session else None
     merged, errors = crm_schema.clean_custom(custom_field_defs(db, obj), values, existing,
-                                             creating=creating, product=product)
+                                             creating=creating, product=product, role=role)
     if errors:
         raise HTTPException(status_code=422, detail="; ".join(errors.values()))
     return merged

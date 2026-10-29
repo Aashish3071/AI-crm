@@ -28,7 +28,7 @@ CUSTOM_STAGE_CATEGORIES = ("working", "parked", "lost")
 STAGE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 &/()+.-]*$")
 MAX_OPERATIONS = 25
 # Field attributes an operation may adjust. Type, key and target never change here.
-ADJUSTABLE = ("label", "help", "section", "required", "hidden", "products", "min", "max")
+ADJUSTABLE = ("label", "help", "section", "required", "hidden", "products", "min", "max", "editableBy")
 
 CATALOGUE: List[Dict[str, Any]] = [
     {"op": "add_field", "about": "Add a custom field to leads, customers or policies",
@@ -36,8 +36,9 @@ CATALOGUE: List[Dict[str, Any]] = [
                 "key": "optional, lower_snake_case", "options": "list, for choice / multi_choice",
                 "section": "optional", "help": "optional", "required": "true/false",
                 "products": "optional list (lead and policy only)", "min": "optional number", "max": "optional number",
-                "target": "for lookup: lead | customer | policy | renewal | quotation | task"}},
-    {"op": "change_field", "about": "Adjust a field: label, help, section, required, hidden, products, min, max",
+                "target": "for lookup: lead | customer | policy | renewal | quotation | task",
+                "editableBy": "optional list of roles allowed to change it: admin, manager, telecaller"}},
+    {"op": "change_field", "about": "Adjust a field: label, help, section, required, hidden, products, min, max, editableBy",
      "params": {"object": "lead | customer | policy", "key": "the field's key", "changes": "object of those attributes"}},
     {"op": "add_choice", "about": "Add one or more choices to a choice or multi_choice field",
      "params": {"object": "lead | customer | policy", "key": "the field's key", "options": "list of new choices"}},
