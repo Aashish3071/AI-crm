@@ -134,16 +134,18 @@ class EvidenceResult(unittest.TestResult):
 
 
 def inventory_routes():
-    source = (ROOT / "pipecat_server.py").read_text()
+    """Every route declared on the app in pipecat_server.py or on a router in crm_routes/."""
     routes = []
-    for node in ast.walk(ast.parse(source)):
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            continue
-        for dec in node.decorator_list:
-            if isinstance(dec, ast.Call) and isinstance(dec.func, ast.Attribute) and isinstance(dec.func.value, ast.Name):
-                if dec.func.value.id == "app" and dec.func.attr in {"get", "post", "put", "delete", "patch"}:
-                    routes.append({"method": dec.func.attr.upper(), "path": ast.literal_eval(dec.args[0]),
-                                   "handler": node.name, "line": node.lineno})
+    for path in [ROOT / "pipecat_server.py", *sorted((ROOT / "crm_routes").glob("*.py"))]:
+        owner = "app" if path.name == "pipecat_server.py" else "router"
+        for node in ast.walk(ast.parse(path.read_text())):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            for dec in node.decorator_list:
+                if isinstance(dec, ast.Call) and isinstance(dec.func, ast.Attribute) and isinstance(dec.func.value, ast.Name):
+                    if dec.func.value.id == owner and dec.func.attr in {"get", "post", "put", "delete", "patch"}:
+                        routes.append({"method": dec.func.attr.upper(), "path": ast.literal_eval(dec.args[0]),
+                                       "handler": node.name, "file": str(path.relative_to(ROOT)), "line": node.lineno})
     return routes
 
 
@@ -209,7 +211,9 @@ def main():
         failures = [cid for cid in required if criteria[cid]["status"] == "FAIL"]
         journeys.append({"id": jid, "status": "FAIL" if failures else "PARTIAL", "requirements": required,
                          "failedRequirements": failures, "note": "Derived from component evidence; not proof of one uninterrupted production journey"})
-    product_files = ["pipecat_server.py", "crm_store.py", "crm_security.py", "crm_storage.py", "crm_worker.py", "web/app.js", "web/index.html"]
+    product_files = ["pipecat_server.py", "crm_store.py", "crm_security.py", "crm_storage.py", "crm_worker.py",
+                     "crm_ai.py", "crm_schema.py", *sorted(str(p.relative_to(ROOT)) for p in (ROOT / "crm_routes").glob("*.py")),
+                     "web/app.js", "web/index.html"]
     output = {"generatedAt": datetime.now(timezone.utc).isoformat(), "blueprint": "uat/CRM_BLUEPRINT.md",
         "blueprintSha256": hashlib.sha256(blueprint.encode()).hexdigest(),
         "productSha256": {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest() for name in product_files},
@@ -256,7 +260,7 @@ def main():
     lines += ["## Endpoint observation scope", "",
         f"Registered routes: {len(routes)}; observed by API tests: {len(routes)-len(untouched)}; unobserved by API tests: {len(untouched)}.", "",
         output["routeEvidenceNote"], "", "Unobserved routes remain explicitly unverified at the request level; some may be visited in browser tests. AI advisor routes are outside the CRM acceptance boundary.", ""]
-    lines += [f"- `{r['method']} {r['path']}` — `{r['handler']}`, pipecat_server.py:{r['line']}" for r in untouched]
+    lines += [f"- `{r['method']} {r['path']}` — `{r['handler']}`, {r['file']}:{r['line']}" for r in untouched]
     lines += ["", "## Repeat the comparison", "", "```bash", "PYTHONWARNINGS=ignore .venv/bin/python3 -m tests.run_blueprint_audit --browser", "```", "",
         "The runner refuses a deployed browser target or configured database. It writes only the evidence files and disposable test data. Exit 1 is intentional when blueprint defects remain; no expected-failure decorators hide them. Product files are unchanged by this assessment.", "",
         "External and manual acceptance remains necessary. A full keyboard/screen-reader audit, realistic load run, provider round trip and combined database/document recovery were not executed here. Existing green smoke tests must not be interpreted as proof that these checks passed.", "",
