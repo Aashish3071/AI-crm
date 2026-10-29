@@ -490,10 +490,25 @@ def merge_leads(target_id: str, duplicate_id: str):
 ALLOWED_FILTER_MODULES = {"leads", "customers", "policies", "renewals", "deals", "tasks"}
 
 
+# A view an Owner / Admin or Manager shares appears for everyone in the chosen roles. It is only
+# a filter: whoever applies it still sees just the records their role and team allow.
+SHAREABLE_ROLES = ("admin", "manager", "telecaller", "readonly")
+
+
+def _viewer() -> Dict[str, str]:
+    user = crm_security.current_user() or {}
+    return {"id": user.get("sub") or user.get("id") or "local",
+            "role": "admin" if core.AUTH_DISABLED else crm_security.normalized_role(user.get("role", ""))}
+
+
 @router.get("/api/saved-filters")
 def get_saved_filters(module: Optional[str] = None):
-    user = crm_security.current_user() or {}
-    items = [item for item in core.load_db().get("savedFilters", []) if item.get("ownerId") in {user.get("sub"), user.get("id"), "local"}]
+    viewer = _viewer()
+    items = []
+    for item in core.load_db().get("savedFilters", []):
+        mine = item.get("ownerId") in {viewer["id"], "local"}
+        if mine or viewer["role"] in (item.get("sharedWith") or []):
+            items.append({**item, "ownedByMe": mine})
     return [item for item in items if not module or item.get("module") == module]
 
 
@@ -502,17 +517,23 @@ def create_saved_filter(payload: Dict[str, Any]):
     module = str(payload.get("module", "")); name = str(payload.get("name", "")).strip(); criteria = payload.get("criteria")
     if module not in ALLOWED_FILTER_MODULES or not name or not isinstance(criteria, dict):
         raise HTTPException(status_code=422, detail="Filter name, supported module and criteria are required")
-    user = crm_security.current_user() or {}
+    viewer = _viewer()
+    shared = payload.get("sharedWith") or []
+    if shared:
+        if viewer["role"] not in ("admin", "manager"):
+            raise HTTPException(status_code=403, detail="Only an Owner / Admin or a Manager can share a view")
+        if not isinstance(shared, list) or any(role not in SHAREABLE_ROLES for role in shared):
+            raise HTTPException(status_code=422, detail=f"Share with any of: {', '.join(SHAREABLE_ROLES)}")
     db = core.load_db(); item = {"id": f"FLT_{uuid.uuid4().hex[:8]}", "name": name, "module": module,
-                            "criteria": criteria, "ownerId": user.get("sub") or user.get("id") or "local",
-                            "createdAt": datetime.utcnow().isoformat() + "Z"}
+                            "criteria": criteria, "ownerId": viewer["id"],
+                            "sharedWith": sorted(set(shared)), "createdAt": datetime.utcnow().isoformat() + "Z"}
     db.setdefault("savedFilters", []).insert(0, item); core.audit(db, "Saved Filter Created", "Saved Filter", item["id"], {"name": name, "module": module}); core.save_db(db)
     return item
 
 
 @router.delete("/api/saved-filters/{id}")
 def delete_saved_filter(id: str):
-    db = core.load_db(); user = crm_security.current_user() or {}; owner = user.get("sub") or user.get("id") or "local"
+    db = core.load_db(); owner = _viewer()["id"]
     item = core._find_record(db.get("savedFilters", []), id, "Saved filter")
     if item.get("ownerId") != owner: raise HTTPException(status_code=403, detail="This saved view belongs to another user")
     db["savedFilters"] = [value for value in db.get("savedFilters", []) if value.get("id") != id]

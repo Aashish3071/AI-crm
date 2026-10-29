@@ -18,6 +18,8 @@ Under **Settings → Lead stages** an owner can now shape the stages a lead move
 
 The CRM configuration tab no longer shows a stages box that was never saved.
 
+**Shared views.** An owner or manager saving a lead view can share it with whole roles — "Bike leads over 500cc" for every telecaller. Saved views now remember the custom-field filter too. A shared view is only a filter: each person still sees just their own leads (or their team's).
+
 Verification: 369 automated tests pass, 16 of them for lead stages, including one that keeps each company's stages to itself.
 
 ### Custom fields on leads — 29 October 2026

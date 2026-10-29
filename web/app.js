@@ -1128,7 +1128,10 @@ function changeLeadPage(direction) {
 function currentLeadFilterCriteria() {
     return {search: document.getElementById('leads-search')?.value.trim() || '',
         status: document.getElementById('leads-status-filter')?.value || '',
-        assignedTo: document.getElementById('leads-owner-filter')?.value || '', quickFilter: activeQuickFilter || ''};
+        assignedTo: document.getElementById('leads-owner-filter')?.value || '', quickFilter: activeQuickFilter || '',
+        customField: document.getElementById('leads-custom-field')?.value || '',
+        customOp: document.getElementById('leads-custom-op')?.value || '',
+        customValue: document.getElementById('leads-custom-value')?.value || ''};
 }
 
 async function loadSavedLeadFilters() {
@@ -1136,15 +1139,20 @@ async function loadSavedLeadFilters() {
         savedLeadFilters = await apiJson('/api/saved-filters?module=leads');
         const select = document.getElementById('saved-lead-filter');
         const current = select.value;
-        select.innerHTML = '<option value="">Saved views</option>' + savedLeadFilters.map(item => `<option value="${esc(item.id)}">${esc(item.name)}</option>`).join('');
+        select.innerHTML = '<option value="">Saved views</option>' + savedLeadFilters.map(item =>
+            `<option value="${esc(item.id)}">${esc(item.name)}${item.ownedByMe ? (item.sharedWith?.length ? ' (shared by you)' : '') : ' (shared)'}</option>`).join('');
         if (savedLeadFilters.some(item => item.id === current)) select.value = current;
     } catch (_) {}
 }
 
 function saveCurrentLeadFilter() {
-    openInsuranceForm('Save current lead view', [['name','View name','text',true]], async values => {
+    // Owners and managers can hand a view to a whole role, e.g. "Bike leads over 500cc" for telecallers.
+    const sharing = ['admin', 'manager'].includes(roleKey())
+        ? Object.entries(ROLES).map(([key, label]) => [`share_${key}`, `Share with ${label}`, 'checkbox', false]) : [];
+    openInsuranceForm('Save current lead view', [['name','View name','text',true], ...sharing], async values => {
+        const sharedWith = Object.keys(ROLES).filter(key => values[`share_${key}`]);
         await apiJson('/api/saved-filters', {method:'POST', headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({name:values.name,module:'leads',criteria:currentLeadFilterCriteria()})});
+            body:JSON.stringify({name:values.name,module:'leads',criteria:currentLeadFilterCriteria(), sharedWith})});
         savedLeadFilters = []; await loadSavedLeadFilters();
     });
 }
@@ -1156,6 +1164,16 @@ function applySavedLeadFilter(id) {
     document.getElementById('leads-status-filter').value = criteria.status || '';
     document.getElementById('leads-owner-filter').value = criteria.assignedTo || '';
     activeQuickFilter = criteria.quickFilter || null; leadPage = 1;
+    const customField = document.getElementById('leads-custom-field');
+    if (customField) {
+        customField.value = leadCustomFields().some(f => f.key === criteria.customField) ? criteria.customField : '';
+        onCustomFilterFieldChange(false);
+        if (customField.value) {
+            document.getElementById('leads-custom-op').value = criteria.customOp || document.getElementById('leads-custom-op').value;
+            document.getElementById('leads-custom-value').value = criteria.customValue || '';
+            onCustomFilterFieldChange(false);
+        }
+    }
     ['expiring','due-today','overdue'].forEach(key => document.getElementById(`pill-${key}`)?.classList.remove('bg-slate-900','text-white'));
     if (activeQuickFilter) {
         const ids={expiring_soon:'pill-expiring',due_today:'pill-due-today',overdue:'pill-overdue'};
