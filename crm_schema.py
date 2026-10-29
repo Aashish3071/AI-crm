@@ -37,7 +37,9 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 OBJECTS = ("lead", "customer", "policy")
 # Objects whose custom fields the CRM reads and writes so far (plan, phase 1). The others follow.
-ENABLED_OBJECTS = ("lead",)
+ENABLED_OBJECTS = ("lead", "customer", "policy")
+# Records whose product decides which product-limited fields apply. Customers have no product.
+PRODUCT_FIELD = {"lead": "product", "policy": "policyType"}
 LOOKUP_TARGETS = ("lead", "customer", "policy", "renewal", "quotation", "task")
 
 KEY_RE = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
@@ -315,6 +317,8 @@ def check_field(obj: str, defn: Dict[str, Any], existing: Iterable[Dict[str, Any
             raise SchemaError("The minimum is above the maximum")
 
     products = defn.get("products")
+    if products and obj not in PRODUCT_FIELD:
+        raise SchemaError(f"A {obj} has no product, so its fields can't be limited to products")
     if products:
         if not isinstance(products, list) or not all(isinstance(p, str) and p.strip() for p in products):
             raise SchemaError("Products must be a list of product names")

@@ -9,7 +9,7 @@ import os
 import re
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlencode
 
 import httpx
@@ -17,6 +17,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse, Response
 from pydantic import BaseModel
 
+import crm_schema
 import pipecat_server as core
 from crm_security import company_context, current_company_id
 
@@ -551,12 +552,35 @@ def _apply_channel_mapping(channel: Dict[str, Any], extracted: Dict[str, Any]) -
     return {"values": values, "unmapped": unmapped}
 
 
+def _split_custom(db: Dict[str, Any], values: Dict[str, str], unmapped: Dict[str, str]) -> Tuple[Dict[str, Any], List[str]]:
+    """Values mapped to custom.<key>, checked. A web form can send anything, and losing an
+    enquiry is worse than an untyped detail, so a value that can't be read is kept with the
+    unmapped fields, under the field's label, and reported instead of failing the lead."""
+    defs = {d["key"]: d for d in core.custom_field_defs(db) if not d.get("hidden")}
+    custom: Dict[str, Any] = {}
+    problems: List[str] = []
+    for target in [k for k in values if k.startswith("custom.")]:
+        raw_value, key = values.pop(target), target[len("custom."):]
+        defn = defs.get(key)
+        try:
+            if defn is None:
+                raise crm_schema.SchemaError(f"'{key}' is not a field")
+            cleaned = crm_schema.read_value(defn, raw_value)
+            if cleaned is not None:
+                custom[key] = cleaned
+        except crm_schema.SchemaError as exc:
+            unmapped[defn["label"] if defn else key] = raw_value
+            problems.append(f"{defn['label']} {exc}" if defn else str(exc))
+    return custom, problems
+
+
 def _ingest_channel_lead(db: Dict[str, Any], channel: Dict[str, Any], extracted: Dict[str, Any],
                          raw: Dict[str, Any]) -> Dict[str, Any]:
     """Turn one extracted payload into a CRM lead, recording the event either way."""
     now_str = datetime.utcnow().isoformat() + "Z"
     mapped = _apply_channel_mapping(channel, extracted)
     values, unmapped = mapped["values"], mapped["unmapped"]
+    custom, custom_problems = _split_custom(db, values, unmapped)
     defaults = channel.get("defaults") or {}
     attribution = extracted.get("attribution") or {}
 
@@ -572,9 +596,14 @@ def _ingest_channel_lead(db: Dict[str, Any], channel: Dict[str, Any], extracted:
         channel.setdefault("stats", {})["failed"] = channel.get("stats", {}).get("failed", 0) + 1
         return event
 
+    if custom_problems:
+        event["customFieldProblems"] = custom_problems
     existing = _find_lead_by_contact(db, mobile, email)
     if existing:
         existing.setdefault("customFields", {}).update(unmapped)
+        if custom:
+            # A repeat enquiry fills gaps; it doesn't overwrite what a telecaller recorded.
+            existing["custom"] = {**custom, **(existing.get("custom") or {})}
         existing["lastModified"] = now_str
         # Their message reopens WhatsApp's 24-hour window for free-form replies.
         if channel.get("provider") == "whatsapp" and extracted.get("inboundMessage"):
@@ -614,6 +643,8 @@ def _ingest_channel_lead(db: Dict[str, Any], channel: Dict[str, Any], extracted:
             "territory": values.get("territory") or defaults.get("territory", ""), "industry": ""}) or core.get_next_round_robin_user(db),
         "lastModified": now_str, "lostReason": ""
     }
+    if custom:
+        lead["custom"] = custom
     lead["assignedByRule"] = core._last_rule_match["name"]
     if channel.get("provider") == "whatsapp" and extracted.get("inboundMessage"):
         lead["lastWhatsAppInboundAt"] = now_str

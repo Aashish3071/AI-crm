@@ -943,7 +943,7 @@ async function openNewPolicyPrompt() {
         ['customerId','Customer','selectpairs:'+choices,true], ['policyType','Policy type','text',true],
         ['policyNumber','Policy number','text',false], ['insurer','Insurer','text',false], ['premium','Premium','number',false],
         ['sumInsured','Sum insured','number',false], ['startDate','Start date','date',false], ['expiryDate','Expiry date','date',true]
-    ], values => {const c=customers.find(x=>x.id===values.customerId);return apiJson('/api/policies', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...values,customerName:c?.name||'',organization:c?.organization||''})})});
+    ], values => {const c=customers.find(x=>x.id===values.customerId);return apiJson('/api/policies', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...values,customerName:c?.name||'',organization:c?.organization||''})})}, {}, {object:'policy'});
 }
 
 async function openCommunicationPrompt() {
@@ -969,7 +969,8 @@ function handleInsuranceFormBack() {
     else closeInsuranceForm();
 }
 
-function openInsuranceForm(title, fields, submitter, initial = {}) {
+// `custom` ({object, product}) adds that record type's own fields (Settings → Custom fields).
+function openInsuranceForm(title, fields, submitter, initial = {}, custom = null) {
     const modal = document.getElementById('insurance-form-modal');
     const form = document.getElementById('insurance-dynamic-form');
     document.getElementById('insurance-form-title').textContent = title;
@@ -984,12 +985,15 @@ function openInsuranceForm(title, fields, submitter, initial = {}) {
         else if (type === 'checkbox') control = `<input type="checkbox" name="${name}" ${value ? 'checked' : ''} class="rounded">`;
         else control = `<input type="${type}" ${attrs} value="${esc(value)}">`;
         return `<label class="block text-xs font-medium text-slate-700"><span class="block mb-1">${label}${required ? ' *' : ''}</span>${control}</label>`;
-    }).join('') + `<div class="pt-3 border-t border-slateBorder flex justify-end gap-2"><button type="button" onclick="closeInsuranceForm()" class="px-3 py-1.5 border border-slate-300 rounded text-xs">Cancel</button><button type="submit" class="px-4 py-1.5 bg-slate-900 text-white rounded text-xs font-semibold">Save</button></div>`;
+    }).join('') + (custom ? `<div id="insurance-custom-fields" class="space-y-2.5 text-xs">${customSectionsHtml(
+        customFieldsFor(custom.object).filter(f => !f.hidden && fieldApplies(f, custom.product)), initial.custom || {})}</div>` : '')
+      + `<div class="pt-3 border-t border-slateBorder flex justify-end gap-2"><button type="button" onclick="closeInsuranceForm()" class="px-3 py-1.5 border border-slate-300 rounded text-xs">Cancel</button><button type="submit" class="px-4 py-1.5 bg-slate-900 text-white rounded text-xs font-semibold">Save</button></div>`;
     form.onsubmit = async event => {
         event.preventDefault();
         const values = Object.fromEntries(new FormData(form).entries());
         ['premium','sumInsured','deductible'].forEach(k => { if (values[k] !== undefined) values[k] = Number(values[k] || 0); });
         fields.filter(f => f[2] === 'checkbox').forEach(f => values[f[0]] = form.elements[f[0]].checked);
+        if (custom) { const typed = collectCustomValues('#insurance-custom-fields'); if (Object.keys(typed).length) values.custom = typed; }
         try { await submitter(values); closeInsuranceForm(); showToast(`${title} saved`); if(['policies','renewals'].includes(currentView)) await loadInsuranceOperations(); else if(currentView==='customers') await loadCustomers(); else if(currentView==='deals') await loadDeals(); else if(currentView==='contacts') await loadContacts(); else if(currentView==='organizations') await loadOrganizations(); else if(currentView==='notifications') await loadNotifications(); else if(currentView==='leads') await loadLeads(); }
         catch (e) { showToast(e.message); }
     };
@@ -1021,7 +1025,7 @@ async function convertLeadToPolicy(id) {
 
 function editPolicy(id) {
     const p = cachedPolicies.find(x => x.id === id); if (!p) return;
-    openInsuranceForm('Edit policy', [['policyNumber','Policy number','text',false],['insurer','Insurer','text',true],['premium','Net premium','number',false],['sumInsured','Sum insured','number',false],['startDate','Start date','date',true],['expiryDate','Expiry date','date',true],['assignedTo','Owner',ownerFieldOptions(),true]], values => apiJson(`/api/policies/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(values)}), p);
+    openInsuranceForm('Edit policy', [['policyNumber','Policy number','text',false],['insurer','Insurer','text',true],['premium','Net premium','number',false],['sumInsured','Sum insured','number',false],['startDate','Start date','date',true],['expiryDate','Expiry date','date',true],['assignedTo','Owner',ownerFieldOptions(),true]], values => apiJson(`/api/policies/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(values)}), p, {object:'policy', product:p.policyType});
 }
 
 function issuePolicy(id) {
@@ -3578,12 +3582,12 @@ async function loadCustomers() {
 
 function editCustomer(id) {
     const c=(window.crmCustomers||[]).find(x=>x.id===id); if(!c)return;
-    openInsuranceForm('Edit customer profile',[['name','Customer name','text',true],['organization','Organization','text',false],['email','Email','email',false],['mobile','Mobile','text',false],['status','Status','select:Active|Inactive',true],['assignedTo','Account owner',ownerFieldOptions(),false],['city','City','text',false],['preferences','Preferences (language, best time to call…)','text',false],['gstNumber','GST number','text',false],['address','Address','textarea',false]],v=>apiJson(`/api/customers/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)}),c);
+    openInsuranceForm('Edit customer profile',[['name','Customer name','text',true],['organization','Organization','text',false],['email','Email','email',false],['mobile','Mobile','text',false],['status','Status','select:Active|Inactive',true],['assignedTo','Account owner',ownerFieldOptions(),false],['city','City','text',false],['preferences','Preferences (language, best time to call…)','text',false],['gstNumber','GST number','text',false],['address','Address','textarea',false]],v=>apiJson(`/api/customers/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)}),c,{object:'customer'});
 }
 
 function createCustomer() {
     openInsuranceForm('New customer', [['name','Customer name','text',true],['organization','Organization','text',false],['email','Email','email',false],['mobile','Mobile','text',false],['assignedTo','Account owner',ownerFieldOptions(),false],['gstNumber','GST number','text',false],['address','Address','textarea',false]],
-        values => apiJson('/api/customers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(values)}));
+        values => apiJson('/api/customers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(values)}), {}, {object:'customer'});
 }
 
 // Slide 18: one customer, one complete history — the eight blocks of the client's profile.
@@ -3599,7 +3603,7 @@ async function openCustomer360(id) {
         root.innerHTML = `<div class="flex flex-wrap justify-between gap-3"><div><h2 class="font-semibold text-base">${esc(c.name)}</h2><p class="text-xs text-slate-500">${esc(c.mobile || 'No mobile')} · ${esc(c.email || 'No email')}${c.city ? ` · ${esc(c.city)}` : ''} · owned by ${esc(c.assignedTo || 'nobody')}</p></div>
             <div class="flex gap-2">${c.leads[0] ? callButton(c.leads[0].id) : ''}<button onclick="openCalendarEventForm('Customer','${c.id}')" class="px-2.5 py-1 border rounded text-xs font-semibold">Schedule</button><button onclick="editCustomer('${c.id}')" class="px-2.5 py-1 border rounded text-xs font-semibold">Edit profile</button><button aria-label="Close customer profile" onclick="document.getElementById('customer-360').classList.add('hidden')">✕</button></div></div>
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 mt-4">
-            ${box('Basic details', null, `${row('Contact', `${esc(c.mobile || '—')}<br>${esc(c.email || '—')}`)}${row('City', esc(c.city || 'Not recorded'))}${row('Preferences', esc(c.preferences || 'None recorded'))}
+            ${box('Basic details', null, `${row('Contact', `${esc(c.mobile || '—')}<br>${esc(c.email || '—')}`)}${row('City', esc(c.city || 'Not recorded'))}${row('Preferences', esc(c.preferences || 'None recorded'))}${filledCustomFields(c, 'customer').map(f => row(esc(f.label), esc(customValueText(f, c.custom[f.key])))).join('')}
                 ${c.leads.length ? row('Came to us as', c.leads.map(l => `<button class="underline" onclick="openLeadDrawer('${l.id}')">${esc(l.product || 'Lead')}</button> · ${esc(l.source || 'source not recorded')}${l.leadDate ? ` · ${esc(formatShortDate(l.leadDate))}` : ''}`).join('<br>')) : ''}`)}
             ${box('Insurance history', c.insuranceHistory.length, c.insuranceHistory.map(h => row(`${esc(h.insurer || 'Insurer not recorded')} · ${esc(h.product || '')}`,
                 `${esc(h.source)}${h.policyNumber ? ` · ${esc(h.policyNumber)}` : ''}${h.status ? ` · ${esc(h.status)}` : ''}${h.hadClaim ? ' · had a claim' : ''}`, esc(h.expiryDate || ''))).join('') || none('No earlier policies recorded.'))}
@@ -5085,7 +5089,8 @@ async function loadCustomFields() {
     return leadCustomFields();
 }
 
-const leadCustomFields = () => customSchema.objects?.lead || [];
+const customFieldsFor = obj => customSchema.objects?.[obj] || [];
+const leadCustomFields = () => customFieldsFor('lead');
 const fieldApplies = (f, product) => !f.products?.length
     || f.products.map(p => p.toLowerCase()).includes((product || '').toLowerCase());
 const fieldTypeLabel = type => (customSchema.fieldTypes.find(t => t.type === type) || {}).label || type;
@@ -5127,34 +5132,41 @@ function customInputHtml(f, value) {
 }
 
 // Values as typed: the server reads "1,200", "yes", "a; b" and so on, and says what it can't.
-function collectLeadCustomValues() {
+function collectCustomValues(root) {
     const values = {};
-    document.querySelectorAll('#lead-custom-fields [data-custom-key]').forEach(el => {
+    document.querySelectorAll(`${root} [data-custom-key]`).forEach(el => {
         values[el.dataset.customKey] = el.dataset.customMulti
             ? [...el.querySelectorAll('input:checked')].map(box => box.value) : el.value.trim();
     });
     return values;
 }
+const collectLeadCustomValues = () => collectCustomValues('#lead-custom-fields');
 
-function renderLeadCustomFields(product) {
-    const box = document.getElementById('lead-custom-fields');
-    if (!box) return;
-    leadCustomValues = { ...leadCustomValues, ...collectLeadCustomValues() };
-    const fields = leadCustomFields().filter(f => !f.hidden && fieldApplies(f, product));
+// The fields of one record type, grouped into their sections, as form inputs.
+function customSectionsHtml(fields, values) {
     const sections = [];
     fields.forEach(f => {
         const name = f.section || 'More details';
         const group = sections.find(s => s.name === name) || (sections.push({ name, fields: [] }), sections[sections.length - 1]);
         group.fields.push(f);
     });
-    box.innerHTML = sections.map(s => `<div class="border border-slateBorder rounded-md">
+    return sections.map(s => `<div class="border border-slateBorder rounded-md">
         <div class="px-3 py-2 font-semibold text-slate-700">${esc(s.name)}</div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-3 pt-1">${s.fields.map(f => customInputHtml(f, leadCustomValues[f.key])).join('')}</div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-3 pt-1">${s.fields.map(f => customInputHtml(f, values[f.key])).join('')}</div>
     </div>`).join('');
 }
 
+function renderLeadCustomFields(product) {
+    const box = document.getElementById('lead-custom-fields');
+    if (!box) return;
+    leadCustomValues = { ...leadCustomValues, ...collectLeadCustomValues() };
+    box.innerHTML = customSectionsHtml(leadCustomFields().filter(f => !f.hidden && fieldApplies(f, product)), leadCustomValues);
+}
+
+const filledCustomFields = (record, obj) => customFieldsFor(obj).filter(f => !f.hidden && customValueText(f, (record.custom || {})[f.key]));
+
 function customFieldsSummary(lead) {
-    const filled = leadCustomFields().filter(f => !f.hidden && customValueText(f, (lead.custom || {})[f.key]));
+    const filled = filledCustomFields(lead, 'lead');
     if (!filled.length) return '';
     return `<div class="pt-2 border-t border-slate-100 grid grid-cols-2 gap-x-3 gap-y-2" data-testid="lead-custom-values">
         ${filled.map(f => detailCell(esc(f.label), customValueText(f, lead.custom[f.key]))).join('')}</div>`;
@@ -5200,6 +5212,8 @@ function customFilterParams(params) {
 // ── Settings → Custom fields ──
 const COMPATIBLE_TYPES = { text: ['text', 'long_text'], long_text: ['long_text', 'text'], choice: ['choice', 'multi_choice'] };
 let customFieldEditing = null;      // null: list; '': new field; key: editing that field
+let customFieldObject = 'lead';     // which record type the screen is editing
+const CUSTOM_OBJECT_LABELS = { lead: 'Leads', customer: 'Customers', policy: 'Policies' };
 
 function fieldKeyFromLabel(label) {
     const key = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40);
@@ -5208,15 +5222,18 @@ function fieldKeyFromLabel(label) {
 
 function renderCustomFieldsPane() {
     const pane = document.getElementById('setting-pane-content');
-    const fields = leadCustomFields();
+    const fields = customFieldsFor(customFieldObject);
     const owner = roleKey() === 'admin';
     if (customFieldEditing !== null && owner) { pane.innerHTML = customFieldForm(fields.find(f => f.key === customFieldEditing)); return; }
     pane.innerHTML = `<div class="space-y-4">
         <div class="flex items-start justify-between gap-3">
             <div><h3 class="font-semibold text-slate-900 text-sm">Custom fields</h3>
-            <p class="text-xs text-slate-500 mt-0.5">Your own details on every lead — engine CC, chassis number, a referral code — on the lead form and card, in filters, automations, imports and exports. A field you no longer need is hidden, never deleted, so its values stay.</p></div>
+            <p class="text-xs text-slate-500 mt-0.5">Your own details on leads, customers and policies — engine CC, chassis number, PAN, add-on covers — on their forms and cards and in exports; lead fields also work in filters, automations and imports. A field you no longer need is hidden, never deleted, so its values stay.</p></div>
             <button data-requires="admin" onclick="editCustomField('')" class="px-3 py-1.5 bg-slate-900 text-white rounded text-xs font-semibold shrink-0">Add field</button>
         </div>
+        <div class="flex gap-1" role="tablist" aria-label="Record type">${Object.entries(CUSTOM_OBJECT_LABELS).map(([obj, label]) =>
+            `<button role="tab" aria-selected="${obj === customFieldObject}" onclick="customFieldObject='${obj}'; renderCustomFieldsPane()"
+                class="px-2.5 py-1 rounded text-xs font-semibold ${obj === customFieldObject ? 'bg-slate-900 text-white' : 'border border-slate-300 text-slate-600'}">${label}</button>`).join('')}</div>
         <div class="space-y-2">${fields.map((f, i) => `
             <div class="flex items-center justify-between gap-3 border border-slateBorder rounded p-3 ${f.hidden ? 'opacity-60' : ''}">
                 <div class="min-w-0">
@@ -5242,7 +5259,7 @@ function customFieldForm(f) {
     const types = editing ? (COMPATIBLE_TYPES[type] || [type]) : customSchema.fieldTypes.map(t => t.type);
     const products = leadOptions.products || [];
     return `<form onsubmit="saveCustomField(event)" class="space-y-3 text-xs">
-        <h3 class="font-semibold text-slate-900 text-sm">${editing ? `Edit “${esc(f.label)}”` : 'New field'}</h3>
+        <h3 class="font-semibold text-slate-900 text-sm">${editing ? `Edit “${esc(f.label)}”` : `New ${customFieldObject} field`}</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label class="block font-medium text-slate-700">Label *<input id="cf-label" required maxlength="60" class="corp-input mt-1" value="${esc(f?.label || '')}"
                 ${editing ? '' : `oninput="document.getElementById('cf-key').value = fieldKeyFromLabel(this.value)"`}></label>
@@ -5261,9 +5278,9 @@ function customFieldForm(f) {
         <label class="block font-medium text-slate-700" data-cf-for="lookup">Links to
             <select id="cf-target" class="corp-input mt-1" ${editing ? 'disabled' : ''}>${optionsHtml(customSchema.lookupTargets || [], f?.target || '')}</select></label>
         <label class="block font-medium text-slate-700">Help text<input id="cf-help" maxlength="200" class="corp-input mt-1" value="${esc(f?.help || '')}"></label>
-        <fieldset class="block font-medium text-slate-700"><legend>Only for these products <span class="font-normal text-slate-400">— none ticked means every product</span></legend>
+        <fieldset class="block font-medium text-slate-700 ${customFieldObject === 'customer' ? 'hidden' : ''}"><legend>Only for these products <span class="font-normal text-slate-400">— none ticked means every product</span></legend>
             <div class="flex flex-wrap gap-x-3 gap-y-1 mt-1">${products.map(p => `<label class="font-normal flex items-center gap-1"><input type="checkbox" class="cf-product" value="${esc(p)}" ${(f?.products || []).includes(p) ? 'checked' : ''}> ${esc(p)}</label>`).join('')}</div></fieldset>
-        <label class="flex items-center gap-2 font-medium text-slate-700"><input id="cf-required" type="checkbox" ${f?.required ? 'checked' : ''}> Required when a lead is added</label>
+        <label class="flex items-center gap-2 font-medium text-slate-700"><input id="cf-required" type="checkbox" ${f?.required ? 'checked' : ''}> Required when one is added</label>
         <div class="flex gap-2 pt-1">
             <button class="px-4 py-2 bg-slate-900 text-white rounded font-semibold">${editing ? 'Save changes' : 'Add field'}</button>
             <button type="button" class="px-3 py-2 border border-slate-300 rounded" onclick="editCustomField(null)">Cancel</button>
@@ -5294,10 +5311,10 @@ async function saveCustomField(event) {
     if (type === 'lookup' && !customFieldEditing) body.target = val('cf-target');
     try {
         if (customFieldEditing) {
-            await apiJson(`/api/schema/fields/lead/${encodeURIComponent(customFieldEditing)}`, { method: 'PUT',
+            await apiJson(`/api/schema/fields/${customFieldObject}/${encodeURIComponent(customFieldEditing)}`, { method: 'PUT',
                 headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         } else {
-            await apiJson('/api/schema/fields/lead', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            await apiJson(`/api/schema/fields/${customFieldObject}`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ...body, key: val('cf-key') || fieldKeyFromLabel(body.label) }) });
         }
         showToast(customFieldEditing ? 'Field updated' : 'Field added');
@@ -5308,21 +5325,21 @@ async function saveCustomField(event) {
 }
 
 async function toggleCustomFieldHidden(key) {
-    const f = leadCustomFields().find(x => x.key === key);
+    const f = customFieldsFor(customFieldObject).find(x => x.key === key);
     try {
-        await apiJson(`/api/schema/fields/lead/${encodeURIComponent(key)}`, { method: 'PUT',
+        await apiJson(`/api/schema/fields/${customFieldObject}/${encodeURIComponent(key)}`, { method: 'PUT',
             headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hidden: !f.hidden }) });
         await loadCustomFields(); renderCustomFieldsPane();
     } catch (err) { showToast(err.message || 'Could not change the field.'); }
 }
 
 async function moveCustomField(key, step) {
-    const keys = leadCustomFields().map(f => f.key);
+    const keys = customFieldsFor(customFieldObject).map(f => f.key);
     const i = keys.indexOf(key), j = i + step;
     if (i < 0 || j < 0 || j >= keys.length) return;
     [keys[i], keys[j]] = [keys[j], keys[i]];
     try {
-        await apiJson('/api/schema/fields/lead/order', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        await apiJson(`/api/schema/fields/${customFieldObject}/order`, { method: 'PUT', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ keys }) });
         await loadCustomFields(); renderCustomFieldsPane();
     } catch (err) { showToast(err.message || 'Could not reorder the fields.'); }

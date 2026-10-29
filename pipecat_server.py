@@ -626,11 +626,17 @@ def _reconcile_work_notifications(db: Dict[str, Any]):
             if not record:
                 notification["archivedRelatedId"] = notification.pop(field)
 
-def update_record(collection: str, record_id: str, updates: Dict[str, Any], allowed: set, label: str):
+def update_record(collection: str, record_id: str, updates: Dict[str, Any], allowed: set, label: str,
+                  custom_object: Optional[str] = None):
+    """``custom_object`` names the record type whose custom fields an update may carry."""
     db = load_db(); item = _find_record(db.get(collection, []), record_id, label); before = dict(item)
     if "assignedTo" in item:
         require_visible(item, visible_owners(db), label)
-    changes = {k: v for k, v in updates.items() if k in allowed}; item.update(changes); item["lastModified"] = datetime.utcnow().isoformat()+"Z"
+    changes = {k: v for k, v in updates.items() if k in allowed}
+    if custom_object and "custom" in updates:
+        product = item.get(crm_schema.PRODUCT_FIELD[custom_object]) if custom_object in crm_schema.PRODUCT_FIELD else None
+        changes["custom"] = checked_custom_values(db, item.get("custom"), updates["custom"], product=product, obj=custom_object)
+    item.update(changes); item["lastModified"] = datetime.utcnow().isoformat()+"Z"
     audit(db, f"{label} Updated", label, record_id, {"before": {k:before.get(k) for k in changes}, "after":changes})
     save_db(db); return item
 

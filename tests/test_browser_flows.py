@@ -255,6 +255,28 @@ class CommercialCrmBrowserFlows(unittest.TestCase):
         for text in ("Engine CC", "650", "EV", "MA3FJEB1S00999"):
             expect(values.get_by_text(text, exact=True)).to_be_visible()
 
+    def test_customer_custom_field_on_the_form_and_customer_360(self):
+        page = self.page
+        page.goto(f"{self.base_url}/", wait_until="networkidle")
+        csrf = next(c["value"] for c in page.context.cookies() if c["name"] == "crm_csrf")
+        response = page.request.post(f"{self.base_url}/api/schema/fields/customer", headers={"X-CSRF-Token": csrf},
+                                     data={"key": "pan", "label": "PAN", "type": "text"})
+        self.assertTrue(response.ok, response.text())
+        page.reload(wait_until="networkidle")
+        page.locator("#app-sidebar").get_by_role("button", name="Customers", exact=True).click()
+        page.get_by_role("button", name="New customer", exact=True).click()
+        form = page.locator("#insurance-dynamic-form")
+        form.locator('[name="name"]').fill("Custom Field Customer")
+        form.locator('[name="mobile"]').fill("+91 98765 40088")
+        form.locator("#cf-pan").fill("ABCDE1234F")
+        form.get_by_role("button", name="Save", exact=True).click()
+        row = page.locator("tr").filter(has_text="Custom Field Customer")
+        expect(row).to_have_count(1)
+        row.get_by_role("button", name="360°", exact=True).click()
+        profile = page.locator("#customer-360")
+        expect(profile.get_by_text("PAN", exact=True)).to_be_visible()
+        expect(profile.get_by_text("ABCDE1234F", exact=True)).to_be_visible()
+
 
 if __name__ == "__main__":
     unittest.main()

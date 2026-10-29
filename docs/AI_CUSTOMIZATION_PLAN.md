@@ -185,9 +185,9 @@ Progress, 29 October 2026:
 
 Phase 1 progress, 29 October 2026: custom fields on **leads** are done end to end — Settings screen,
 lead form and card, validation on the form, edits and imports, list filter and search, automation
-conditions, export, merge. Still to do in Phase 1: the same for customers and policies (the module
-is ready: `crm_schema.ENABLED_OBJECTS`), webhook lead sources mapping to custom fields, and moving the
-old untyped `customFields` from imports into typed fields.
+conditions, export, merge. Customers and policies followed (forms, Customer 360, export), and
+webhook lead sources map payload fields to lead custom fields. Not done: converting the old untyped
+`customFields` from earlier imports into typed fields — they remain visible on the lead card as before.
 
 ### Phase 2 — Products, pipelines and layouts (≈3–4 weeks)
 

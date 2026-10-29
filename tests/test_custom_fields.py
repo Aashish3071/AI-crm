@@ -76,9 +76,15 @@ class Definitions(CustomFieldCase):
             self.assertEqual(res.status_code, 422, bad)
             self.assertIn(reason, res.json()["detail"])
 
-    def test_other_record_types_are_not_open_yet(self):
-        res = self.call(self.owner, "POST", "/api/schema/fields/policy", json=ENGINE)
+    def test_unknown_record_types_have_no_fields(self):
+        res = self.call(self.owner, "POST", "/api/schema/fields/deal", json=ENGINE)
         self.assertEqual(res.status_code, 404)
+
+    def test_customer_fields_cannot_be_limited_to_products(self):
+        res = self.call(self.owner, "POST", "/api/schema/fields/customer",
+                        json={"key": "pan", "label": "PAN", "type": "text", "products": ["Car Insurance"]})
+        self.assertEqual(res.status_code, 422)
+        self.assertIn("has no product", res.json()["detail"])
 
     def test_settings_endpoint_cannot_overwrite_definitions(self):
         self.define(ENGINE)
@@ -317,6 +323,80 @@ class ImportExportMerge(CustomFieldCase):
         res = self.call(self.owner, "POST", f"/api/leads/{keep['id']}/merge/{dupe['id']}")
         self.assertEqual(res.status_code, 200, res.text)
         self.assertEqual(self.get(keep["id"])["custom"], {"engine_cc": 150, "fuel": ["EV"]})
+
+
+class CustomersAndPolicies(CustomFieldCase):
+    def setUp(self):
+        super().setUp()
+        for obj, field in (("customer", {"key": "pan", "label": "PAN", "type": "text", "required": True}),
+                           ("customer", {"key": "vip", "label": "VIP", "type": "boolean"}),
+                           ("policy", {"key": "addons", "label": "Add-ons", "type": "multi_choice",
+                                       "options": ["Zero dep", "Roadside"], "products": ["Car Insurance"]})):
+            res = self.call(self.owner, "POST", f"/api/schema/fields/{obj}", json=field)
+            self.assertEqual(res.status_code, 200, res.text)
+
+    def customer(self, **body):
+        return self.call(self.owner, "POST", "/api/customers", json={"name": "Neha Kapoor", "mobile": "+91 90000 12121", **body})
+
+    def test_customer_fields_are_checked_and_kept(self):
+        missing = self.customer()
+        self.assertEqual(missing.status_code, 422)
+        self.assertIn("PAN is required", missing.json()["detail"])
+        made = self.customer(custom={"pan": "ABCDE1234F", "vip": "yes"})
+        self.assertEqual(made.status_code, 200, made.text)
+        cid = made.json()["id"]
+        res = self.call(self.owner, "PUT", f"/api/customers/{cid}", json={"custom": {"vip": "no"}})
+        self.assertEqual(res.json()["custom"], {"pan": "ABCDE1234F", "vip": False})
+        self.assertEqual(self.call(self.owner, "PUT", f"/api/customers/{cid}", json={"custom": {"vip": "maybe"}}).status_code, 422)
+        self.assertEqual(self.call(self.owner, "GET", f"/api/customers/{cid}").json()["custom"]["vip"], False)
+
+    def test_policy_fields_follow_the_policy_product(self):
+        cid = self.customer(custom={"pan": "ABCDE1234F"}).json()["id"]
+        body = {"customerId": cid, "customerName": "Neha Kapoor", "expiryDate": "2027-10-01"}
+        car = self.call(self.owner, "POST", "/api/policies",
+                        json={**body, "policyType": "Car Insurance", "custom": {"addons": "zero dep; roadside"}})
+        self.assertEqual(car.status_code, 200, car.text)
+        self.assertEqual(car.json()["custom"], {"addons": ["Zero dep", "Roadside"]})
+        bad = self.call(self.owner, "PUT", f"/api/policies/{car.json()['id']}", json={"custom": {"addons": "Flood"}})
+        self.assertEqual(bad.status_code, 422)
+        changed = self.call(self.owner, "PUT", f"/api/policies/{car.json()['id']}", json={"custom": {"addons": "Roadside"}})
+        self.assertEqual(changed.json()["custom"], {"addons": ["Roadside"]})
+
+    def test_exports_have_customer_and_policy_columns(self):
+        cid = self.customer(custom={"pan": "ABCDE1234F", "vip": True}).json()["id"]
+        self.call(self.owner, "POST", "/api/policies", json={"customerId": cid, "customerName": "Neha Kapoor",
+                  "expiryDate": "2027-10-01", "policyType": "Car Insurance", "custom": {"addons": ["Roadside"]}})
+        archive = zipfile.ZipFile(io.BytesIO(self.call(self.owner, "GET", "/api/export").content))
+        customer = next(csv.DictReader(io.StringIO(archive.read("customers.csv").decode("utf-8-sig"))))
+        policy = next(csv.DictReader(io.StringIO(archive.read("policies.csv").decode("utf-8-sig"))))
+        self.assertEqual((customer["PAN"], customer["VIP"], policy["Add-ons"]), ("ABCDE1234F", "Yes", "Roadside"))
+
+
+class WebhookLeads(CustomFieldCase):
+    def setUp(self):
+        super().setUp()
+        self.define(ENGINE)
+        res = self.call(self.owner, "POST", "/api/channels", json={
+            "name": "Bike form", "provider": "custom",
+            "fieldMapping": {"name": "name", "phone": "mobile", "engine": "custom.engine_cc"}})
+        self.assertEqual(res.status_code, 200, res.text)
+        self.channel = res.json()
+
+    def send(self, **payload):
+        res = self.call(self.owner, "POST", f"/api/channels/{self.channel['id']}/test", json=payload)
+        self.assertEqual(res.status_code, 200, res.text)
+        with self.company_db() as db:
+            return next(l for l in db["leads"] if l.get("name") == payload["name"]), db["channelEvents"][0]
+
+    def test_a_mapped_web_form_field_fills_the_custom_field(self):
+        lead, _ = self.send(name="Web Rider", phone="9999888001", engine="1,000")
+        self.assertEqual(lead["custom"], {"engine_cc": 1000})
+
+    def test_an_unreadable_value_never_loses_the_enquiry(self):
+        lead, event = self.send(name="Web Typo", phone="9999888002", engine="a lot")
+        self.assertNotIn("custom", lead)
+        self.assertEqual(lead["customFields"]["Engine CC"], "a lot")
+        self.assertIn("Engine CC must be a number", event["customFieldProblems"][0])
 
 
 if __name__ == "__main__":

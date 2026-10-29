@@ -30,6 +30,7 @@ class PolicyModel(BaseModel):
     status: Optional[str] = "Draft"
     issuanceStatus: Optional[str] = "Pending Documents"
     assignedTo: Optional[str] = None
+    custom: Optional[Dict[str, Any]] = None       # the company's own policy fields (crm_routes/schema.py)
 
 
 @router.post("/api/policies/{id}/issue")
@@ -73,6 +74,10 @@ def get_policies(leadId: Optional[str] = None, status: Optional[str] = None):
 def create_policy(payload: PolicyModel):
     db = core.load_db()
     item = payload.model_dump()
+    item.pop("custom", None)
+    custom = core.checked_custom_values(db, None, payload.custom, creating=True, product=payload.policyType, obj="policy")
+    if custom:
+        item["custom"] = custom
     item["assignedTo"] = payload.assignedTo or current_actor("")
     if not payload.customerId:
         raise HTTPException(status_code=422, detail="Select a customer before creating a policy")
@@ -141,11 +146,15 @@ def update_policy(id: str, updates: Dict[str, Any]):
         configured_products = db.get("settings", {}).get("crm", {}).get("insuranceProducts", [])
         if configured_products and updates["policyType"] not in configured_products:
             raise HTTPException(status_code=422, detail=f"Policy type '{updates['policyType']}' is not among configured insurance products")
-    policy.update({k: v for k, v in updates.items() if k in allowed})
+    changes = {k: v for k, v in updates.items() if k in allowed}
+    if "custom" in updates:
+        changes["custom"] = core.checked_custom_values(db, policy.get("custom"), updates["custom"],
+                                                       product=changes.get("policyType", policy.get("policyType")), obj="policy")
+    policy.update(changes)
     if "premium" in updates or "taxRate" in updates: policy.update(core.policy_financials(policy.get("premium"), updates.get("taxRate", policy.get("taxRate", 18))))
     policy["daysRemaining"] = core._days_until(policy.get("expiryDate", ""))
     policy["updatedAt"] = datetime.utcnow().isoformat() + "Z"
-    core.audit(db, "Policy Updated", "Policy", id, {k: updates[k] for k in updates if k in allowed})
+    core.audit(db, "Policy Updated", "Policy", id, changes)
     core.save_db(db)
     return policy
 

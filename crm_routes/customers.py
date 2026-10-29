@@ -43,6 +43,9 @@ def create_customer(item: Dict[str, Any]):
     customer = {k: item.get(k, "") for k in ["name", "organization", "email", "mobile", "status", "assignedTo", "address", "gstNumber"]}
     customer.update({"id": f"CUS_{uuid.uuid4().hex[:8]}", "status": customer.get("status") or "Active",
                      "createdAt": datetime.utcnow().isoformat() + "Z"})
+    custom = core.checked_custom_values(db, None, item.get("custom"), creating=True, obj="customer")
+    if custom:
+        customer["custom"] = custom
     organization = next((o for o in db.get("organizations", []) if o.get("name", "").lower() == customer.get("organization", "").lower()), None)
     if organization: customer["organizationId"] = organization["id"]
     db.setdefault("customers", []).insert(0, customer)
@@ -103,7 +106,7 @@ def get_customer(id: str):
 @router.put("/api/customers/{id}")
 def update_customer(id: str, updates: Dict[str, Any]):
     res = core.update_record("customers", id, updates, {"name","organization","email","mobile","status","assignedTo","address","gstNumber",
-                                                   "city","preferences"}, "Customer")
+                                                   "city","preferences"}, "Customer", custom_object="customer")
     if "name" in updates:
         db = core.load_db()
         new_name = updates["name"]
