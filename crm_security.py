@@ -353,7 +353,7 @@ def may_mutate_path(role: str, path: str) -> bool:
     if level == "readonly":
         return False
     admin_only = ("/api/users", "/api/settings", "/api/backups", "/api/admin", "/api/automations", "/api/commission",
-                  "/api/incentives", "/api/recognition", "/api/schema", "/api/pipeline")
+                  "/api/incentives", "/api/recognition", "/api/schema", "/api/pipeline", "/api/builder")
     if path.startswith(admin_only):
         return level == "admin"
     # /api/leads/import is the legacy bulk path; it must carry the same permission as /api/imports.
@@ -365,7 +365,7 @@ def may_mutate_path(role: str, path: str) -> bool:
 
 def may_read_path(role: str, path: str) -> bool:
     level = normalized_role(role)
-    if path.startswith(("/api/backups", "/api/admin", "/api/commission", "/api/export")):
+    if path.startswith(("/api/backups", "/api/admin", "/api/commission", "/api/export", "/api/builder")):
         return level == "admin"
     if path.startswith(("/api/leaderboard", "/api/reports")):
         return level in {"admin", "manager", "readonly"}

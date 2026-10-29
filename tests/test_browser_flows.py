@@ -300,6 +300,28 @@ class CommercialCrmBrowserFlows(unittest.TestCase):
         self.assertIn("Site Inspection", options)
         self.assertNotIn("Interested", options)
 
+    def test_customize_with_ai_previews_applies_and_undoes(self):
+        page = self.page
+        page.goto(f"{self.base_url}/", wait_until="networkidle")
+        csrf = next(c["value"] for c in page.context.cookies() if c["name"] == "crm_csrf")
+        made = page.request.post(f"{self.base_url}/api/builder/changesets", headers={"X-CSRF-Token": csrf}, data={
+            "summary": "Track the referral partner", "operations": [
+                {"op": "add_field", "params": {"object": "lead", "label": "Referral partner", "type": "text"}}]})
+        self.assertTrue(made.ok, made.text())
+        page.on("dialog", lambda dialog: dialog.accept())
+        page.locator('button[onclick="openSettingsModal()"]').click()
+        page.locator('[data-setting-tab="builder"]').click()
+        pane = page.locator("#setting-pane-content")
+        expect(pane.get_by_text("Every change can still be made under", exact=False)).to_be_visible()
+        card = pane.get_by_test_id("change-set").filter(has_text="Track the referral partner")
+        expect(card.get_by_text("Add a short text field “Referral partner” on leads", exact=True)).to_be_visible()
+        card.get_by_role("button", name="Apply", exact=True).click()
+        expect(card.get_by_text("Applied", exact=False)).to_be_visible()
+        schema = page.request.get(f"{self.base_url}/api/schema").json()
+        self.assertIn("referral_partner", [f["key"] for f in schema["objects"]["lead"]])
+        card.get_by_role("button", name="Undo", exact=True).click()
+        expect(card.get_by_text("Undone", exact=False)).to_be_visible()
+
 
 if __name__ == "__main__":
     unittest.main()

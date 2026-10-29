@@ -59,10 +59,9 @@ def used_today(company_id: str) -> int:
 
 def not_configured_reason() -> str:
     if not api_key():
-        return "No OPENROUTER_API_KEY is set, so the built-in answers are being used."
+        return "AI is switched off: no OPENROUTER_API_KEY is set."
     if not model():
-        return ("No AI_MODEL is set, so the built-in answers are being used. "
-                "Set it to an OpenRouter model id, such as one ending in ':free'.")
+        return "AI is switched off: no AI_MODEL is set. Set it to an OpenRouter model id, such as one ending in ':free'."
     return ""
 
 
@@ -112,7 +111,7 @@ async def complete(company_id: str, messages: List[Dict[str, str]], *, title: st
         return None
     if not _take_allowance(company_id):
         _fail(company_id, f"Today's AI limit for this company ({daily_limit()} requests) is used up; "
-                          "the built-in answers are being used until midnight UTC.")
+                          "AI features are off until midnight UTC.")
         return None
     base_url = (os.environ.get("AI_BASE_URL") or DEFAULT_BASE_URL).rstrip("/")
     try:

@@ -2664,13 +2664,15 @@ def checked_custom_values(db: Dict[str, Any], existing: Optional[Dict[str, Any]]
     return merged
 
 
-def custom_rule_fields(db: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
-    """Custom fields as automation-rule fields, each carrying its definition for typed matching."""
+def custom_rule_fields(db: Dict[str, Any], lead_fields: Optional[List[Dict[str, Any]]] = None) -> Dict[str, List[Dict[str, Any]]]:
+    """Custom fields as automation-rule fields, each carrying its definition for typed matching.
+    ``lead_fields`` replaces the company's own, e.g. with a change set's fields still unsaved."""
     operators = {t["type"]: t["operators"] for t in crm_schema.type_catalogue()}
+    defs = custom_field_defs(db, "lead") if lead_fields is None else lead_fields
     return {"lead": [{"field": f"custom.{d['key']}", "label": d["label"], "custom": True, "type": d["type"],
                       "operators": operators[d["type"]], "options": d.get("options", []),
                       "numeric": d["type"] in ("number", "currency"), "hidden": d.get("hidden", False),
-                      "definition": d} for d in custom_field_defs(db, "lead")]}
+                      "definition": d} for d in defs]}
 
 
 def refresh_rule_definitions(db: Dict[str, Any], obj: str, definition: Dict[str, Any]) -> None:
@@ -3401,6 +3403,7 @@ from crm_routes import calls as _calls_routes  # noqa: E402
 from crm_routes import advisor as _advisor_routes  # noqa: E402
 from crm_routes import schema as _schema_routes  # noqa: E402
 from crm_routes import pipeline as _pipeline_routes  # noqa: E402
+from crm_routes import builder as _builder_routes  # noqa: E402
 
 app.include_router(_advisor_routes.router)
 app.include_router(_calls_routes.router)
@@ -3432,3 +3435,4 @@ app.include_router(_admin_routes.router)
 app.include_router(_backups_routes.router)
 app.include_router(_schema_routes.router)
 app.include_router(_pipeline_routes.router)
+app.include_router(_builder_routes.router)

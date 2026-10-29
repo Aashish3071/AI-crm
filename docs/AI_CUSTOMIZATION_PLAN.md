@@ -213,6 +213,12 @@ fields limited to that product.
 - Evaluation set: ~50 realistic owner requests (including ambiguous and malicious ones) with expected
   change sets, run in CI against the validator so a model change can't quietly regress.
 
+Phase 3 progress, 29 October 2026: built — catalogue and checks (`crm_builder.py`), propose, hand-written
+change sets, apply and undo (`crm_routes/builder.py`), the Settings screen, an evaluation set and a
+runner. The catalogue only adds and adjusts (no deletes, retypes or removed choices), which goes
+beyond §3.3: it means a wrong proposal can never lose data. Not yet tried against a real model,
+because the AI key is deferred; run `tools/run_builder_evals.py` once one is set.
+
 ### Phase 4 — Deeper customization (≈4+ weeks, prioritise with users)
 
 - Custom objects (e.g. *Vehicle Inspection*, *Claim*) with lookups to existing records.

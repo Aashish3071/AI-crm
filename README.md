@@ -8,6 +8,17 @@ The build follows the client's own requirement document, *Insurance Telecalling 
 
 An alternative plan, [CLIENT_NON_AI_LAUNCH_PLAN.md](uat/CLIENT_NON_AI_LAUNCH_PLAN.md), proposes shipping every non-AI module before launch. It was written in a separate session and is **not** the plan being followed; it is kept for reference.
 
+### Customize with AI — 29 October 2026
+
+**Settings → Customize with AI** (owner only): describe what the business needs — "we now sell bike insurance; note the engine CC and make big bikes hot" — and the AI proposes the products, fields, stages, lead sources and automation rules to add. Each step is listed in plain words, and anything that can't be done is marked with the reason. Nothing changes until you press **Apply**, and the latest change can be **undone**.
+
+- **It can only add and adjust.** The AI can't delete anything, change a field's type or take away a choice; those stay under Custom fields and Lead stages, where their own safety checks apply. New automation rules arrive switched off.
+- **It sees your settings, never your customers.**
+- **Undo is careful.** It is refused when someone has changed the settings since, or when leads already use a field or stage it added; hiding is the safe way back then.
+- **AI is off until a key is set** (`OPENROUTER_API_KEY` and `AI_MODEL`). The screen says so and points to the settings screens.
+
+For trying a model: `tools/run_builder_evals.py` scores it against 15 realistic, vague and hostile requests.
+
 ### Your own lead stages — 29 October 2026
 
 Under **Settings → Lead stages** an owner can now shape the stages a lead moves through:

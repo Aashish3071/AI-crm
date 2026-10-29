@@ -3903,6 +3903,8 @@ async function switchSettingTab(tab) {
                         </div>`}
                 </div>
             </div>`;
+    } else if (tab === 'builder') {
+        await renderBuilderPane();
     } else if (tab === 'stages') {
         await renderStagesPane();
     } else if (tab === 'fields') {
@@ -5458,4 +5460,81 @@ function editStage(index) {
         await loadLeadOptions();
         await renderStagesPane();
     }, { label: s.label || '', name: s.name, category: s.category });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CUSTOMIZE WITH AI (Settings; crm_routes/builder.py)
+// ═══════════════════════════════════════════════════════════════════
+// The owner describes a change; the model proposes a change set; every step is shown in
+// plain words and nothing changes until it is applied. Undo takes the latest one back.
+let builderState = null;
+const CHANGE_SET_STATUS = { proposed: 'Proposed — not applied', applied: 'Applied', undone: 'Undone' };
+
+async function renderBuilderPane(focusId = null) {
+    const pane = document.getElementById('setting-pane-content');
+    builderState = await apiJson('/api/builder');
+    const ai = builderState.ai;
+    const sets = builderState.changeSets;
+    const latestApplied = sets.find(c => c.status === 'applied')?.id;
+    const focus = sets.find(c => c.id === focusId);
+    pane.innerHTML = `<div class="space-y-4 text-xs">
+        <div><h3 class="font-semibold text-slate-900 text-sm">Customize with AI</h3>
+            <p class="text-slate-500 mt-0.5">Describe what your business needs — “we now sell bike insurance; note the engine CC” — and the AI proposes the fields, stages, products and automations to add. You see every step before anything changes, and the latest change can be undone. The AI sees your settings, never your customers. It can add and adjust, but not delete: removing things stays under Custom fields and Lead stages.</p></div>
+        <div class="border rounded p-2.5 ${ai.modelConfigured ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-amber-200 bg-amber-50 text-amber-900'}">
+            ${ai.modelConfigured ? `AI is on (${esc(ai.model)}) · ${ai.usedToday} of ${ai.dailyLimit} requests used today${ai.lastError ? ` · last problem: ${esc(ai.lastError)}` : ''}`
+                : `${esc(ai.lastError || 'AI is switched off.')} Every change can still be made under <button class="underline" onclick="switchSettingTab('fields')">Custom fields</button> and <button class="underline" onclick="switchSettingTab('stages')">Lead stages</button>.`}
+        </div>
+        <form onsubmit="proposeCustomization(event)" class="space-y-2">
+            <label class="block font-medium text-slate-700">What should change?
+                <textarea id="builder-request" rows="3" maxlength="2000" class="corp-input mt-1" placeholder="e.g. Add a stage after Interested for the car inspection, and make leads over 2000cc hot" ${ai.modelConfigured ? '' : 'disabled'}></textarea></label>
+            <button id="builder-propose" class="px-4 py-2 bg-slate-900 text-white rounded font-semibold" ${ai.modelConfigured ? '' : 'disabled'}>Propose changes</button>
+        </form>
+        ${focus ? changeSetCard(focus, latestApplied) : ''}
+        ${sets.filter(c => c.id !== focusId).length ? `<div><h4 class="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Earlier changes</h4>
+            <div class="space-y-2">${sets.filter(c => c.id !== focusId).map(c => changeSetCard(c, latestApplied, true)).join('')}</div></div>` : ''}
+    </div>`;
+}
+
+function changeSetCard(c, latestApplied, compact = false) {
+    const steps = c.results.map(r => `<li class="flex gap-1.5 ${r.ok ? 'text-slate-800' : 'text-rose-700'}"><span aria-hidden="true">${r.ok ? '✓' : '✗'}</span><span>${esc(r.ok ? r.description : r.error)}</span></li>`).join('');
+    return `<div class="border border-slateBorder rounded p-3 space-y-2" data-testid="change-set">
+        <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0"><div class="font-semibold text-slate-900">${esc(c.summary || c.request || 'Change set')}</div>
+                <div class="text-[11px] text-slate-500">${esc(CHANGE_SET_STATUS[c.status] || c.status)} · ${esc(c.source === 'ai' ? 'proposed by AI' : 'written by hand')} · ${esc(formatShortDate(c.createdAt))}</div></div>
+            <div class="flex gap-1.5 shrink-0">
+                ${c.status === 'proposed' && c.ready ? `<button class="px-3 py-1.5 bg-slate-900 text-white rounded font-semibold" onclick="changeSetAction('${c.id}', 'apply')">Apply</button>` : ''}
+                ${c.status === 'applied' && c.id === latestApplied ? `<button class="px-3 py-1.5 border border-slate-300 rounded font-semibold" onclick="changeSetAction('${c.id}', 'undo')">Undo</button>` : ''}
+            </div>
+        </div>
+        ${compact && c.status !== 'proposed' ? '' : `${c.request && c.summary ? `<p class="text-slate-500">You asked: “${esc(c.request)}”</p>` : ''}
+            ${steps ? `<ul class="space-y-1">${steps}</ul>` : ''}
+            ${c.questions?.length ? `<div class="text-amber-900 bg-amber-50 border border-amber-200 rounded p-2">${c.questions.map(q => `<div>${esc(q)}</div>`).join('')}</div>` : ''}
+            ${c.status === 'proposed' && !c.ready && c.results.length ? '<p class="text-rose-700">Some steps can’t be applied. Rephrase the request, or make the change under Settings.</p>' : ''}`}
+    </div>`;
+}
+
+async function proposeCustomization(event) {
+    event.preventDefault();
+    const request = document.getElementById('builder-request').value.trim();
+    if (!request) return;
+    const button = document.getElementById('builder-propose');
+    button.disabled = true; button.textContent = 'Thinking…';
+    try {
+        const proposal = await apiJson('/api/builder/propose', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ request }) });
+        await renderBuilderPane(proposal.id);
+    } catch (err) {
+        showToast(err.message || 'The AI could not propose changes.');
+        button.disabled = false; button.textContent = 'Propose changes';
+    }
+}
+
+async function changeSetAction(id, action) {
+    if (action === 'apply' && !confirm('Apply these changes to your CRM?')) return;
+    try {
+        await apiJson(`/api/builder/changesets/${id}/${action}`, { method: 'POST' });
+        await Promise.all([loadLeadOptions(), loadCustomFields()]);
+        showToast(action === 'apply' ? 'Changes applied' : 'Changes undone');
+        await renderBuilderPane(id);
+    } catch (err) { showToast(err.message || 'Could not change the CRM.'); await renderBuilderPane(id); }
 }
